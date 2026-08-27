@@ -18,6 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE = REPO_ROOT / "candidates" / "garm-controller-app" / "candidate.json"
 SOURCE = REPO_ROOT / "candidates" / "garm-controller-app" / "ix-dev" / "community" / "garm"
 EXPECTED_SERVICES = {"garm", "garm-config-seed"}
+DUMMY_JWT_SECRET = "N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa"
+DUMMY_DATABASE_PASSPHRASE = "Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa"
 
 
 class ValidationError(RuntimeError):
@@ -253,11 +255,8 @@ def assert_render(
     configs = compose.get("configs") or {}
     initial = configs.get("garm-initial-config") or {}
     content = str(initial.get("content") or "")
-    if (
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" not in content
-        or "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" not in content
-    ):
-        raise ValidationError("dummy bootstrap configuration did not materialize as expected")
+    if DUMMY_JWT_SECRET not in content or DUMMY_DATABASE_PASSPHRASE not in content:
+        raise ValidationError("qualified dummy bootstrap configuration did not materialize as expected")
     lower = content.lower()
     if "github" in lower and "credential" in lower:
         raise ValidationError("GitHub credential material unexpectedly present in bootstrap config")
@@ -362,7 +361,7 @@ def controller_smoke(image: str, user: str, root: Path) -> None:
     state = root / "controller-state"
     state.mkdir()
     (state / "config.toml").write_text(
-        """[default]
+        f"""[default]
 enable_webhook_management = true
 
 [logging]
@@ -377,7 +376,7 @@ log_rotate_compress = true
 disable_auth = false
 
 [jwt_auth]
-secret = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+secret = "{DUMMY_JWT_SECRET}"
 time_to_live = "8760h"
 
 [apiserver]
@@ -390,7 +389,7 @@ enable = true
 
 [database]
 backend = "sqlite3"
-passphrase = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+passphrase = "{DUMMY_DATABASE_PASSPHRASE}"
 
 [database.sqlite3]
 db_file = "/etc/garm/garm.db"
