@@ -1,0 +1,63 @@
+name: Validate TrueNAS materialization
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/truenas-apps-upstream.json'
+      - 'tools/validate_truenas_materialization.py'
+      - '.github/workflows/validate-truenas-materialization.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.foundry/truenas-apps-upstream.json'
+      - 'tools/validate_truenas_materialization.py'
+      - '.github/workflows/validate-truenas-materialization.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truenas-materialization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialization-controls:
+    name: Pinned iX materialization controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify Docker Compose availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+
+      - name: Validate pinned TrueNAS materializer controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_truenas_materialization.py \
+            --evidence materialization-evidence.json
+
+      - name: Record public-safe materialization evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### TrueNAS Apps materialization control gate'
+            if [[ -f materialization-evidence.json ]]; then
+              echo '```json'
+              cat materialization-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed validation step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
