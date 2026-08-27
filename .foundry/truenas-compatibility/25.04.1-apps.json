@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "profile_id": "truenas-scale-25.04.1-apps",
+  "runtime_target": "truenas-scale-apps",
+  "truenas_version": "25.04.1",
+  "middleware": {
+    "repository": "https://github.com/truenas/middleware.git",
+    "release_ref": "release/25.04.1",
+    "commit": "74ab5a2d373be4097dece257d00e1086376333ba"
+  },
+  "source_contract": [
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/crud.py",
+      "blob_sha": "f3c4f79201c0d2340a8bc2cfbe4757448a6851ba",
+      "contains": [
+        "roles=['APPS_WRITE']",
+        "if data['custom_app']:",
+        "remove_volumes=True",
+        "options['remove_ix_volumes']",
+        "active_workloads"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/custom_app.py",
+      "blob_sha": "2bd57f59ea0c2ab76c7a4779f52a7a4d8e6457f3",
+      "contains": [
+        "compose_config = validate_payload(data, 'app_create')",
+        "update_app_config(app_name, version, compose_config, custom_app=True)",
+        "compose_action(app_name, version, 'up', force_recreate=True, remove_orphans=True)"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/compose_utils.py",
+      "blob_sha": "84029578bedfc89e5495e21107aaf6f75a6d42c1",
+      "contains": [
+        "docker compose"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/lifecycle.py",
+      "blob_sha": "f439322fda9c3fa38fa1ff2367c1e002ab4c2f70",
+      "contains": []
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/query.py",
+      "blob_sha": "bfbd96d2bd5bdd9853f753d485300911588636c1",
+      "contains": [
+        "AppState.CRASHED",
+        "AppState.DEPLOYING",
+        "AppState.RUNNING",
+        "AppState.STOPPED",
+        "'active_workloads': active_workloads",
+        "'container_details': []",
+        "'volumes': []",
+        "'networks': []"
+      ]
+    }
+  ],
+  "provider_assumptions": {
+    "app_states": ["CRASHED", "DEPLOYING", "RUNNING", "STOPPED"],
+    "active_workload_fields": ["containers", "used_ports", "container_details", "volumes", "images", "networks"],
+    "delete_semantics": {
+      "compose_volumes_removed": true,
+      "ix_volumes_removed_only_when_requested": true
+    },
+    "custom_app_create_uses_compose_up": true
+  },
+  "scope": {
+    "qualifies": [
+      "source-level Apps middleware assumptions",
+      "custom App create/delete semantics",
+      "observed Apps workload/state field contract"
+    ],
+    "does_not_qualify": [
+      "live TrueNAS JSON-RPC transport",
+      "RBAC on a deployed appliance",
+      "real middleware job timing",
+      "network/storage behavior",
+      "Containers backend",
+      "VM backend",
+      "hardware-in-loop behavior"
+    ]
+  }
+}
