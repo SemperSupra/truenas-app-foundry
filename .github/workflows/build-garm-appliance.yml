@@ -1,0 +1,212 @@
+name: Build GARM appliance
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/garm-appliance/mvp-v1.json'
+      - '.foundry/garm-appliance/upstream-v0.2.1.json'
+      - 'images/garm-appliance/**'
+      - 'tools/validate_garm_appliance.py'
+      - '.github/workflows/build-garm-appliance.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.foundry/garm-appliance/mvp-v1.json'
+      - '.foundry/garm-appliance/upstream-v0.2.1.json'
+      - 'images/garm-appliance/**'
+      - 'tools/validate_garm_appliance.py'
+      - '.github/workflows/build-garm-appliance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LOCK_FILE: .foundry/garm-appliance/mvp-v1.json
+  LOCAL_IMAGE: semper-garm-appliance:qualification
+
+jobs:
+  validate:
+    name: Build and validate appliance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Resolve exact assembly inputs
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.schema_version == 1' "$LOCK_FILE" >/dev/null
+          controller_sha="$(jq -r '.controller.sha' "$LOCK_FILE")"
+          provider_sha="$(jq -r '.truenas_provider.sha' "$LOCK_FILE")"
+          garm_version="$(jq -r '.controller.version_label' "$LOCK_FILE")"
+          stock_image="$(jq -r '.stock_provider_artifact.reference' "$LOCK_FILE")"
+          node_image="$(jq -r '.build_images.node' "$LOCK_FILE")"
+          go_image="$(jq -r '.build_images.golang' "$LOCK_FILE")"
+          tag_prefix="$(jq -r '.publication.immutable_tag_prefix' "$LOCK_FILE")"
+          alias="$(jq -r '.publication.mutable_alias' "$LOCK_FILE")"
+          [[ "$controller_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$provider_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$stock_image" == *@sha256:* ]]
+          {
+            echo "controller_sha=$controller_sha"
+            echo "provider_sha=$provider_sha"
+            echo "garm_version=$garm_version"
+            echo "stock_image=$stock_image"
+            echo "node_image=$node_image"
+            echo "go_image=$go_image"
+            echo "tag_prefix=$tag_prefix"
+            echo "alias=$alias"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build exact appliance candidate
+        shell: bash
+        env:
+          CONTROLLER_SHA: ${{ steps.lock.outputs.controller_sha }}
+          PROVIDER_SHA: ${{ steps.lock.outputs.provider_sha }}
+          GARM_VERSION: ${{ steps.lock.outputs.garm_version }}
+          STOCK_IMAGE: ${{ steps.lock.outputs.stock_image }}
+          NODE_IMAGE: ${{ steps.lock.outputs.node_image }}
+          GO_IMAGE: ${{ steps.lock.outputs.go_image }}
+        run: |
+          set -euo pipefail
+          docker build \
+            --file images/garm-appliance/Dockerfile \
+            --tag "$LOCAL_IMAGE" \
+            --build-arg "GARM_SHA=$CONTROLLER_SHA" \
+            --build-arg "GARM_VERSION=$GARM_VERSION" \
+            --build-arg "TRUENAS_PROVIDER_SHA=$PROVIDER_SHA" \
+            --build-arg "STOCK_IMAGE=$STOCK_IMAGE" \
+            --build-arg "NODE_IMAGE=$NODE_IMAGE" \
+            --build-arg "GO_IMAGE=$GO_IMAGE" \
+            --build-arg "FOUNDRY_SHA=$GITHUB_SHA" \
+            .
+
+      - name: Validate runtime inventory and source labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_garm_appliance.py \
+            --lock "$LOCK_FILE" \
+            --image "$LOCAL_IMAGE" | tee /tmp/garm-appliance-validation.txt
+          {
+            echo '### GARM appliance qualification'
+            echo '```text'
+            cat /tmp/garm-appliance-validation.txt
+            echo '```'
+            echo "- Foundry candidate: $GITHUB_SHA"
+            echo '- Runner: GitHub-hosted ubuntu-24.04'
+            echo '- TrueNAS HIL: not exercised'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish GHCR appliance
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Resolve exact assembly inputs
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "controller_sha=$(jq -r '.controller.sha' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "provider_sha=$(jq -r '.truenas_provider.sha' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "garm_version=$(jq -r '.controller.version_label' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "stock_image=$(jq -r '.stock_provider_artifact.reference' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "node_image=$(jq -r '.build_images.node' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "go_image=$(jq -r '.build_images.golang' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "tag_prefix=$(jq -r '.publication.immutable_tag_prefix' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "alias=$(jq -r '.publication.mutable_alias' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+          echo "image_repo=$(jq -r '.image.repository' "$LOCK_FILE")" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Initialize Buildx
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx create --name garm-appliance-builder --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build and publish immutable image with attestations
+        id: publish
+        shell: bash
+        env:
+          CONTROLLER_SHA: ${{ steps.lock.outputs.controller_sha }}
+          PROVIDER_SHA: ${{ steps.lock.outputs.provider_sha }}
+          GARM_VERSION: ${{ steps.lock.outputs.garm_version }}
+          STOCK_IMAGE: ${{ steps.lock.outputs.stock_image }}
+          NODE_IMAGE: ${{ steps.lock.outputs.node_image }}
+          GO_IMAGE: ${{ steps.lock.outputs.go_image }}
+          IMAGE_REPO: ${{ steps.lock.outputs.image_repo }}
+          TAG_PREFIX: ${{ steps.lock.outputs.tag_prefix }}
+          ALIAS: ${{ steps.lock.outputs.alias }}
+        run: |
+          set -euo pipefail
+          foundry_short="${GITHUB_SHA:0:12}"
+          immutable_tag="${IMAGE_REPO}:${TAG_PREFIX}-foundry-${foundry_short}"
+          alias_tag="${IMAGE_REPO}:${ALIAS}"
+          docker buildx build \
+            --platform linux/amd64 \
+            --file images/garm-appliance/Dockerfile \
+            --build-arg "GARM_SHA=$CONTROLLER_SHA" \
+            --build-arg "GARM_VERSION=$GARM_VERSION" \
+            --build-arg "TRUENAS_PROVIDER_SHA=$PROVIDER_SHA" \
+            --build-arg "STOCK_IMAGE=$STOCK_IMAGE" \
+            --build-arg "NODE_IMAGE=$NODE_IMAGE" \
+            --build-arg "GO_IMAGE=$GO_IMAGE" \
+            --build-arg "FOUNDRY_SHA=$GITHUB_SHA" \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file /tmp/build-metadata.json \
+            --tag "$immutable_tag" \
+            --tag "$alias_tag" \
+            --push \
+            .
+          digest="$(jq -r '."containerimage.digest"' /tmp/build-metadata.json)"
+          test -n "$digest"
+          test "$digest" != null
+          {
+            echo "digest=$digest"
+            echo "immutable_tag=$immutable_tag"
+            echo "alias_tag=$alias_tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Re-pull and validate published digest
+        shell: bash
+        env:
+          IMAGE_REPO: ${{ steps.lock.outputs.image_repo }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          set -euo pipefail
+          image="${IMAGE_REPO}@${DIGEST}"
+          docker pull "$image"
+          python3 tools/validate_garm_appliance.py --lock "$LOCK_FILE" --image "$image" \
+            | tee /tmp/garm-appliance-published-validation.txt
+          {
+            echo '### Published GARM appliance'
+            echo "- immutable tag: `${{ steps.publish.outputs.immutable_tag }}`"
+            echo "- alias: `${{ steps.publish.outputs.alias_tag }}`"
+            echo "- digest: `${DIGEST}`"
+            echo '- SBOM/provenance: BuildKit attestations requested'
+            echo '```text'
+            cat /tmp/garm-appliance-published-validation.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
