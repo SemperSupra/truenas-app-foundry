@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/truenas/apps.git",
+  "ref": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+  "train": "community",
+  "library_version": "2.3.4",
+  "library_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+  "controls": [
+    {
+      "app": "forgejo-runner",
+      "test_file": "basic-values.yaml",
+      "primary_service": "forgejo-runner"
+    },
+    {
+      "app": "ntfy",
+      "test_file": "basic-values.yaml",
+      "primary_service": "ntfy"
+    }
+  ]
+}
