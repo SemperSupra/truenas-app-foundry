@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/truenas/apps.git",
+  "ref": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+  "train": "community",
+  "library_version": "2.3.11",
+  "library_hash": "874636814efb275e5276ea9d709b7cd665fed42bb1d50328e853d9253a2e1229",
+  "source_evidence": "SupraCraft/minecraft-infra#147",
+  "verified_at": "2026-08-26T17:35:00Z"
+}
