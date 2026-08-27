@@ -48,6 +48,18 @@ The first consumer is the GARM + TrueNAS runner stack:
 
 Public GitHub-hosted execution is the default for this repository.
 
+## GARM controller appliance boundary
+
+The eventual TrueNAS controller package is a **general GARM appliance running on TrueNAS**, not a controller restricted to TrueNAS runner infrastructure.
+
+The packaging invariant is to preserve the exact pinned upstream GARM provider bundle and stock GARM behavior, then add `garm-provider-truenas` as an explicit extension. Users may therefore run GARM on TrueNAS while provisioning runners on TrueNAS, on upstream remote/cloud providers, or on both.
+
+For GitHub.com, GARM Runner Scale Sets are the preferred scheduling path where supported because they use GitHub message-queue/long-poll delivery and do not require an inbound `workflow_job` webhook. Webhook-driven Pools remain supported.
+
+The baseline must remain useful with GitHub Free/self-hosted runners and the Default runner group; plan-dependent custom runner groups and enterprise controls are optional capabilities rather than install prerequisites. Independent organizations retain independent credential/entity boundaries.
+
+See `docs/garm-appliance-architecture.md` and public tracking issue #9. Controller-appliance qualification is separate from TrueNAS Apps/Containers/VM runner-backend qualification.
+
 ## TrueNAS source-rendering control gate
 
 `.foundry/truenas-apps-upstream.json` pins one exact public `truenas/apps` revision and its iX library identity. `tools/validate_truenas_materialization.py` checks out that exact revision, source-renders known-good catalog controls through upstream `ci.py`, normalizes the generated Compose with Docker Compose, and verifies stable structural/security properties.
