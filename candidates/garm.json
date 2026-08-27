@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "repository": "SemperSupra/garm",
+  "sha": "982e361b57a8ce557dfba539d334ec3a93bdab4b",
+  "upstream_repository": "cloudbase/garm",
+  "purpose": "baseline public qualification before SemperSupra safety backports",
+  "execution_class": "public-hosted"
+}
