@@ -59,7 +59,7 @@ questions:
                 description: Debug
               - value: info
                 description: Info
-              - value: warning
+              - value: warn
                 description: Warning
               - value: error
                 description: Error
