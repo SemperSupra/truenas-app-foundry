@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_IMAGE=docker.io/node:24-alpine
-ARG GO_IMAGE=docker.io/golang:1.26.2-alpine
+ARG NODE_IMAGE=docker.io/node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43
+ARG GO_IMAGE=docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1
 ARG STOCK_IMAGE=ghcr.io/cloudbase/garm@sha256:5ccdc29c31084ed4f30ec85e09a57b5105cf3dcc5fa8c1aba9e68de461e7e635
 
 FROM ${NODE_IMAGE} AS webapp
