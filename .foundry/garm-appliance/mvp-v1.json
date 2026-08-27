@@ -8,7 +8,8 @@
     "repository": "https://github.com/SemperSupra/garm.git",
     "sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
     "version_label": "v0.2.1-semper.078ccc0d",
-    "qualification_run": 33097979555
+    "qualification_run": 33097979555,
+    "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names"
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
@@ -26,13 +27,21 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_sha256": "6b46d51086d4adca05dd3b826ddc9cc793cf673a9fc696391ed7ae52f4f4888e",
     "garm_provider_truenas_sha256": "b1aa1414a9db147ea109cdf2eaef01caffe5e3491341a0cbe9af2313aa58e8eb",
-    "source_run": 33098960208
+    "controller_observations": [
+      {
+        "run": 33098960208,
+        "sha256": "6b46d51086d4adca05dd3b826ddc9cc793cf673a9fc696391ed7ae52f4f4888e"
+      },
+      {
+        "run": 33099425686,
+        "sha256": "8d316d9e20d5733ecef5fc501c1bc3fa61452a50b6f4dc8c523f1e8c7d25c1ab"
+      }
+    ]
   },
   "publication": {
     "immutable_tag_prefix": "controller-078ccc0d-provider-6d203672",
     "mutable_alias": "mvp"
   },
-  "claim_boundary": "MVP controller image assembly only. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
+  "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
 }
