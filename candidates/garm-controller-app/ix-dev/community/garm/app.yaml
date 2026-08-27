@@ -1,0 +1,37 @@
+app_version: v0.2.1-semper.078ccc0d
+capabilities: []
+categories:
+- development
+- productivity
+changelog_url: https://github.com/cloudbase/garm/releases
+date_added: '2026-08-27'
+description: SemperSupra-qualified GARM controller appliance with the stock provider bundle and additive TrueNAS provider.
+home: https://github.com/cloudbase/garm
+host_mounts: []
+icon: https://raw.githubusercontent.com/cloudbase/garm/v0.2.1/doc/logo.svg
+keywords:
+- github-actions
+- runners
+- garm
+- truenas
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+- name: SemperSupra
+  url: https://github.com/SemperSupra
+name: garm
+run_as_context:
+- description: The pinned GARM BusyBox appliance currently runs as root inside the container with all Linux capabilities dropped and no-new-privileges enabled. Non-root hardening requires separate qualification.
+  gid: 0
+  group_name: root
+  uid: 0
+  user_name: root
+screenshots: []
+sources:
+- https://github.com/SemperSupra/truenas-app-foundry
+- https://github.com/SemperSupra/garm
+- https://github.com/SemperSupra/garm-provider-truenas
+- https://github.com/cloudbase/garm
+title: GARM
+train: community
+version: 1.0.0
