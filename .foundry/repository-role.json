@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "repository": "SemperSupra/truenas-app-foundry",
+  "visibility": "public",
+  "role": "public-execution-packaging-and-materialization",
+  "authoritativeForPrivatePromotion": false,
+  "authoritativePrivateRepository": "SemperSupra/truenas-app-foundry-private",
+  "defaultExecutionClass": "public-hosted",
+  "privateRepositoryReadCredentialsAllowed": false,
+  "privateTrueNASCredentialsAllowed": false,
+  "selfHostedRunnerUseAllowed": false,
+  "zones": {
+    "genericExecution": {
+      "authorship": "hand-authored-reviewed-public",
+      "allowedClasses": [
+        "github-hosted-qualification-workflows",
+        "truenas-app-rendering",
+        "catalog-validation",
+        "ordinary-public-tests",
+        "checksum-sbom-provenance-tools",
+        "public-documentation"
+      ],
+      "privateValidatorKnowledgeAllowed": false
+    },
+    "candidateState": {
+      "authorship": "generated-or-reviewed-public-safe",
+      "authoritative": false,
+      "immutableSourceIdentityRequired": true
+    }
+  },
+  "trustClaims": {
+    "establishes": [
+      "public-source-inspectability",
+      "workflow-inspectability",
+      "public-build-test-evidence",
+      "materialization-evidence"
+    ],
+    "doesNotEstablish": [
+      "private-promotion-approval",
+      "software-correctness",
+      "software-security",
+      "equivalence-to-private-validation"
+    ]
+  }
+}
