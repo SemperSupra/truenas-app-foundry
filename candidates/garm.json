@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "dd9eb09d6ffc6cfd395b93c5f886472ee918a275",
+  "sha": "afa603dc3a58924d415af48a76e5e3a0a37b29ee",
   "upstream_repository": "cloudbase/garm",
-  "upstream_issue": "cloudbase/garm#847",
-  "upstream_pr": "cloudbase/garm#850",
-  "purpose": "qualify watcher ordered-delivery/no-drop safety backport",
+  "prior_qualified_sha": "dd9eb09d6ffc6cfd395b93c5f886472ee918a275",
+  "fork_pr": "SemperSupra/garm#1",
+  "purpose": "RED qualification of v0.1.1 external-provider ListInstances regression before controller-candidate repin",
   "execution_class": "public-hosted"
 }
