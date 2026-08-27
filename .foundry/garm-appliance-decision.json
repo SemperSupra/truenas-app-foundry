@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "decision": "general-garm-appliance-on-truenas",
+  "tracking_issue": 9,
+  "controller_deployment_target": "truenas-scale-app",
+  "upstream_provider_bundle_policy": "preserve-by-default",
+  "truenas_provider_policy": "additive",
+  "github_com_preferred_scheduler": "runner-scale-set",
+  "github_pool_support": "retained",
+  "free_baseline": {
+    "self_hosted_runners": true,
+    "default_runner_group_required": true,
+    "custom_runner_groups_required": false
+  },
+  "current_truenas_runner_backend": "apps",
+  "future_truenas_runner_backends": ["containers", "vms"],
+  "claims": {
+    "controller_app_implemented": false,
+    "controller_app_hil_qualified": false,
+    "containers_backend_implemented": false,
+    "vms_backend_implemented": false
+  }
+}
