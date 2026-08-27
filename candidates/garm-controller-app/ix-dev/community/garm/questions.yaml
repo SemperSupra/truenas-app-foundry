@@ -19,6 +19,7 @@ questions:
           label: JWT Secret
           description: |
             Initial GARM JWT signing secret. It is written only when /etc/garm/config.toml does not yet exist.
+            Use a high-entropy value; GARM rejects secrets that do not meet its password-strength check.
             TrueNAS private fields mask values in the UI; they are not a zero-residue secret store.
           schema:
             type: string
@@ -26,19 +27,20 @@ questions:
             private: true
             min_length: 32
             valid_chars: '^[A-Za-z0-9_-]+$'
-            valid_chars_error: Use at least 32 characters containing only letters, numbers, underscore, and hyphen.
+            valid_chars_error: Use at least 32 high-entropy characters containing only letters, numbers, underscore, and hyphen.
         - variable: database_passphrase
           label: Database Encryption Passphrase
           description: |
-            Initial GARM database encryption passphrase. It is written only when /etc/garm/config.toml does not yet exist.
-            Do not rotate this value through the TrueNAS App form after initialization.
+            Initial GARM database encryption passphrase. GARM requires exactly 32 characters and rejects weak values.
+            It is written only when /etc/garm/config.toml does not yet exist. Do not rotate this value through the TrueNAS App form after initialization; changing it invalidates encrypted database content.
           schema:
             type: string
             required: true
             private: true
             min_length: 32
+            max_length: 32
             valid_chars: '^[A-Za-z0-9_-]+$'
-            valid_chars_error: Use at least 32 characters containing only letters, numbers, underscore, and hyphen.
+            valid_chars_error: Use exactly 32 high-entropy characters containing only letters, numbers, underscore, and hyphen.
         - variable: enable_webhook_management
           label: Enable GARM Webhook Management
           description: Enable upstream GARM webhook management for Pool-mode compatibility. Runner Scale Sets do not require inbound workflow-job webhooks.
