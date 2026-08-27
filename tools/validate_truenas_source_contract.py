@@ -101,6 +101,9 @@ def main() -> int:
     if set(assumptions.get("active_workload_fields", [])) != required_workload_fields:
         fail("active_workload_fields do not match the recorded Apps query contract")
 
+    if assumptions.get("compose_action_timeout_seconds") != 1200:
+        fail("25.04.1 Apps profile must record the observed 1200-second compose action timeout")
+
     delete_semantics = assumptions.get("delete_semantics", {})
     if delete_semantics.get("compose_volumes_removed") is not True:
         fail("profile must record Compose volume removal on app deletion")
