@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "repository": "SemperSupra/garm",
+  "sha": "dd9eb09d6ffc6cfd395b93c5f886472ee918a275",
+  "upstream_repository": "cloudbase/garm",
+  "upstream_issue": "cloudbase/garm#847",
+  "upstream_pr": "cloudbase/garm#850",
+  "purpose": "qualify watcher ordered-delivery/no-drop safety backport",
+  "execution_class": "public-hosted"
+}
