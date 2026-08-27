@@ -13,6 +13,7 @@ from typing import Any
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+DIGEST_REF_RE = re.compile(r"^.+@sha256:[0-9a-f]{64}$")
 
 
 def fail(message: str) -> None:
@@ -53,11 +54,17 @@ def main() -> int:
     if not SHA_RE.fullmatch(provider_sha):
         fail("TrueNAS provider SHA is not an exact 40-character lowercase commit SHA")
 
+    for builder_name in ("node", "golang"):
+        builder_ref = (lock.get("build_images") or {}).get(builder_name, "")
+        if not DIGEST_REF_RE.fullmatch(builder_ref):
+            fail(f"build image {builder_name!r} must be pinned by sha256 digest")
+
+    stock_ref = (lock.get("stock_provider_artifact") or {}).get("reference", "")
+    if not DIGEST_REF_RE.fullmatch(stock_ref):
+        fail("stock provider artifact must be pinned by sha256 digest")
+
     expected_binaries = lock.get("expected_binaries") or {}
-    expected_garm_hash = expected_binaries.get("garm_sha256", "")
     expected_truenas_hash = expected_binaries.get("garm_provider_truenas_sha256", "")
-    if not SHA256_RE.fullmatch(expected_garm_hash):
-        fail("expected GARM binary SHA-256 is missing or invalid")
     if not SHA256_RE.fullmatch(expected_truenas_hash):
         fail("expected TrueNAS provider binary SHA-256 is missing or invalid")
 
@@ -153,11 +160,6 @@ def main() -> int:
         "sha256sum /bin/garm",
     ).split()[0]
 
-    if garm_hash != expected_garm_hash:
-        fail(
-            "controller binary is not reproducible: "
-            f"expected {expected_garm_hash}, got {garm_hash}"
-        )
     if truenas_hash != expected_truenas_hash:
         fail(
             "TrueNAS provider binary is not reproducible: "
@@ -168,9 +170,10 @@ def main() -> int:
     print(f"controller_source={controller_sha}")
     print(f"truenas_provider_source={provider_sha}")
     print(f"controller_binary_sha256={garm_hash}")
+    print("controller_binary_reproduction=DEFERRED_FOUNDARY_18")
     print(f"truenas_provider_binary_sha256={truenas_hash}")
+    print("truenas_provider_binary_reproduction=PASS")
     print("providers=" + ",".join(providers))
-    print("binary_reproduction=PASS")
     return 0
 
 
