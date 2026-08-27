@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "purpose": "pin the actual upstream GARM controller image/provider bundle before additive TrueNAS appliance packaging",
+  "source": {
+    "repository": "https://github.com/cloudbase/garm.git",
+    "release": "v0.2.1",
+    "annotated_tag_object": "859585744a82a760af10d35b2f37b1d0a22d7948",
+    "commit": "154638445c3949c1958b01812f69d9a1e4d82684"
+  },
+  "image": {
+    "reference": "ghcr.io/cloudbase/garm:v0.2.1",
+    "platform": "linux/amd64",
+    "digest": "sha256:5ccdc29c31084ed4f30ec85e09a57b5105cf3dcc5fa8c1aba9e68de461e7e635"
+  },
+  "providers": {
+    "expected_names": [
+      "garm-provider-aws",
+      "garm-provider-azure",
+      "garm-provider-cloudstack",
+      "garm-provider-gcp",
+      "garm-provider-incus",
+      "garm-provider-k8s",
+      "garm-provider-lxd",
+      "garm-provider-openstack"
+    ],
+    "sha256": {
+      "garm-provider-aws": "2a4578be0c21485f17f2112878b17cc2542d64ce9a1d9185ac62cd980c6b2f06",
+      "garm-provider-azure": "f32482fb7538ff740df824c422d9151d67ba11ef00e193ec7eacaee7f4a97a36",
+      "garm-provider-cloudstack": "98f9e3d5eb3ae97d57a8afcdb17edf17c5f1126fb4d0964dba863fd1e88ed45d",
+      "garm-provider-gcp": "58dfb89f5d07c772938ca4e4fee9f4d02f877f9944eb56b88f6ccb8f90a357de",
+      "garm-provider-incus": "889781a60745e9f09b6956d642954c8878ff4b01d6f467657c8fe97c9dcbabd7",
+      "garm-provider-k8s": "ec9f1b358cf5d59e898cfc597bde25dec4b76dac3523d647f005511e040ae1d1",
+      "garm-provider-lxd": "8e83508e35e4e8f03d65f337d63df50222116c20dfa4d6b543ee6381a6f3049a",
+      "garm-provider-openstack": "b9a440226769786881c21c83e681f3e531e1ee15edd0d386ab374130b81d516b"
+    }
+  },
+  "known_upstream_seams": [
+    "At the pinned v0.2.1 source commit, the Dockerfile build loop builds garm-provider-linode but the final image stage does not COPY it.",
+    "At the pinned v0.2.1 source commit, garm-provider-oci is not present in the Dockerfile build/final-image provider list even though newer/current GARM provider documentation lists OCI as supported.",
+    "The preservation contract is therefore based on the actual pinned image contents, not on a current documentation table or an intermediate build-loop list."
+  ],
+  "claim_boundary": "This profile proves appliance-base byte preservation only; it does not functionally qualify any bundled provider or the controller on TrueNAS."
+}
