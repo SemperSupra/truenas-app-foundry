@@ -257,6 +257,11 @@ def assert_render(
     content = str(initial.get("content") or "")
     if DUMMY_JWT_SECRET not in content or DUMMY_DATABASE_PASSPHRASE not in content:
         raise ValidationError("qualified dummy bootstrap configuration did not materialize as expected")
+    for forbidden in ("enable_log_file", "log_file", "log_rotate_max_size", "log_rotate_backups", "log_rotate_compress"):
+        if forbidden in content:
+            raise ValidationError(f"unsupported file-logging key materialized: {forbidden}")
+    if '[logging]\nlog_level = "info"' not in content:
+        raise ValidationError("container-native logging level did not materialize as expected")
     lower = content.lower()
     if "github" in lower and "credential" in lower:
         raise ValidationError("GitHub credential material unexpectedly present in bootstrap config")
@@ -365,12 +370,7 @@ def controller_smoke(image: str, user: str, root: Path) -> None:
 enable_webhook_management = true
 
 [logging]
-enable_log_file = true
-log_file = "/etc/garm/garm.log"
 log_level = "info"
-log_rotate_max_size = 100
-log_rotate_backups = 3
-log_rotate_compress = true
 
 [metrics]
 disable_auth = false
@@ -486,6 +486,7 @@ def validate(public_pull: bool) -> dict[str, Any]:
                 "runtime_socket_allowed": False,
                 "qualified_root_runtime": True,
             },
+            "logging": "PASS:container-native/no persistent log file",
             "seed_behavior": "PASS:create-once/preserve/fail-empty",
             "controller_smoke": "PASS:wget http://127.0.0.1:8080/ui/",
             "ghcr_anonymous_pull": public_pull,
