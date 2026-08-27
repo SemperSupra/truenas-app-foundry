@@ -194,6 +194,8 @@ jobs:
         env:
           IMAGE_REPO: ${{ steps.lock.outputs.image_repo }}
           DIGEST: ${{ steps.publish.outputs.digest }}
+          IMMUTABLE_TAG: ${{ steps.publish.outputs.immutable_tag }}
+          ALIAS_TAG: ${{ steps.publish.outputs.alias_tag }}
         run: |
           set -euo pipefail
           image="${IMAGE_REPO}@${DIGEST}"
@@ -202,9 +204,9 @@ jobs:
             | tee /tmp/garm-appliance-published-validation.txt
           {
             echo '### Published GARM appliance'
-            echo "- immutable tag: `${{ steps.publish.outputs.immutable_tag }}`"
-            echo "- alias: `${{ steps.publish.outputs.alias_tag }}`"
-            echo "- digest: `${DIGEST}`"
+            printf '%s\n' "- immutable tag: ${IMMUTABLE_TAG}"
+            printf '%s\n' "- alias: ${ALIAS_TAG}"
+            printf '%s\n' "- digest: ${DIGEST}"
             echo '- SBOM/provenance: BuildKit attestations requested'
             echo '```text'
             cat /tmp/garm-appliance-published-validation.txt
