@@ -33,7 +33,8 @@
       "path": "src/middlewared/middlewared/plugins/apps/compose_utils.py",
       "blob_sha": "84029578bedfc89e5495e21107aaf6f75a6d42c1",
       "contains": [
-        "docker compose"
+        "cp = run(['docker', '--config', '/etc/docker', 'compose'] + compose_files + args, timeout=1200)",
+        "args.append('-v')"
       ]
     },
     {
@@ -59,6 +60,7 @@
   "provider_assumptions": {
     "app_states": ["CRASHED", "DEPLOYING", "RUNNING", "STOPPED"],
     "active_workload_fields": ["containers", "used_ports", "container_details", "volumes", "images", "networks"],
+    "compose_action_timeout_seconds": 1200,
     "delete_semantics": {
       "compose_volumes_removed": true,
       "ix_volumes_removed_only_when_requested": true
