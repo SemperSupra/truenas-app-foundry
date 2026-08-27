@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "purpose": "pin the actual upstream GARM controller image/provider bundle before additive TrueNAS appliance packaging",
+  "source": {
+    "repository": "https://github.com/cloudbase/garm.git",
+    "release": "v0.2.1",
+    "annotated_tag_object": "859585744a82a760af10d35b2f37b1d0a22d7948",
+    "commit": "154638445c3949c1958b01812f69d9a1e4d82684"
+  },
+  "image": {
+    "reference": "ghcr.io/cloudbase/garm:v0.2.1",
+    "platform": "linux/amd64",
+    "digest": null
+  },
+  "providers": {
+    "expected_names": [
+      "garm-provider-aws",
+      "garm-provider-azure",
+      "garm-provider-cloudstack",
+      "garm-provider-gcp",
+      "garm-provider-incus",
+      "garm-provider-k8s",
+      "garm-provider-lxd",
+      "garm-provider-openstack"
+    ],
+    "sha256": {}
+  },
+  "known_upstream_seams": [
+    "At the pinned v0.2.1 source commit, the Dockerfile build loop builds garm-provider-linode but the final image stage does not COPY it.",
+    "At the pinned v0.2.1 source commit, garm-provider-oci is not present in the Dockerfile build/final-image provider list even though newer/current GARM provider documentation lists OCI as supported.",
+    "The preservation contract is therefore based on the actual pinned image contents, not on a current documentation table or an intermediate build-loop list."
+  ],
+  "claim_boundary": "This profile proves appliance-base byte preservation only; it does not functionally qualify any bundled provider or the controller on TrueNAS."
+}
