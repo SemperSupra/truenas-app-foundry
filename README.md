@@ -17,3 +17,16 @@ The first consumer is the GARM + TrueNAS runner stack:
 - never receive credentials capable of reading private repositories or reaching a private TrueNAS host.
 
 Public GitHub-hosted execution is the default for this repository.
+
+## TrueNAS materialization control gate
+
+`.foundry/truenas-apps-upstream.json` pins one exact public `truenas/apps` revision and its iX library identity. `tools/validate_truenas_materialization.py` checks out that exact revision, renders known-good catalog controls through upstream `ci.py`, normalizes the generated Compose with Docker Compose, and verifies stable structural/security properties.
+
+The initial controls deliberately exercise different materialization shapes:
+
+- `community/forgejo-runner` proves a runner-like App with helper services, persistent data, healthcheck, and its intentional upstream Docker-socket mount;
+- `community/ntfy` proves conventional storage, permission-helper, healthcheck, and published-port materialization without a Docker socket.
+
+The GitHub-hosted workflow `.github/workflows/validate-truenas-materialization.yml` records a sanitized fingerprint of the normalized controls together with the exact upstream source/library identity.
+
+A PASS establishes only that the pinned public TrueNAS Apps materializer reproduced the expected known-good control envelopes in public CI. It does **not** establish private promotion approval, provider correctness/security, or live compatibility with a private TrueNAS host. Those remain separate private qualification and HIL gates.
