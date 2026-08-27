@@ -4,8 +4,8 @@ resources:
     memory: 4096
 
 garm:
-  jwt_secret: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-  database_passphrase: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+  jwt_secret: N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa
+  database_passphrase: Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa
   enable_webhook_management: true
   log_level: info
 
