@@ -41,6 +41,19 @@ jobs:
           python3 --version
           git --version
 
+      - name: Verify ixVolume-only source storage boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          questions='candidates/garm-controller-app/ix-dev/community/garm/questions.yaml'
+          fixture='candidates/garm-controller-app/ix-dev/community/garm/templates/test_values/basic-values.yaml'
+          grep -Eq '^ +default: ix_volume$' "$questions"
+          grep -Eq '^ +type: ix_volume$' "$fixture"
+          if grep -Eq 'value: *host_path|type: *hostpath|host_path_config|additional_storage' "$questions"; then
+            echo 'Host-path or arbitrary additional-storage option leaked into the MVP source schema.' >&2
+            exit 2
+          fi
+
       - name: Resolve exact appliance identity
         id: appliance
         shell: bash
