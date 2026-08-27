@@ -1,0 +1,84 @@
+name: Validate TrueNAS source contract
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/truenas-compatibility/**'
+      - 'tools/validate_truenas_source_contract.py'
+      - '.github/workflows/validate-truenas-source-contract.yml'
+      - 'docs/testing-strategy.md'
+  push:
+    branches: [main]
+    paths:
+      - '.foundry/truenas-compatibility/**'
+      - 'tools/validate_truenas_source_contract.py'
+      - '.github/workflows/validate-truenas-source-contract.yml'
+      - 'docs/testing-strategy.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truenas-source-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Pinned TrueNAS middleware source contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Resolve pinned middleware identity
+        id: profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          p = json.load(open('.foundry/truenas-compatibility/25.04.1-apps.json', encoding='utf-8'))
+          print(f"repository={p['middleware']['repository']}")
+          print(f"commit={p['middleware']['commit']}")
+          PY
+
+      - name: Checkout exact TrueNAS middleware source
+        shell: bash
+        env:
+          MW_REPOSITORY: ${{ steps.profile.outputs.repository }}
+          MW_COMMIT: ${{ steps.profile.outputs.commit }}
+        run: |
+          set -euo pipefail
+          rm -rf .cache/truenas-middleware
+          mkdir -p .cache/truenas-middleware
+          git -C .cache/truenas-middleware init
+          git -C .cache/truenas-middleware remote add origin "$MW_REPOSITORY"
+          git -C .cache/truenas-middleware fetch --depth=1 origin "$MW_COMMIT"
+          git -C .cache/truenas-middleware checkout --detach FETCH_HEAD
+          test "$(git -C .cache/truenas-middleware rev-parse HEAD)" = "$MW_COMMIT"
+
+      - name: Validate source-derived compatibility contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_truenas_source_contract.py \
+            --source-root .cache/truenas-middleware \
+            --evidence source-contract-evidence.json
+
+      - name: Record public-safe compatibility evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### TrueNAS middleware source-contract gate'
+            if [[ -f source-contract-evidence.json ]]; then
+              echo '```json'
+              cat source-contract-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed validation step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
