@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import pathlib
 import re
@@ -13,6 +12,7 @@ import sys
 from typing import Any
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def fail(message: str) -> None:
@@ -52,6 +52,14 @@ def main() -> int:
         fail("controller SHA is not an exact 40-character lowercase commit SHA")
     if not SHA_RE.fullmatch(provider_sha):
         fail("TrueNAS provider SHA is not an exact 40-character lowercase commit SHA")
+
+    expected_binaries = lock.get("expected_binaries") or {}
+    expected_garm_hash = expected_binaries.get("garm_sha256", "")
+    expected_truenas_hash = expected_binaries.get("garm_provider_truenas_sha256", "")
+    if not SHA256_RE.fullmatch(expected_garm_hash):
+        fail("expected GARM binary SHA-256 is missing or invalid")
+    if not SHA256_RE.fullmatch(expected_truenas_hash):
+        fail("expected TrueNAS provider binary SHA-256 is missing or invalid")
 
     profile_path = pathlib.Path(lock["stock_provider_artifact"]["profile"])
     stock = load_json(profile_path)
@@ -124,7 +132,6 @@ def main() -> int:
         if actual != expected:
             fail(f"stock provider {name} hash drift: expected {expected}, got {actual}")
 
-    # Print useful public evidence without dumping environment or config/secrets.
     truenas_hash = run(
         "docker",
         "run",
@@ -146,12 +153,24 @@ def main() -> int:
         "sha256sum /bin/garm",
     ).split()[0]
 
+    if garm_hash != expected_garm_hash:
+        fail(
+            "controller binary is not reproducible: "
+            f"expected {expected_garm_hash}, got {garm_hash}"
+        )
+    if truenas_hash != expected_truenas_hash:
+        fail(
+            "TrueNAS provider binary is not reproducible: "
+            f"expected {expected_truenas_hash}, got {truenas_hash}"
+        )
+
     print("GARM appliance validation: PASS")
     print(f"controller_source={controller_sha}")
     print(f"truenas_provider_source={provider_sha}")
     print(f"controller_binary_sha256={garm_hash}")
     print(f"truenas_provider_binary_sha256={truenas_hash}")
     print("providers=" + ",".join(providers))
+    print("binary_reproduction=PASS")
     return 0
 
 
