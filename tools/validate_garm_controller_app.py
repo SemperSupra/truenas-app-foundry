@@ -154,7 +154,16 @@ def mounts(service: dict[str, Any]) -> list[dict[str, str]]:
     return result
 
 
-def assert_security(name: str, service: dict[str, Any]) -> None:
+def normalized_user(service: dict[str, Any], name: str) -> str:
+    user = str(service.get("user") or "")
+    if user in {"0", "root"}:
+        return "0:0"
+    if user == "0:0":
+        return user
+    raise ValidationError(f"{name}: expected explicitly-qualified root runtime, got {user!r}")
+
+
+def assert_security(name: str, service: dict[str, Any]) -> str:
     if service.get("privileged"):
         raise ValidationError(f"{name}: privileged mode materialized")
     caps = {str(v).upper() for v in service.get("cap_drop") or []}
@@ -163,22 +172,24 @@ def assert_security(name: str, service: dict[str, Any]) -> None:
     opts = {str(v).lower().replace(":", "=") for v in service.get("security_opt") or []}
     if not any(v.startswith("no-new-privileges=true") for v in opts):
         raise ValidationError(f"{name}: no-new-privileges missing")
-    user = str(service.get("user") or "")
-    if user not in {"0", "0:0", "root"}:
-        raise ValidationError(f"{name}: expected explicitly-qualified root runtime, got {user!r}")
+    return normalized_user(service, name)
 
 
 def extract_seed_script(seed: dict[str, Any]) -> str:
     command = seed.get("command")
-    if isinstance(command, list):
-        parts = [str(v) for v in command]
-        if len(parts) == 2 and parts[0] == "-ec":
-            return parts[1]
-        raise ValidationError(f"garm-config-seed: unexpected command shape {parts!r}")
-    raise ValidationError(f"garm-config-seed: expected list command, got {type(command).__name__}")
+    if not isinstance(command, list):
+        raise ValidationError(
+            f"garm-config-seed: expected list command, got {type(command).__name__}"
+        )
+    parts = [str(v) for v in command]
+    if len(parts) == 2 and parts[0] == "-ec":
+        return parts[1]
+    raise ValidationError(f"garm-config-seed: unexpected command shape {parts!r}")
 
 
-def assert_render(compose: dict[str, Any], manifest: dict[str, Any]) -> tuple[str, str]:
+def assert_render(
+    compose: dict[str, Any], manifest: dict[str, Any]
+) -> tuple[str, str, str, str]:
     services = compose.get("services") or {}
     if set(services) != EXPECTED_SERVICES:
         raise ValidationError(
@@ -191,10 +202,11 @@ def assert_render(compose: dict[str, Any], manifest: dict[str, Any]) -> tuple[st
 
     controller = services["garm"]
     seed = services["garm-config-seed"]
+    users: dict[str, str] = {}
     for name, service in (("garm", controller), ("garm-config-seed", seed)):
         if service.get("image") != image:
             raise ValidationError(f"{name}: exact appliance digest mismatch: {service.get('image')!r}")
-        assert_security(name, service)
+        users[name] = assert_security(name, service)
         service_mounts = mounts(service)
         targets = [m["target"] for m in service_mounts]
         if targets != ["/etc/garm"]:
@@ -250,10 +262,10 @@ def assert_render(compose: dict[str, Any], manifest: dict[str, Any]) -> tuple[st
     if "github" in lower and "credential" in lower:
         raise ValidationError("GitHub credential material unexpectedly present in bootstrap config")
 
-    return image, seed_script
+    return image, seed_script, users["garm-config-seed"], users["garm"]
 
 
-def docker_hash(image: str, state: Path) -> str:
+def docker_hash(image: str, state: Path, user: str) -> str:
     cp = run(
         [
             "docker",
@@ -261,6 +273,8 @@ def docker_hash(image: str, state: Path) -> str:
             "--rm",
             "--network",
             "none",
+            "--user",
+            user,
             "--entrypoint",
             "/bin/sh",
             "-v",
@@ -276,7 +290,7 @@ def docker_hash(image: str, state: Path) -> str:
     return digest
 
 
-def seed_behavior(image: str, seed_script: str, root: Path) -> None:
+def seed_behavior(image: str, seed_script: str, user: str, root: Path) -> None:
     state = root / "state"
     state.mkdir()
     seed_a = root / "seed-a.toml"
@@ -292,6 +306,8 @@ def seed_behavior(image: str, seed_script: str, root: Path) -> None:
                 "--rm",
                 "--network",
                 "none",
+                "--user",
+                user,
                 "--cap-drop",
                 "ALL",
                 "--security-opt",
@@ -315,9 +331,9 @@ def seed_behavior(image: str, seed_script: str, root: Path) -> None:
             )
 
     invoke(seed_a)
-    first = docker_hash(image, state)
+    first = docker_hash(image, state, user)
     invoke(seed_b)
-    second = docker_hash(image, state)
+    second = docker_hash(image, state, user)
     if first != second:
         raise ValidationError("seed helper overwrote non-empty persistent config")
 
@@ -328,6 +344,8 @@ def seed_behavior(image: str, seed_script: str, root: Path) -> None:
             "--rm",
             "--network",
             "none",
+            "--user",
+            user,
             "--entrypoint",
             "/bin/sh",
             "-v",
@@ -340,7 +358,7 @@ def seed_behavior(image: str, seed_script: str, root: Path) -> None:
     invoke(seed_b, expected=42)
 
 
-def controller_smoke(image: str, root: Path) -> None:
+def controller_smoke(image: str, user: str, root: Path) -> None:
     state = root / "controller-state"
     state.mkdir()
     (state / "config.toml").write_text(
@@ -388,6 +406,8 @@ db_file = "/etc/garm/garm.db"
                 "-d",
                 "--name",
                 name,
+                "--user",
+                user,
                 "--cap-drop",
                 "ALL",
                 "--security-opt",
@@ -444,9 +464,9 @@ def validate(public_pull: bool) -> dict[str, Any]:
         checkout = checkout_upstream(root, manifest)
         app_dir = install_candidate(checkout, manifest)
         compose = render_candidate(checkout, app_dir)
-        image, seed_script = assert_render(compose, manifest)
-        seed_behavior(image, seed_script, root)
-        controller_smoke(image, root)
+        image, seed_script, seed_user, controller_user = assert_render(compose, manifest)
+        seed_behavior(image, seed_script, seed_user, root)
+        controller_smoke(image, controller_user, root)
         canonical = json.dumps(compose, sort_keys=True, separators=(",", ":")).encode()
         return {
             "result": "PASS",
@@ -455,6 +475,10 @@ def validate(public_pull: bool) -> dict[str, Any]:
             "materializer": manifest["source_materializer"],
             "compose_sha256": hashlib.sha256(canonical).hexdigest(),
             "services": sorted((compose.get("services") or {}).keys()),
+            "runtime_users": {
+                "garm": controller_user,
+                "garm-config-seed": seed_user,
+            },
             "security": {
                 "cap_drop_all": True,
                 "no_new_privileges": True,
