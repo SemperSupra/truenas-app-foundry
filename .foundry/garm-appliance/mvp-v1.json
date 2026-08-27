@@ -22,8 +22,13 @@
     "usage": "immutable source for the eight stock provider executables and runtime base only; its controller binary is replaced"
   },
   "build_images": {
-    "node": "docker.io/node:24-alpine",
-    "golang": "docker.io/golang:1.26.2-alpine"
+    "node": "docker.io/node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43",
+    "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
+  },
+  "expected_binaries": {
+    "garm_sha256": "6b46d51086d4adca05dd3b826ddc9cc793cf673a9fc696391ed7ae52f4f4888e",
+    "garm_provider_truenas_sha256": "b1aa1414a9db147ea109cdf2eaef01caffe5e3491341a0cbe9af2313aa58e8eb",
+    "source_run": 33098960208
   },
   "publication": {
     "immutable_tag_prefix": "controller-078ccc0d-provider-6d203672",
