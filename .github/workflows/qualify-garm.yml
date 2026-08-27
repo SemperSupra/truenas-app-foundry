@@ -1,0 +1,92 @@
+name: Qualify GARM candidate
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/garm.json'
+      - '.github/workflows/qualify-garm.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/garm.json'
+      - '.github/workflows/qualify-garm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualify-garm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: GARM public qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Validate candidate declaration
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$(jq -r '.repository' candidates/garm.json)"
+          sha="$(jq -r '.sha' candidates/garm.json)"
+          execution_class="$(jq -r '.execution_class' candidates/garm.json)"
+          test "$repo" = "SemperSupra/garm"
+          test "$execution_class" = "public-hosted"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch exact public GARM candidate
+        shell: bash
+        env:
+          GARM_REPO: ${{ steps.candidate.outputs.repo }}
+          GARM_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git init garm
+          git -C garm remote add origin "https://github.com/${GARM_REPO}.git"
+          git -C garm fetch --depth=1 origin "$GARM_SHA"
+          git -C garm checkout --detach FETCH_HEAD
+          test "$(git -C garm rev-parse HEAD)" = "$GARM_SHA"
+
+      - name: Set up Go from candidate
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: garm/go.mod
+          cache-dependency-path: garm/go.sum
+
+      - name: Install GARM test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libbtrfs-dev build-essential apg jq
+
+      - name: Run GARM Go tests
+        working-directory: garm
+        run: make go-test
+
+      - name: Build GARM and CLI
+        working-directory: garm
+        run: make build
+
+      - name: Record qualification identity
+        if: always()
+        shell: bash
+        env:
+          GARM_REPO: ${{ steps.candidate.outputs.repo }}
+          GARM_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          {
+            echo '### GARM candidate'
+            echo "- repository: $GARM_REPO"
+            echo "- sha: $GARM_SHA"
+            echo '- runner: ubuntu-24.04 (GitHub-hosted)'
+          } >> "$GITHUB_STEP_SUMMARY"
