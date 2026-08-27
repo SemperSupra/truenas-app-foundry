@@ -1,0 +1,12 @@
+images:
+  image:
+    repository: ghcr.io/sempersupra/garm-appliance@sha256
+    tag: 1b168152649033b4afefc04a98f104a9f1347f9b56e1f5d17dc71b394d19f6ef
+
+consts:
+  controller_container_name: garm
+  seed_container_name: garm-config-seed
+  config_path: /etc/garm
+  config_file: /etc/garm/config.toml
+  seed_config_path: /seed/config.toml
+  internal_http_port: 8080
