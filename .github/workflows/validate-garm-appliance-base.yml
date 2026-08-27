@@ -1,0 +1,125 @@
+name: Validate GARM appliance base
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/garm-appliance/**'
+      - 'tools/validate_garm_appliance_base.py'
+      - '.github/workflows/validate-garm-appliance-base.yml'
+      - 'docs/garm-appliance-base-gate.md'
+  push:
+    branches: [main]
+    paths:
+      - '.foundry/garm-appliance/**'
+      - 'tools/validate_garm_appliance_base.py'
+      - '.github/workflows/validate-garm-appliance-base.yml'
+      - 'docs/garm-appliance-base-gate.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: garm-appliance-base-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-bundle:
+    name: Pinned GARM image/provider bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Read appliance-base profile
+        id: profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          p = json.load(open('.foundry/garm-appliance/upstream-v0.2.1.json', encoding='utf-8'))
+          print(f"image={p['image']['reference']}")
+          print(f"platform={p['image']['platform']}")
+          print(f"pinned={'true' if p['image']['digest'] and p['providers']['sha256'] else 'false'}")
+          PY
+
+      - name: Pull exact candidate platform and resolve immutable digest
+        id: image
+        shell: bash
+        env:
+          IMAGE_REF: ${{ steps.profile.outputs.image }}
+          PLATFORM: ${{ steps.profile.outputs.platform }}
+        run: |
+          set -euo pipefail
+          docker pull --platform "$PLATFORM" "$IMAGE_REF"
+          repository="${IMAGE_REF%:*}"
+          resolved="$(docker image inspect "$IMAGE_REF" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "${repository}@sha256:" | head -n1)"
+          test -n "$resolved"
+          echo "resolved=$resolved" >> "$GITHUB_OUTPUT"
+          echo "Resolved immutable image: $resolved"
+
+      - name: Extract provider bundle without running GARM
+        shell: bash
+        env:
+          IMAGE_REF: ${{ steps.profile.outputs.image }}
+          PLATFORM: ${{ steps.profile.outputs.platform }}
+        run: |
+          set -euo pipefail
+          rm -rf .cache/garm-providers
+          mkdir -p .cache/garm-providers
+          cid="$(docker create --platform "$PLATFORM" "$IMAGE_REF")"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/garm/providers.d/." .cache/garm-providers/
+          test -n "$(find .cache/garm-providers -maxdepth 1 -type f -print -quit)"
+
+      - name: Validate and record actual provider bytes
+        shell: bash
+        env:
+          RESOLVED_IMAGE: ${{ steps.image.outputs.resolved }}
+        run: |
+          set -euo pipefail
+          python3 tools/validate_garm_appliance_base.py \
+            --profile .foundry/garm-appliance/upstream-v0.2.1.json \
+            --provider-dir .cache/garm-providers \
+            --resolved-image "$RESOLVED_IMAGE" \
+            --evidence garm-appliance-base-evidence.json
+
+      - name: Record public-safe evidence summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### GARM appliance-base provider-bundle gate'
+            if [[ -f garm-appliance-base-evidence.json ]]; then
+              echo '```json'
+              cat garm-appliance-base-evidence.json
+              echo '```'
+            else
+              echo 'No evidence file was produced; inspect the failed validation step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload provider-bundle evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: garm-appliance-base-evidence
+          path: garm-appliance-base-evidence.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Require immutable pins before PASS
+        if: always()
+        shell: bash
+        env:
+          PROFILE_PINNED: ${{ steps.profile.outputs.pinned }}
+        run: |
+          set -euo pipefail
+          if [[ "$PROFILE_PINNED" != "true" ]]; then
+            echo 'Discovery evidence was captured, but the profile is not yet immutable.' >&2
+            echo 'Pin the observed image digest and all provider SHA-256 values, then rerun.' >&2
+            exit 1
+          fi
