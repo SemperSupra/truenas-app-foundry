@@ -1,0 +1,100 @@
+name: Qualify GARM controller App
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/garm-controller-app/**'
+      - 'tools/validate_garm_controller_app.py'
+      - '.github/workflows/qualify-garm-controller-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/garm-controller-app/**'
+      - 'tools/validate_garm_controller_app.py'
+      - '.github/workflows/qualify-garm-controller-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: garm-controller-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Pinned render, seed, and controller smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+
+      - name: Resolve exact appliance identity
+        id: appliance
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(jq -r '.appliance.reference' candidates/garm-controller-app/candidate.json)"
+          test -n "$image"
+          test "$image" != null
+          case "$image" in
+            ghcr.io/sempersupra/garm-appliance@sha256:*) ;;
+            *) echo "Unexpected appliance reference: $image" >&2; exit 2 ;;
+          esac
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Check anonymous GHCR pull, then authenticate if required
+        id: pull
+        env:
+          IMAGE: ${{ steps.appliance.outputs.image }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          if docker pull "$IMAGE"; then
+            echo 'public_pull=true' >> "$GITHUB_OUTPUT"
+            echo 'Anonymous GHCR digest pull: PASS' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'public_pull=false' >> "$GITHUB_OUTPUT"
+            echo 'Anonymous GHCR digest pull: FAIL; using repository-scoped GITHUB_TOKEN for qualification.' >> "$GITHUB_STEP_SUMMARY"
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$IMAGE"
+          fi
+
+      - name: Qualify pinned TrueNAS source and exact controller image
+        env:
+          PUBLIC_PULL: ${{ steps.pull.outputs.public_pull }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_garm_controller_app.py \
+            --public-pull "$PUBLIC_PULL" \
+            --evidence garm-controller-app-evidence.json
+
+      - name: Record public-safe qualification evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### GARM native TrueNAS controller App qualification'
+            if [[ -f garm-controller-app-evidence.json ]]; then
+              echo '```json'
+              cat garm-controller-app-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed qualification step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
