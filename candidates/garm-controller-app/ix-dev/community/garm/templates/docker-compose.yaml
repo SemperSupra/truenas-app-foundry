@@ -8,11 +8,7 @@
 enable_webhook_management = {{ "true" if values.garm.enable_webhook_management else "false" }}
 
 [logging]
-log_file = "/etc/garm/garm.log"
 log_level = "{{ values.garm.log_level }}"
-log_rotate_max_size = 100
-log_rotate_backups = 3
-log_rotate_compress = true
 
 [metrics]
 disable_auth = false
