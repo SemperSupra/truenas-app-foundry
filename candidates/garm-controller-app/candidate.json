@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "candidate": "garm-controller-app",
+  "source_path": "candidates/garm-controller-app/ix-dev/community/garm",
+  "runtime_target": "TrueNAS SCALE Apps",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "appliance": {
+    "reference": "ghcr.io/sempersupra/garm-appliance@sha256:1b168152649033b4afefc04a98f104a9f1347f9b56e1f5d17dc71b394d19f6ef",
+    "controller_source": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+    "truenas_provider_source": "6d2036723b9a6a3b2add7e041cc0f10d98de3ac6",
+    "publication_run": 33100264672
+  },
+  "invariants": {
+    "persistent_path": "/etc/garm",
+    "internal_http_port": 8080,
+    "host_paths_allowed": false,
+    "container_runtime_socket_allowed": false,
+    "privileged_allowed": false,
+    "cap_drop_all": true,
+    "no_new_privileges": true,
+    "config_seed": "create-if-absent; fail if present-but-empty; never overwrite non-empty config"
+  },
+  "claim_boundary": "Source/render qualification only until a separately authorized TrueNAS HIL run proves controller lifecycle on the target NAS."
+}
