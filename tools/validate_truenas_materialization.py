@@ -277,8 +277,8 @@ def validate() -> dict[str, Any]:
             raise ValidationError(f"required tool not found: {tool}")
 
     pin = load_pin()
-    with tempfile.TemporaryDirectory(prefix="foundry-truenas-materialization-") as tmp_name:
-        root = Path(tmp_name)
+    root = Path(tempfile.mkdtemp(prefix="foundry-truenas-materialization-"))
+    try:
         checkout = checkout_upstream(root, pin)
         evidence: dict[str, Any] = {}
         for control in pin["controls"]:
@@ -289,6 +289,14 @@ def validate() -> dict[str, Any]:
             evidence[f"{pin['train']}/{app}:{control['test_file']}"] = fingerprint(
                 compose, primary_name
             )
+    finally:
+        try:
+            shutil.rmtree(root)
+        except OSError as exc:
+            # Upstream ci.py may leave rendered paths owned by a container user.
+            # Hosted runners are ephemeral; cleanup inability must not convert an
+            # otherwise-valid materialization result into a qualification failure.
+            print(f"WARNING: best-effort temporary cleanup failed: {exc}", file=sys.stderr)
 
     return {
         "result": "PASS",
