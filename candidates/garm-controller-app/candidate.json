@@ -11,10 +11,10 @@
     "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
   },
   "appliance": {
-    "reference": "ghcr.io/sempersupra/garm-appliance@sha256:1b168152649033b4afefc04a98f104a9f1347f9b56e1f5d17dc71b394d19f6ef",
+    "reference": "ghcr.io/sempersupra/garm-appliance@sha256:6e54a4c39b88266196971fc20e62d603b4d670100b827ff534edfe0cbeb6f9b0",
     "controller_source": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
     "truenas_provider_source": "6d2036723b9a6a3b2add7e041cc0f10d98de3ac6",
-    "publication_run": 33100264672
+    "publication_run": 33171118898
   },
   "invariants": {
     "persistent_path": "/etc/garm",
