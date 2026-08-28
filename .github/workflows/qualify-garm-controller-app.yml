@@ -40,6 +40,7 @@ jobs:
           docker compose version
           python3 --version
           git --version
+          sudo -n true
 
       - name: Verify fixed source-schema boundaries
         shell: bash
@@ -106,7 +107,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/validate_garm_controller_app.py \
+          # Run the host-side harness as root so its bind-mounted scratch directories
+          # model a root-owned TrueNAS ixVolume. The containers themselves still run
+          # with the rendered UID/GID, cap_drop: ALL, and no-new-privileges.
+          sudo -n python3 tools/validate_garm_controller_app.py \
             --public-pull "$PUBLIC_PULL" \
             --evidence garm-controller-app-evidence.json
 
