@@ -114,6 +114,68 @@ jobs:
             --public-pull "$PUBLIC_PULL" \
             --evidence garm-controller-app-evidence.json
 
+      - name: Capture controller startup diagnostics on qualification failure
+        if: failure()
+        env:
+          IMAGE: ${{ steps.appliance.outputs.image }}
+        shell: bash
+        run: |
+          set -u
+          state="$(mktemp -d)"
+          name="foundry-garm-diagnostic-${GITHUB_RUN_ID}"
+          cleanup() {
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            sudo rm -rf "$state"
+          }
+          trap cleanup EXIT
+
+          sudo tee "$state/config.toml" >/dev/null <<'EOF'
+          [default]
+          enable_webhook_management = true
+
+          [logging]
+          log_level = "info"
+
+          [metrics]
+          disable_auth = false
+
+          [jwt_auth]
+          secret = "N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa"
+          time_to_live = "8760h"
+
+          [apiserver]
+          bind = "0.0.0.0"
+          port = 8080
+          use_tls = false
+
+          [apiserver.webui]
+          enable = true
+
+          [database]
+          backend = "sqlite3"
+          passphrase = "Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa"
+
+          [database.sqlite3]
+          db_file = "/etc/garm/garm.db"
+          EOF
+          sudo chmod 0600 "$state/config.toml"
+          sudo chown -R root:root "$state"
+          sudo chmod 0755 "$state"
+
+          docker run -d \
+            --name "$name" \
+            --user 0:0 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            -v "$state:/etc/garm" \
+            "$IMAGE"
+          sleep 4
+
+          echo '--- docker inspect state ---'
+          docker inspect -f '{{json .State}}' "$name" || true
+          echo '--- docker logs (stdout + stderr) ---'
+          docker logs --tail 120 "$name" 2>&1 || true
+
       - name: Record public-safe qualification evidence
         if: always()
         shell: bash
