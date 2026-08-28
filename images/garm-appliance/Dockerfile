@@ -57,4 +57,4 @@ LABEL org.opencontainers.image.source="https://github.com/SemperSupra/truenas-ap
 COPY --from=builder /out/garm /bin/garm
 COPY --from=builder /out/garm-cli /bin/garm-cli
 COPY --from=builder /out/garm-provider-truenas /opt/garm/providers.d/garm-provider-truenas
-ENTRYPOINT ["/bin/garm", "-config", "/etc/garm/config.toml"]
+ENTRYPOINT ["/bin/garm", "--config", "/etc/garm/config.toml"]
