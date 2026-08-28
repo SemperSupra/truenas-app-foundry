@@ -1,0 +1,55 @@
+{% set tpl = ix_lib.base.render.Render(values) %}
+
+{% set seed = tpl.add_container(values.consts.seed_container_name, "image") %}
+{% set controller = tpl.add_container(values.consts.controller_container_name, "image") %}
+
+{% set initial_config %}
+[default]
+enable_webhook_management = {{ "true" if values.garm.enable_webhook_management else "false" }}
+
+[logging]
+log_level = "{{ values.garm.log_level }}"
+
+[metrics]
+disable_auth = false
+
+[jwt_auth]
+secret = "{{ values.garm.jwt_secret }}"
+time_to_live = "8760h"
+
+[apiserver]
+bind = "0.0.0.0"
+port = {{ values.consts.internal_http_port }}
+use_tls = false
+
+[apiserver.webui]
+enable = true
+
+[database]
+backend = "sqlite3"
+passphrase = "{{ values.garm.database_passphrase }}"
+
+[database.sqlite3]
+db_file = "/etc/garm/garm.db"
+{% endset %}
+
+{% set seed_script = "set -eu; if [ -e /etc/garm/config.toml ]; then if [ ! -s /etc/garm/config.toml ]; then echo 'existing /etc/garm/config.toml is empty; refusing to regenerate persistent controller secrets' >&2; exit 42; fi; exit 0; fi; umask 077; cp /seed/config.toml /etc/garm/config.toml; test -s /etc/garm/config.toml" %}
+
+{% do seed.set_user(0, 0) %}
+{% do seed.set_entrypoint(["/bin/sh"]) %}
+{% do seed.set_command(["-ec", seed_script]) %}
+{% do seed.setup_as_helper("low", true) %}
+{% do seed.add_storage(values.consts.config_path, values.storage.config) %}
+{% do seed.configs.add("garm-initial-config", initial_config, values.consts.seed_config_path, "0400") %}
+
+{% do controller.set_user(0, 0) %}
+{% do controller.add_storage(values.consts.config_path, values.storage.config) %}
+{% do controller.add_port(values.network.http_port) %}
+{% do controller.depends.add_dependency(values.consts.seed_container_name, "service_completed_successfully") %}
+{% do controller.healthcheck.set_test("wget", {"port": values.consts.internal_http_port, "path": "/ui/", "busybox": true, "spider": false}) %}
+{% do controller.healthcheck.set_start_period(30) %}
+{% do controller.healthcheck.set_retries(10) %}
+
+{% do tpl.portals.add(values.network.http_port, {"name": "GARM WebUI", "scheme": "http"}) %}
+
+{{ tpl.render() | tojson }}

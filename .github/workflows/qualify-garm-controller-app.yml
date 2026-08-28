@@ -1,0 +1,192 @@
+name: Qualify GARM controller App
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/garm-controller-app/**'
+      - 'tools/validate_garm_controller_app.py'
+      - '.github/workflows/qualify-garm-controller-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/garm-controller-app/**'
+      - 'tools/validate_garm_controller_app.py'
+      - '.github/workflows/qualify-garm-controller-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: garm-controller-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Pinned render, seed, and controller smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+          sudo -n true
+
+      - name: Verify fixed source-schema boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          questions='candidates/garm-controller-app/ix-dev/community/garm/questions.yaml'
+          fixture='candidates/garm-controller-app/ix-dev/community/garm/templates/test_values/basic-values.yaml'
+
+          # Storage remains TrueNAS-managed ixVolume only.
+          grep -Eq '^ +default: ix_volume$' "$questions"
+          grep -Eq '^ +type: ix_volume$' "$fixture"
+          if grep -Eq 'value: *host_path|type: *hostpath|host_path_config|additional_storage' "$questions"; then
+            echo 'Host-path or arbitrary additional-storage option leaked into the MVP source schema.' >&2
+            exit 2
+          fi
+
+          # Pinned GARM config accepts "warn", not "warning".
+          grep -Eq '^ +- value: warn$' "$questions"
+          if grep -Eq '^ +- value: warning$' "$questions"; then
+            echo 'Invalid GARM log level "warning" leaked into the source schema.' >&2
+            exit 2
+          fi
+
+          # Pinned GARM requires its database encryption passphrase to be exactly 32 characters.
+          grep -Eq '^ +min_length: 32$' "$questions"
+          grep -Eq '^ +max_length: 32$' "$questions"
+
+      - name: Resolve exact appliance identity
+        id: appliance
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(jq -r '.appliance.reference' candidates/garm-controller-app/candidate.json)"
+          test -n "$image"
+          test "$image" != null
+          case "$image" in
+            ghcr.io/sempersupra/garm-appliance@sha256:*) ;;
+            *) echo "Unexpected appliance reference: $image" >&2; exit 2 ;;
+          esac
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Check anonymous GHCR pull, then authenticate if required
+        id: pull
+        env:
+          IMAGE: ${{ steps.appliance.outputs.image }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          if docker pull "$IMAGE"; then
+            echo 'public_pull=true' >> "$GITHUB_OUTPUT"
+            echo 'Anonymous GHCR digest pull: PASS' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'public_pull=false' >> "$GITHUB_OUTPUT"
+            echo 'Anonymous GHCR digest pull: FAIL; using repository-scoped GITHUB_TOKEN for qualification.' >> "$GITHUB_STEP_SUMMARY"
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$IMAGE"
+          fi
+
+      - name: Qualify pinned TrueNAS source and exact controller image
+        env:
+          PUBLIC_PULL: ${{ steps.pull.outputs.public_pull }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run the host-side harness as root so its bind-mounted scratch directories
+          # model a root-owned TrueNAS ixVolume. The containers themselves still run
+          # with the rendered UID/GID, cap_drop: ALL, and no-new-privileges.
+          sudo -n python3 tools/validate_garm_controller_app.py \
+            --public-pull "$PUBLIC_PULL" \
+            --evidence garm-controller-app-evidence.json
+
+      - name: Capture controller startup diagnostics on qualification failure
+        if: failure()
+        env:
+          IMAGE: ${{ steps.appliance.outputs.image }}
+        shell: bash
+        run: |
+          set -u
+          state="$(mktemp -d)"
+          name="foundry-garm-diagnostic-${GITHUB_RUN_ID}"
+          cleanup() {
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            sudo rm -rf "$state"
+          }
+          trap cleanup EXIT
+
+          sudo tee "$state/config.toml" >/dev/null <<'EOF'
+          [default]
+          enable_webhook_management = true
+
+          [logging]
+          log_level = "info"
+
+          [metrics]
+          disable_auth = false
+
+          [jwt_auth]
+          secret = "N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa"
+          time_to_live = "8760h"
+
+          [apiserver]
+          bind = "0.0.0.0"
+          port = 8080
+          use_tls = false
+
+          [apiserver.webui]
+          enable = true
+
+          [database]
+          backend = "sqlite3"
+          passphrase = "Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa"
+
+          [database.sqlite3]
+          db_file = "/etc/garm/garm.db"
+          EOF
+          sudo chmod 0600 "$state/config.toml"
+          sudo chown -R root:root "$state"
+          sudo chmod 0755 "$state"
+
+          docker run -d \
+            --name "$name" \
+            --user 0:0 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            -v "$state:/etc/garm" \
+            "$IMAGE"
+          sleep 4
+
+          echo '--- docker inspect state ---'
+          docker inspect -f '{{json .State}}' "$name" || true
+          echo '--- docker logs (stdout + stderr) ---'
+          docker logs --tail 120 "$name" 2>&1 || true
+
+      - name: Record public-safe qualification evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### GARM native TrueNAS controller App qualification'
+            if [[ -f garm-controller-app-evidence.json ]]; then
+              echo '```json'
+              cat garm-controller-app-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed qualification step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
