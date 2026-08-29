@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a release-pinned TrueNAS middleware source contract.
+"""Validate a release-pinned TrueNAS middleware source/materialization contract.
 
 This intentionally does not emulate TrueNAS. It verifies that an exact upstream
 checkout still contains the source identities and semantics recorded by a
@@ -30,11 +30,59 @@ def fail(message: str) -> None:
     raise SystemExit(f"source-contract validation failed: {message}")
 
 
+def validate_materialization_profile(profile: dict) -> dict:
+    features = profile.get("platform_features")
+    if not isinstance(features, dict):
+        fail("schema v2 profile must define platform_features")
+
+    required = {
+        "definitions/certificate",
+        "normalize/ix_volume",
+        "normalize/acl",
+        "definitions/node_bind_ip",
+        "definitions/certificate_authority",
+        "definitions/gpu_configuration",
+    }
+    missing = required - set(features)
+    if missing:
+        fail(f"materialization feature matrix missing {sorted(missing)!r}")
+
+    certificate = features["definitions/certificate"]
+    if certificate.get("mvp_status") != "supported":
+        fail("certificate normalization must be explicitly supported for the MVP")
+    if certificate.get("resolver_method") != "certificate.get_instance":
+        fail("certificate resolver must match middleware certificate.get_instance")
+    if certificate.get("reserved_target") != "ix_certificates":
+        fail("certificate resolver must target ix_certificates")
+    if "post-render-lifecycle-shim" not in certificate.get("parity_class", []):
+        fail("certificate feature must record the Custom App lifecycle shim")
+
+    volume = features["normalize/ix_volume"]
+    if volume.get("mvp_status") != "supported" or volume.get("reserved_target") != "ix_volumes":
+        fail("ixVolume normalization must be an explicit MVP-supported ix_volumes feature")
+
+    policies = profile.get("policies", {})
+    if policies.get("unknown_active_ref") != "fail-closed":
+        fail("materialization profile must fail closed on unknown active refs")
+    if policies.get("desired_state_authority") != "foundry":
+        fail("Foundry must remain desired-state authority")
+    if policies.get("private_material_in_public_evidence") != "prohibited":
+        fail("public evidence policy must prohibit private material")
+
+    return {
+        name: {
+            "mvp_status": value.get("mvp_status"),
+            "parity_class": value.get("parity_class", []),
+        }
+        for name, value in sorted(features.items())
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--profile",
-        default=".foundry/truenas-compatibility/25.04.1-apps.json",
+        default=".foundry/truenas-compatibility/25.04.2.6-materialization.json",
     )
     parser.add_argument("--source-root", required=True)
     parser.add_argument("--evidence", default="source-contract-evidence.json")
@@ -44,7 +92,8 @@ def main() -> int:
     source_root = Path(args.source_root)
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
 
-    if profile.get("schema_version") != 1:
+    schema_version = profile.get("schema_version")
+    if schema_version not in {1, 2}:
         fail("unsupported profile schema_version")
 
     middleware = profile.get("middleware", {})
@@ -102,13 +151,15 @@ def main() -> int:
         fail("active_workload_fields do not match the recorded Apps query contract")
 
     if assumptions.get("compose_action_timeout_seconds") != 1200:
-        fail("25.04.1 Apps profile must record the observed 1200-second compose action timeout")
+        fail("Apps profile must record the observed 1200-second compose action timeout")
 
     delete_semantics = assumptions.get("delete_semantics", {})
     if delete_semantics.get("compose_volumes_removed") is not True:
         fail("profile must record Compose volume removal on app deletion")
     if delete_semantics.get("ix_volumes_removed_only_when_requested") is not True:
         fail("profile must record conditional ixVolume dataset deletion")
+
+    feature_summary = validate_materialization_profile(profile) if schema_version >= 2 else None
 
     evidence = {
         "status": "PASS",
@@ -120,6 +171,7 @@ def main() -> int:
         "middleware_commit": actual_commit,
         "checked_files": checked_files,
         "provider_assumptions": assumptions,
+        "platform_features": feature_summary,
         "scope": profile.get("scope", {}),
     }
     Path(args.evidence).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")

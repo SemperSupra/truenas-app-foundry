@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "model": "foundry-garm-truenas-runner-system",
+  "principles": [
+    "one authority per concern",
+    "observe authoritative state instead of creating duplicate state",
+    "use supported APIs and contracts",
+    "unknown compatibility or runtime states fail closed",
+    "read-only discovery never authorizes mutation",
+    "site secrets remain local and are excluded from sanitized evidence",
+    "qualification claims require evidence from the layer being claimed"
+  ],
+  "components": {
+    "app_author": {
+      "role": "source_intent_authority",
+      "owns": ["catalog_source", "input_values", "workflow_intent"],
+      "must_not_own": ["runtime_reconciliation", "host_resource_enforcement"]
+    },
+    "foundry": {
+      "role": "catalog_compiler_materializer",
+      "owns": [
+        "compatibility_profiles",
+        "source_validation",
+        "catalog_normalization",
+        "native_reference_resolution_contract",
+        "pinned_renderer_invocation",
+        "dependency_fingerprints",
+        "desired_state_planning",
+        "materialization_parity_tests"
+      ],
+      "must_not_own": [
+        "github_runner_scheduling",
+        "truenas_runtime_internals",
+        "site_credentials",
+        "github_job_dispatch"
+      ]
+    },
+    "private_operator_hil": {
+      "role": "site_authority_and_qualification_adapter",
+      "owns": [
+        "site_specific_resolution",
+        "explicit_mutation_authorization",
+        "secret_local_adapters",
+        "read_only_discovery",
+        "hil_orchestration",
+        "cross_layer_performance_correlation",
+        "evidence_redaction",
+        "sanitized_evidence_publication"
+      ],
+      "must_not_own": ["component_redesign_during_qualification", "silent_gate_relaxation"]
+    },
+    "truenas": {
+      "role": "host_runtime_authority",
+      "owns": [
+        "native_certificates_and_acme",
+        "datasets_and_storage_objects",
+        "apps_runtime",
+        "resource_enforcement",
+        "runtime_state",
+        "reporting_netdata",
+        "middleware_api_semantics"
+      ],
+      "must_not_be_bypassed_by": ["docker_socket", "containerd_internals", "host_shell_runtime_control"]
+    },
+    "garm": {
+      "role": "runner_control_plane",
+      "owns": [
+        "github_entity_credentials",
+        "pools_and_scalesets",
+        "desired_runner_capacity",
+        "jit_metadata_contract",
+        "runner_callbacks",
+        "runner_and_job_orchestration_state",
+        "orchestration_metrics"
+      ],
+      "delegates": {"runner_runtime_realization": "garm_provider_truenas"},
+      "must_not_own": ["truenas_runtime_implementation", "github_job_execution"]
+    },
+    "garm_provider_truenas": {
+      "role": "truenas_runtime_realization_adapter",
+      "owns": [
+        "qualified_execution_profile_validation",
+        "provider_owned_identity",
+        "truenas_api_runtime_operations",
+        "state_translation",
+        "fail_closed_reconciliation",
+        "safe_retirement"
+      ],
+      "must_not_own": [
+        "independent_runner_scheduling",
+        "github_job_execution",
+        "acme_lifecycle",
+        "general_foundry_materialization"
+      ]
+    },
+    "ephemeral_runner": {
+      "role": "one_job_execution_environment",
+      "owns": [
+        "runner_payload_verification",
+        "jit_credential_retrieval",
+        "outbound_github_connection",
+        "workflow_execution",
+        "bootstrap_status_callbacks",
+        "local_jit_credential_cleanup"
+      ],
+      "constraints": ["one_job", "no_docker_socket", "no_host_paths", "no_persistent_worktree"]
+    },
+    "github_actions": {
+      "role": "job_queue_and_dispatch_authority",
+      "owns": ["workflow_job_queue", "job_dispatch", "runner_registration_service"],
+      "connectivity": "runner_and_garm_outbound_https; no inbound truenas connection required for scalesets"
+    }
+  },
+  "concerns": {
+    "catalog_materialization": {
+      "accountable": "foundry",
+      "responsible": ["foundry"],
+      "consulted": ["truenas"],
+      "informed": ["private_operator_hil"]
+    },
+    "site_mutation_authorization": {
+      "accountable": "private_operator_hil",
+      "responsible": ["private_operator_hil"]
+    },
+    "desired_runner_capacity": {
+      "accountable": "garm",
+      "responsible": ["garm"],
+      "consulted": ["github_actions", "garm_provider_truenas"]
+    },
+    "runner_runtime_realization": {
+      "accountable": "garm",
+      "responsible": ["garm_provider_truenas", "truenas"],
+      "consulted": ["garm"]
+    },
+    "workflow_dispatch": {
+      "accountable": "github_actions",
+      "responsible": ["github_actions"]
+    },
+    "workflow_execution": {
+      "accountable": "github_actions",
+      "responsible": ["ephemeral_runner"]
+    },
+    "resource_measurement": {
+      "accountable": "truenas",
+      "responsible": ["truenas"],
+      "source": "reporting.netdata_graphs/reporting.netdata_graph where supported"
+    },
+    "orchestration_measurement": {
+      "accountable": "garm",
+      "responsible": ["garm"],
+      "source": "GARM Prometheus/job/runner/scale-set state"
+    },
+    "performance_correlation": {
+      "accountable": "private_operator_hil",
+      "responsible": ["private_operator_hil"],
+      "consulted": ["truenas", "garm", "garm_provider_truenas", "ephemeral_runner", "github_actions"],
+      "rule": "add only missing lifecycle timestamps; do not duplicate existing resource or orchestration measurement"
+    },
+    "runner_retirement": {
+      "accountable": "garm",
+      "responsible": ["garm_provider_truenas", "truenas"],
+      "safety_preconditions": ["provider_ownership_proven", "runtime_inactive_proven", "state_understood"]
+    },
+    "qualification_claims": {
+      "accountable": "private_operator_hil",
+      "responsible": ["private_operator_hil"],
+      "rule": "source inspection and public CI cannot claim live TrueNAS/GitHub behavior"
+    }
+  },
+  "flows": {
+    "materialization": [
+      "catalog_source_and_values",
+      "compatibility_gate",
+      "native_reference_resolution",
+      "normalized_ix_values",
+      "pinned_truenas_apps_renderer",
+      "canonical_compose_and_dependency_identity",
+      "supported_truenas_apps_api",
+      "runtime_readback",
+      "semantic_reconciliation"
+    ],
+    "runner_lifecycle": [
+      "github_queue",
+      "garm_desired_capacity",
+      "provider_create_instance",
+      "truenas_custom_app",
+      "runner_bootstrap",
+      "garm_jit_metadata",
+      "github_runner_registration",
+      "one_job",
+      "runner_exit_and_local_cleanup",
+      "garm_retirement_request",
+      "provider_owned_inactive_proof",
+      "truenas_app_delete"
+    ]
+  },
+  "telemetry": {
+    "reuse": {
+      "truenas": ["cpu", "memory", "network", "disk_or_block_io", "available_cgroup_or_container_graphs"],
+      "garm": ["desired_runner_count", "runner_state", "job_state", "provider_operation_attempts", "provider_operation_errors"],
+      "github": ["job_queue_start_completion_timestamps"],
+      "runner_bootstrap": ["download", "jit_metadata", "ready_status_milestones"]
+    },
+    "add_only_if_missing": [
+      "provider_operation_elapsed_time",
+      "truenas_create_to_bootstrap_start",
+      "retirement_elapsed_time",
+      "cross_source_correlation_ids_or_timestamps"
+    ],
+    "derived_metrics": [
+      "cold_start_seconds",
+      "provider_create_seconds",
+      "runner_download_seconds",
+      "jit_bootstrap_seconds",
+      "github_queue_to_job_start_seconds",
+      "job_duration_seconds",
+      "retirement_seconds",
+      "cpu_mean_and_peak",
+      "memory_mean_and_peak",
+      "network_and_block_io_when_available"
+    ]
+  }
+}

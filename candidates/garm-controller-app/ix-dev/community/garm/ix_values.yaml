@@ -9,4 +9,6 @@ consts:
   config_path: /etc/garm
   config_file: /etc/garm/config.toml
   seed_config_path: /seed/config.toml
-  internal_http_port: 8080
+  tls_certificate_path: /garm-tls.crt
+  tls_private_key_path: /garm-tls.key
+  internal_https_port: 8080

@@ -5,14 +5,20 @@ on:
     paths:
       - '.foundry/truenas-compatibility/**'
       - 'tools/validate_truenas_source_contract.py'
+      - 'tools/prepare_truenas_platform_values.py'
+      - 'tools/test_prepare_truenas_platform_values.py'
       - '.github/workflows/validate-truenas-source-contract.yml'
+      - 'docs/catalog-materialization-parity.md'
       - 'docs/testing-strategy.md'
   push:
     branches: [main]
     paths:
       - '.foundry/truenas-compatibility/**'
       - 'tools/validate_truenas_source_contract.py'
+      - 'tools/prepare_truenas_platform_values.py'
+      - 'tools/test_prepare_truenas_platform_values.py'
       - '.github/workflows/validate-truenas-source-contract.yml'
+      - 'docs/catalog-materialization-parity.md'
       - 'docs/testing-strategy.md'
   workflow_dispatch:
 
@@ -25,7 +31,7 @@ concurrency:
 
 jobs:
   source-contract:
-    name: Pinned TrueNAS middleware source contract
+    name: Pinned TrueNAS middleware materialization contract
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -40,7 +46,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json
-          p = json.load(open('.foundry/truenas-compatibility/25.04.1-apps.json', encoding='utf-8'))
+          p = json.load(open('.foundry/truenas-compatibility/25.04.2.6-materialization.json', encoding='utf-8'))
           print(f"repository={p['middleware']['repository']}")
           print(f"commit={p['middleware']['commit']}")
           PY
@@ -68,12 +74,20 @@ jobs:
             --source-root .cache/truenas-middleware \
             --evidence source-contract-evidence.json
 
+      - name: Install platform-resolver test dependency
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+
+      - name: Test fail-closed platform value resolution
+        shell: bash
+        run: python3 tools/test_prepare_truenas_platform_values.py
+
       - name: Record public-safe compatibility evidence
         if: always()
         shell: bash
         run: |
           {
-            echo '### TrueNAS middleware source-contract gate'
+            echo '### TrueNAS middleware materialization-contract gate'
             if [[ -f source-contract-evidence.json ]]; then
               echo '```json'
               cat source-contract-evidence.json

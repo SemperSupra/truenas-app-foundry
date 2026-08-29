@@ -2,6 +2,7 @@
 
 {% set seed = tpl.add_container(values.consts.seed_container_name, "image") %}
 {% set controller = tpl.add_container(values.consts.controller_container_name, "image") %}
+{% set certificate = values.ix_certificates[values.network.certificate_id] %}
 
 {% set initial_config %}
 [default]
@@ -19,8 +20,12 @@ time_to_live = "8760h"
 
 [apiserver]
 bind = "0.0.0.0"
-port = {{ values.consts.internal_http_port }}
-use_tls = false
+port = {{ values.consts.internal_https_port }}
+use_tls = true
+
+[apiserver.tls]
+certificate = "{{ values.consts.tls_certificate_path }}"
+key = "{{ values.consts.tls_private_key_path }}"
 
 [apiserver.webui]
 enable = true
@@ -44,12 +49,15 @@ db_file = "/etc/garm/garm.db"
 
 {% do controller.set_user(0, 0) %}
 {% do controller.add_storage(values.consts.config_path, values.storage.config) %}
-{% do controller.add_port(values.network.http_port) %}
+{% do controller.configs.add("garm-tls-certificate", certificate.certificate, values.consts.tls_certificate_path, "0444") %}
+{% do controller.configs.add("garm-tls-private-key", certificate.privatekey, values.consts.tls_private_key_path, "0400") %}
+{% do controller.add_port(values.network.https_port) %}
 {% do controller.depends.add_dependency(values.consts.seed_container_name, "service_completed_successfully") %}
-{% do controller.healthcheck.set_test("wget", {"port": values.consts.internal_http_port, "path": "/ui/", "busybox": true, "spider": false}) %}
+{# Loopback health is an availability probe, not the external certificate trust gate. #}
+{% do controller.healthcheck.set_test("wget", {"port": values.consts.internal_https_port, "path": "/ui/", "scheme": "https", "busybox": true, "spider": false}) %}
 {% do controller.healthcheck.set_start_period(30) %}
 {% do controller.healthcheck.set_retries(10) %}
 
-{% do tpl.portals.add(values.network.http_port, {"name": "GARM WebUI", "scheme": "http"}) %}
+{% do tpl.portals.add(values.network.https_port, {"name": "GARM WebUI", "scheme": "https"}) %}
 
 {{ tpl.render() | tojson }}

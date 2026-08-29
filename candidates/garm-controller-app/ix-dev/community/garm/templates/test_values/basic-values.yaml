@@ -10,11 +10,23 @@ garm:
   log_level: info
 
 network:
-  http_port:
+  certificate_id: 1
+  https_port:
     bind_mode: published
     port_number: 30880
     container_port: 8080
     host_ips: []
+
+ix_certificates:
+  1:
+    certificate: |
+      -----BEGIN CERTIFICATE-----
+      PUBLIC-QUALIFICATION-FIXTURE
+      -----END CERTIFICATE-----
+    privatekey: |
+      -----BEGIN PRIVATE KEY-----
+      PRIVATE-QUALIFICATION-FIXTURE
+      -----END PRIVATE KEY-----
 
 ix_volumes:
   garm-config: /opt/tests/mnt/garm/config

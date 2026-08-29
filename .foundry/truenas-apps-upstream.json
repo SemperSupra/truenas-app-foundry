@@ -15,6 +15,11 @@
       "app": "ntfy",
       "test_file": "basic-values.yaml",
       "primary_service": "ntfy"
+    },
+    {
+      "app": "ntfy",
+      "test_file": "https-values.yaml",
+      "primary_service": "ntfy"
     }
   ]
 }

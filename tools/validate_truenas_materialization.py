@@ -230,7 +230,7 @@ def assert_library_security(label: str, value: dict[str, Any]) -> None:
         raise ValidationError(f"{label}: " + "; ".join(failures))
 
 
-def assert_control(app: str, compose: dict[str, Any], primary_name: str) -> None:
+def assert_control(app: str, test_file: str, compose: dict[str, Any], primary_name: str) -> None:
     primary = service(compose, primary_name)
     assert_library_security(app, primary)
 
@@ -246,12 +246,24 @@ def assert_control(app: str, compose: dict[str, Any], primary_name: str) -> None
     if app == "ntfy":
         service(compose, "permissions")
         if not primary.get("ports"):
-            raise ValidationError("ntfy: expected published HTTP port missing")
+            raise ValidationError("ntfy: expected published port missing")
         for target in ("/var/ntfy", "/etc/ntfy"):
             if not has_target(primary, target):
                 raise ValidationError(f"ntfy: expected storage target {target} missing")
         if has_docker_socket(primary):
             raise ValidationError("ntfy: unexpected Docker socket materialized")
+
+        if test_file == "https-values.yaml":
+            configs = compose.get("configs") or {}
+            if not all(name in configs for name in ("private", "public")):
+                raise ValidationError("ntfy HTTPS: certificate/private-key configs were not rendered")
+            env = primary.get("environment") or {}
+            if not isinstance(env, dict):
+                raise ValidationError("ntfy HTTPS: expected environment mapping")
+            if not env.get("NTFY_KEY_FILE") or not env.get("NTFY_CERT_FILE"):
+                raise ValidationError("ntfy HTTPS: certificate paths were not wired into the container")
+            if not str(env.get("NTFY_LISTEN_HTTPS") or "").startswith(":"):
+                raise ValidationError("ntfy HTTPS: HTTPS listener was not enabled")
         return
 
     raise ValidationError(f"no stable control assertions defined for {app!r}")
@@ -266,6 +278,7 @@ def fingerprint(compose: dict[str, Any], primary_name: str) -> dict[str, Any]:
         "security": security(primary),
         "mount_targets": sorted(mount["target"] for mount in mounts(primary)),
         "has_ports": bool(primary.get("ports")),
+        "has_configs": bool(compose.get("configs")),
         "has_docker_socket": has_docker_socket(primary),
         "compose_sha256": hashlib.sha256(canonical).hexdigest(),
     }
@@ -283,10 +296,11 @@ def validate() -> dict[str, Any]:
         evidence: dict[str, Any] = {}
         for control in pin["controls"]:
             app = str(control["app"])
+            test_file = str(control["test_file"])
             primary_name = str(control["primary_service"])
             compose = normalize_rendered(checkout, pin, control)
-            assert_control(app, compose, primary_name)
-            evidence[f"{pin['train']}/{app}:{control['test_file']}"] = fingerprint(
+            assert_control(app, test_file, compose, primary_name)
+            evidence[f"{pin['train']}/{app}:{test_file}"] = fingerprint(
                 compose, primary_name
             )
     finally:
