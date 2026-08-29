@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   qualify:
-    name: Pinned render, seed, and controller smoke
+    name: Pinned render, seed, and controller TLS smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -40,6 +40,7 @@ jobs:
           docker compose version
           python3 --version
           git --version
+          openssl version
           sudo -n true
 
       - name: Verify fixed source-schema boundaries
@@ -48,12 +49,25 @@ jobs:
           set -euo pipefail
           questions='candidates/garm-controller-app/ix-dev/community/garm/questions.yaml'
           fixture='candidates/garm-controller-app/ix-dev/community/garm/templates/test_values/basic-values.yaml'
+          template='candidates/garm-controller-app/ix-dev/community/garm/templates/docker-compose.yaml'
 
           # Storage remains TrueNAS-managed ixVolume only.
           grep -Eq '^ +default: ix_volume$' "$questions"
           grep -Eq '^ +type: ix_volume$' "$fixture"
           if grep -Eq 'value: *host_path|type: *hostpath|host_path_config|additional_storage' "$questions"; then
             echo 'Host-path or arbitrary additional-storage option leaked into the MVP source schema.' >&2
+            exit 2
+          fi
+
+          # HTTPS must be backed by the native catalog certificate reference contract.
+          grep -Eq '^ +- variable: certificate_id$' "$questions"
+          grep -Eq '^ +\- definitions/certificate$' "$questions"
+          grep -Eq '^ +- variable: https_port$' "$questions"
+          grep -Fq 'values.ix_certificates[values.network.certificate_id]' "$template"
+          grep -Fq 'use_tls = true' "$template"
+          grep -Fq '[apiserver.tls]' "$template"
+          if grep -Fq 'use_tls = false' "$template"; then
+            echo 'Plain-HTTP GARM API configuration leaked into the TLS candidate.' >&2
             exit 2
           fi
 
@@ -129,6 +143,10 @@ jobs:
           }
           trap cleanup EXIT
 
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=localhost' \
+            -keyout "$state/tls.key" -out "$state/tls.crt" >/dev/null 2>&1
+
           sudo tee "$state/config.toml" >/dev/null <<'EOF'
           [default]
           enable_webhook_management = true
@@ -146,7 +164,11 @@ jobs:
           [apiserver]
           bind = "0.0.0.0"
           port = 8080
-          use_tls = false
+          use_tls = true
+
+          [apiserver.tls]
+          certificate = "/garm-tls.crt"
+          key = "/garm-tls.key"
 
           [apiserver.webui]
           enable = true
@@ -158,7 +180,7 @@ jobs:
           [database.sqlite3]
           db_file = "/etc/garm/garm.db"
           EOF
-          sudo chmod 0600 "$state/config.toml"
+          sudo chmod 0600 "$state/config.toml" "$state/tls.key"
           sudo chown -R root:root "$state"
           sudo chmod 0755 "$state"
 
@@ -168,6 +190,8 @@ jobs:
             --cap-drop ALL \
             --security-opt no-new-privileges=true \
             -v "$state:/etc/garm" \
+            -v "$state/tls.crt:/garm-tls.crt:ro" \
+            -v "$state/tls.key:/garm-tls.key:ro" \
             "$IMAGE"
           sleep 4
 
