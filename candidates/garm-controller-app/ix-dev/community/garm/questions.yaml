@@ -70,8 +70,16 @@ questions:
     schema:
       type: dict
       attrs:
-        - variable: http_port
-          label: GARM HTTP Port
+        - variable: certificate_id
+          label: GARM HTTPS Certificate
+          description: Select the TrueNAS-managed certificate presented by the GARM WebUI/API.
+          schema:
+            type: int
+            required: true
+            $ref:
+              - definitions/certificate
+        - variable: https_port
+          label: GARM HTTPS Port
           schema:
             type: dict
             attrs:
@@ -87,7 +95,7 @@ questions:
                       description: Publish on the TrueNAS host
               - variable: port_number
                 label: Host Port
-                description: Host port for the GARM WebUI and API.
+                description: Host port for the GARM WebUI and API over HTTPS.
                 schema:
                   type: int
                   default: 30880
