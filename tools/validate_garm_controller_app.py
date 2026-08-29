@@ -20,6 +20,8 @@ SOURCE = REPO_ROOT / "candidates" / "garm-controller-app" / "ix-dev" / "communit
 EXPECTED_SERVICES = {"garm", "garm-config-seed"}
 DUMMY_JWT_SECRET = "N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa"
 DUMMY_DATABASE_PASSPHRASE = "Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa"
+TLS_CERT_PATH = "/garm-tls.crt"
+TLS_KEY_PATH = "/garm-tls.key"
 
 
 class ValidationError(RuntimeError):
@@ -237,8 +239,12 @@ def assert_render(
 
     healthcheck = controller.get("healthcheck") or {}
     health_text = json.dumps(healthcheck)
-    if "wget" not in health_text or "http://127.0.0.1:8080/ui/" not in health_text:
-        raise ValidationError("garm: expected BusyBox wget /ui/ health probe not materialized")
+    if (
+        "wget" not in health_text
+        or "https://127.0.0.1:8080/ui/" not in health_text
+        or "--no-check-certificate" not in health_text
+    ):
+        raise ValidationError("garm: expected loopback HTTPS availability probe not materialized")
 
     seed_script = extract_seed_script(seed)
     for required in (
@@ -257,6 +263,14 @@ def assert_render(
     content = str(initial.get("content") or "")
     if DUMMY_JWT_SECRET not in content or DUMMY_DATABASE_PASSPHRASE not in content:
         raise ValidationError("qualified dummy bootstrap configuration did not materialize as expected")
+    for required in (
+        "use_tls = true",
+        "[apiserver.tls]",
+        f'certificate = "{TLS_CERT_PATH}"',
+        f'key = "{TLS_KEY_PATH}"',
+    ):
+        if required not in content:
+            raise ValidationError(f"GARM direct TLS setting did not materialize: {required!r}")
     for forbidden in ("enable_log_file", "log_file", "log_rotate_max_size", "log_rotate_backups", "log_rotate_compress"):
         if forbidden in content:
             raise ValidationError(f"unsupported file-logging key materialized: {forbidden}")
@@ -265,6 +279,13 @@ def assert_render(
     lower = content.lower()
     if "github" in lower and "credential" in lower:
         raise ValidationError("GitHub credential material unexpectedly present in bootstrap config")
+
+    cert = str((configs.get("garm-tls-certificate") or {}).get("content") or "")
+    key = str((configs.get("garm-tls-private-key") or {}).get("content") or "")
+    if "PUBLIC-QUALIFICATION-FIXTURE" not in cert:
+        raise ValidationError("catalog certificate value was not materialized as a Compose config")
+    if "PRIVATE-QUALIFICATION-FIXTURE" not in key:
+        raise ValidationError("catalog private-key value was not materialized as a Compose config")
 
     return image, seed_script, users["garm-config-seed"], users["garm"]
 
@@ -365,6 +386,26 @@ def seed_behavior(image: str, seed_script: str, user: str, root: Path) -> None:
 def controller_smoke(image: str, user: str, root: Path) -> None:
     state = root / "controller-state"
     state.mkdir()
+    cert = root / "tls.crt"
+    key = root / "tls.key"
+    run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-days",
+            "1",
+            "-subj",
+            "/CN=localhost",
+            "-keyout",
+            str(key),
+            "-out",
+            str(cert),
+        ]
+    )
     (state / "config.toml").write_text(
         f"""[default]
 enable_webhook_management = true
@@ -382,7 +423,11 @@ time_to_live = "8760h"
 [apiserver]
 bind = "0.0.0.0"
 port = 8080
-use_tls = false
+use_tls = true
+
+[apiserver.tls]
+certificate = "{TLS_CERT_PATH}"
+key = "{TLS_KEY_PATH}"
 
 [apiserver.webui]
 enable = true
@@ -413,6 +458,10 @@ db_file = "/etc/garm/garm.db"
                 "no-new-privileges=true",
                 "-v",
                 f"{state}:/etc/garm",
+                "-v",
+                f"{cert}:{TLS_CERT_PATH}:ro",
+                "-v",
+                f"{key}:{TLS_KEY_PATH}:ro",
                 image,
             ]
         )
@@ -434,9 +483,10 @@ db_file = "/etc/garm/garm.db"
                     name,
                     "wget",
                     "--quiet",
+                    "--no-check-certificate",
                     "-O",
                     "/dev/null",
-                    "http://127.0.0.1:8080/ui/",
+                    "https://127.0.0.1:8080/ui/",
                 ],
                 check=False,
             )
@@ -446,14 +496,14 @@ db_file = "/etc/garm/garm.db"
             time.sleep(2)
         logs = run(["docker", "logs", "--tail", "80", name], check=False)
         raise ValidationError(
-            f"controller /ui/ smoke probe did not become ready: {last}\n{logs.stdout[-4000:]}"
+            f"controller HTTPS /ui/ smoke probe did not become ready: {last}\n{logs.stdout[-4000:]}"
         )
     finally:
         run(["docker", "rm", "-f", name], check=False)
 
 
 def validate(public_pull: bool) -> dict[str, Any]:
-    for tool in ("git", "docker", "python3"):
+    for tool in ("git", "docker", "python3", "openssl"):
         if not shutil.which(tool):
             raise ValidationError(f"required tool missing: {tool}")
 
@@ -488,12 +538,15 @@ def validate(public_pull: bool) -> dict[str, Any]:
             },
             "logging": "PASS:container-native/no persistent log file",
             "seed_behavior": "PASS:create-once/preserve/fail-empty",
-            "controller_smoke": "PASS:wget http://127.0.0.1:8080/ui/",
+            "certificate_rendering": "PASS:ix_certificates->Compose configs",
+            "controller_smoke": "PASS:self-signed loopback HTTPS /ui/",
+            "external_tls_nonclaim": "external trust/SAN/chain remains a TrueNAS HIL gate",
             "ghcr_anonymous_pull": public_pull,
             "non_claims": [
                 "no TrueNAS runtime realization",
                 "no provider HIL correctness",
                 "no site credential use",
+                "no public-CA trust claim from the self-signed loopback smoke",
                 "GHCR public visibility is only proven when ghcr_anonymous_pull=true",
             ],
         }
