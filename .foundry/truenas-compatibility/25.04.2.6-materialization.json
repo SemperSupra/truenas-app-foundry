@@ -1,0 +1,223 @@
+{
+  "schema_version": 2,
+  "profile_id": "truenas-scale-25.04.2.6-materialization",
+  "runtime_target": "truenas-scale-apps",
+  "truenas_version": "25.04.2.6",
+  "middleware": {
+    "repository": "https://github.com/truenas/middleware.git",
+    "release_ref": "release/25.04.2.6",
+    "commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6"
+  },
+  "source_contract": [
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/crud.py",
+      "blob_sha": "f3c4f79201c0d2340a8bc2cfbe4757448a6851ba",
+      "contains": [
+        "if data['custom_app']:",
+        "app.schema.normalize_and_validate_values",
+        "add_context_to_values",
+        "update_app_config(app_name, version, new_values)",
+        "remove_volumes=True",
+        "options['remove_ix_volumes']"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/custom_app.py",
+      "blob_sha": "2bd57f59ea0c2ab76c7a4779f52a7a4d8e6457f3",
+      "contains": [
+        "compose_config = validate_payload(data, 'app_create')",
+        "update_app_config(app_name, version, compose_config, custom_app=True)",
+        "compose_action(app_name, version, 'up', force_recreate=True, remove_orphans=True)"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/custom_app_utils.py",
+      "blob_sha": "a81666e2195fa9ef99883ffff4d1b106a74685c0",
+      "contains": [
+        "custom_compose_config",
+        "custom_compose_config_string",
+        "yaml.safe_load"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/schema_normalization.py",
+      "blob_sha": "c1a8a2cbf6b11d039f1711d864f53af6c0032e12",
+      "contains": [
+        "'definitions/certificate': 'certificate'",
+        "'definitions/certificate_authority': 'certificate_authorities'",
+        "'definitions/gpu_configuration': 'gpu_configuration'",
+        "'normalize/acl': 'acl'",
+        "'normalize/ix_volume': 'ix_volume'",
+        "complete_config['ix_certificates'][value]",
+        "certificate.get_instance",
+        "complete_config['ix_volumes'][ds_name] = host_path"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/schema_action_context.py",
+      "blob_sha": "9f1a0531cbf3565a9680e24f3ba895bd0e494ebe",
+      "contains": [
+        "async def update_volumes",
+        "zfs.dataset.create",
+        "zfs.dataset.mount",
+        "async def apply_acls",
+        "filesystem.add_to_acl"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/schema_utils.py",
+      "blob_sha": "ea21c2c08be54e982e72f0a66019dd6ad8f4b4e9",
+      "contains": [
+        "('ix_certificates', dict)",
+        "('ix_certificate_authorities', dict)",
+        "('ix_volumes', dict)",
+        "CONTEXT_KEY_NAME"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/cert_attachments.py",
+      "blob_sha": "f5fe4676999413e9fa2301e084eca349666372e9",
+      "contains": [
+        "cert_id in app_config.get('ix_certificates', {})",
+        "core.bulk', 'app.redeploy'",
+        "get_apps_consuming_outdated_certs"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/lifecycle.py",
+      "blob_sha": "f439322fda9c3fa38fa1ff2367c1e002ab4c2f70",
+      "contains": [
+        "if custom_app:",
+        "write_if_changed(compose_file_path",
+        "render_compose_templates"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/setup.py",
+      "blob_sha": "489755e30c5038aca7e300054af2a730d5875642",
+      "contains": [
+        "if custom_app:",
+        "shutil.copytree(app_version_details['location'], destination)"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/metadata.py",
+      "blob_sha": "64ee57edbff8ce9a985fc63e8205da19a0a74f18",
+      "contains": [
+        "custom_app",
+        "get_collective_config",
+        "get_portals_and_app_notes"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/path.py",
+      "blob_sha": "08b83a387aa07f83953d200ee574203f4facd270",
+      "contains": [
+        "user_config.yaml",
+        "templates/rendered",
+        "docker-compose.yaml"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/query.py",
+      "blob_sha": "bfbd96d2bd5bdd9853f753d485300911588636c1",
+      "contains": [
+        "retrieve_config",
+        "'active_workloads': active_workloads",
+        "'container_details': []",
+        "'volumes': []",
+        "'networks': []"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/compose_utils.py",
+      "blob_sha": "84029578bedfc89e5495e21107aaf6f75a6d42c1",
+      "contains": [
+        "docker', '--config', '/etc/docker', 'compose'",
+        "timeout=1200"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+      "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8",
+      "contains": [
+        "get_normalized_questions_context",
+        "app.certificate_choices",
+        "app.certificate_authority_choices",
+        "app.ip_choices",
+        "app.gpu_choices_internal"
+      ]
+    }
+  ],
+  "platform_features": {
+    "definitions/certificate": {
+      "mvp_status": "supported",
+      "parity_class": ["pre-render-resolution", "post-render-lifecycle-shim"],
+      "resolver_method": "certificate.get_instance",
+      "reserved_target": "ix_certificates",
+      "dependency_fingerprint": "sha256(public-certificate-pem)",
+      "secret_fields": ["privatekey"],
+      "native_lifecycle_gap": "Custom App config does not retain native ix_certificates attachment metadata; Foundry must reconcile public-certificate fingerprint drift."
+    },
+    "normalize/ix_volume": {
+      "mvp_status": "supported",
+      "parity_class": ["pre-render-action"],
+      "reserved_target": "ix_volumes",
+      "action": "ensure-ix-volume",
+      "native_methods": ["zfs.dataset.query", "zfs.dataset.create", "zfs.dataset.mount"]
+    },
+    "normalize/acl": {
+      "mvp_status": "conditional-deferred",
+      "parity_class": ["pre-render-action"],
+      "native_method": "filesystem.add_to_acl",
+      "policy": "empty/disabled ACL is accepted; an active ACL request fails closed until HIL-qualified"
+    },
+    "definitions/node_bind_ip": {
+      "mvp_status": "conditional-deferred",
+      "parity_class": ["schema-context-validation"],
+      "policy": "empty selection is accepted; active values fail closed until normalized question-context validation is implemented"
+    },
+    "definitions/certificate_authority": {
+      "mvp_status": "deferred",
+      "parity_class": ["pre-render-resolution"],
+      "resolver_method": "certificateauthority.get_instance",
+      "reserved_target": "ix_certificate_authorities"
+    },
+    "definitions/gpu_configuration": {
+      "mvp_status": "deferred",
+      "parity_class": ["pre-render-resolution"],
+      "policy": "fail closed when active"
+    }
+  },
+  "provider_assumptions": {
+    "app_states": ["CRASHED", "DEPLOYING", "RUNNING", "STOPPED"],
+    "active_workload_fields": ["containers", "used_ports", "container_details", "volumes", "images", "networks"],
+    "compose_action_timeout_seconds": 1200,
+    "delete_semantics": {
+      "compose_volumes_removed": true,
+      "ix_volumes_removed_only_when_requested": true
+    },
+    "custom_app_create_uses_compose_up": true
+  },
+  "policies": {
+    "unknown_active_ref": "fail-closed",
+    "desired_state_authority": "foundry",
+    "read_back_role": "verification-and-reconciliation",
+    "private_material_in_public_evidence": "prohibited"
+  },
+  "scope": {
+    "qualifies": [
+      "source-level catalog versus Custom App pipeline boundary",
+      "release-pinned middleware normalization/action identities",
+      "MVP feature classification contract",
+      "source-level Custom App lifecycle/read-back assumptions"
+    ],
+    "does_not_qualify": [
+      "live TrueNAS API transport or RBAC",
+      "site certificate/volume resolution",
+      "runtime certificate renewal behavior",
+      "hardware-in-loop parity",
+      "unsupported/deferred platform features"
+    ]
+  }
+}
