@@ -13,9 +13,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "6d2036723b9a6a3b2add7e041cc0f10d98de3ac6",
+    "sha": "e7fb23460a50bde501377c2719aea905fbaa673d",
     "interface_version": "v0.1.1",
-    "qualification_note": "public main includes the previously qualified runtime and source-attributed tests; the pinned head adds documentation only"
+    "qualification_note": "accepted public callback-host-gateway implementation; PR #19 CI #52 PASS and post-merge push CI #53 PASS"
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -40,7 +40,7 @@
     ]
   },
   "publication": {
-    "immutable_tag_prefix": "controller-078ccc0d-provider-6d203672",
+    "immutable_tag_prefix": "controller-078ccc0d-provider-e7fb2346",
     "mutable_alias": "mvp"
   },
   "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
