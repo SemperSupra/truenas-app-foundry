@@ -13,9 +13,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "e7fb23460a50bde501377c2719aea905fbaa673d",
-    "interface_version": "v0.1.1",
-    "qualification_note": "accepted public callback-host-gateway implementation; PR #19 CI #52 PASS and post-merge push CI #53 PASS"
+    "sha": "cc3eef9ad90bdd45101465e4e427ab49e968daca",
+    "interface_version": "v0.1.0",
+    "qualification_note": "accepted public ListApps controller-name coexistence fix; PR #20 CI #55 PASS and post-merge push CI #56 PASS; v0.1.0 explicitly selected for pinned GARM v0.2.1 compatibility"
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,7 +27,7 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "da5be72f41c088299948ce5496beb5bdc44799e9b16a6af2f510fa4500a6a2de",
+    "garm_provider_truenas_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "controller_observations": [
       {
         "run": 33098960208,
@@ -40,7 +40,7 @@
     ]
   },
   "publication": {
-    "immutable_tag_prefix": "controller-078ccc0d-provider-e7fb2346",
+    "immutable_tag_prefix": "controller-078ccc0d-provider-cc3eef9a",
     "mutable_alias": "mvp"
   },
   "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
