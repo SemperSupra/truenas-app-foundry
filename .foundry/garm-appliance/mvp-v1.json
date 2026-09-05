@@ -27,7 +27,7 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "garm_provider_truenas_sha256": "33a559f94d5f49c973ccd257a2704d641a67bd5732223314ea711692e84cea6f",
     "controller_observations": [
       {
         "run": 33098960208,
