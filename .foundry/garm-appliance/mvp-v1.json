@@ -14,8 +14,8 @@
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
     "sha": "cc3eef9ad90bdd45101465e4e427ab49e968daca",
-    "interface_version": "v0.1.0",
-    "qualification_note": "accepted public ListApps controller-name coexistence fix; PR #20 CI #55 PASS and post-merge push CI #56 PASS; v0.1.0 explicitly selected for pinned GARM v0.2.1 compatibility"
+    "interface_version": "v0.1.1",
+    "qualification_note": "accepted public ListApps controller-name coexistence fix; PR #20 CI #55 PASS and post-merge push CI #56 PASS; pinned SemperSupra GARM controller 078ccc0 fixes the upstream v0.1.1 ListInstances error condition"
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
