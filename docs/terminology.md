@@ -2,6 +2,22 @@
 
 This document is the canonical vocabulary for the Foundry and the related GARM/TrueNAS repositories. Use these terms consistently in issues, pull requests, code comments, architecture documents, and qualification evidence.
 
+## Vocabulary discipline
+
+Prefer established terminology from the domain that owns a concept. Introduce a Foundry-specific term only when an existing term is insufficient and the added distinction materially affects correctness, safety, interoperability, qualification, or evidence.
+
+Before adding a new term:
+
+1. check whether an established container/runtime/compiler/software-engineering term already carries the required meaning;
+2. prefer qualifying an established noun over inventing another noun;
+3. ensure the proposed term does not already have a different canonical meaning in an adjacent SemperSupra project;
+4. if a local term is necessary, define its external analogue and why the distinction is required;
+5. keep terminology changes separate from qualification/runtime changes unless ambiguity itself is a correctness or safety defect.
+
+Cross-project vocabulary must be domain-qualified when a noun has different meanings. In particular, **materialization** in this document is a Foundry deployment-transformation term; another project must not reuse the bare term for an unrelated workspace, execution, or provenance concept and assume semantic equivalence.
+
+Use **reconciliation** for desired-state/current-state convergence or recovery control loops, not as a generic synonym for result recording, acceptance, or promotion.
+
 ## Core terms
 
 **Source application** — a TrueNAS App Store-compatible application/package used as canonical Foundry input. It includes application metadata, schema/defaults, templates, and the iX library behavior needed to render the application.
@@ -30,7 +46,7 @@ This document is the canonical vocabulary for the Foundry and the related GARM/T
 
 **Qualification** — evidence that an exact source/application/materializer/adapter identity behaves correctly on an exact target profile. Syntax conversion alone is not runtime qualification.
 
-**Hardware-in-loop (HIL) qualification** — qualification performed against the actual runtime target when behavior cannot be established from mocks or hosted CI alone.
+**Hardware-in-the-Loop (HIL) qualification** — qualification performed against the actual runtime target when behavior cannot be established from mocks or hosted CI alone.
 
 **Compatibility profile** — a versioned Foundry record that binds source-rendering and runtime semantics to exact upstream identities and target-profile assumptions. For the native TrueNAS path this should eventually include the exact `truenas/apps` revision/iX library identity, the exact release-specific `truenas/middleware` ref/commit, IR version, target adapter identity, and qualification evidence.
 
