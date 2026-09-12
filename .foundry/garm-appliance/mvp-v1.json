@@ -13,9 +13,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "cc3eef9ad90bdd45101465e4e427ab49e968daca",
+    "sha": "6be24c54ae3c8d56555c783c215a3e1cbfcb993c",
     "interface_version": "v0.1.1",
-    "qualification_note": "accepted public ListApps controller-name coexistence fix; PR #20 CI #55 PASS and post-merge push CI #56 PASS; pinned SemperSupra GARM controller 078ccc0 fixes the upstream v0.1.1 ListInstances error condition"
+    "qualification_note": "Stage 5 C5 remediation candidate: public provider PR #21 merged after CI run 34687421372 PASS; decouples GARM-advertised runner metadata from the provider runtime pin and adds a narrow v0.2.1 Scale Set lifecycle pool-ID compatibility shim; pinned appliance build discovery run 34687812194 established the deterministic repaired provider binary hash"
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,7 +27,7 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "33a559f94d5f49c973ccd257a2704d641a67bd5732223314ea711692e84cea6f",
+    "garm_provider_truenas_sha256": "fc58e4734ee437e64c28b2145bfd5ac07ac9724d01a51f0f4fafedbf4d74f1a0",
     "controller_observations": [
       {
         "run": 33098960208,
@@ -40,7 +40,7 @@
     ]
   },
   "publication": {
-    "immutable_tag_prefix": "controller-078ccc0d-provider-cc3eef9a",
+    "immutable_tag_prefix": "controller-078ccc0d-provider-6be24c54",
     "mutable_alias": "mvp"
   },
   "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
