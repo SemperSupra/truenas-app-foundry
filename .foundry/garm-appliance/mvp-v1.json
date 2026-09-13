@@ -13,9 +13,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "6be24c54ae3c8d56555c783c215a3e1cbfcb993c",
+    "sha": "c367c95a5cc746db5f8ed3a518c4514919985b8b",
     "interface_version": "v0.1.1",
-    "qualification_note": "Stage 5 C5 remediation candidate: public provider PR #21 merged after CI run 34687421372 PASS; decouples GARM-advertised runner metadata from the provider runtime pin and adds a narrow v0.2.1 Scale Set lifecycle pool-ID compatibility shim; pinned appliance build discovery run 34687812194 established the deterministic repaired provider binary hash"
+    "qualification_note": "Stage 5 C5 source-first compatibility candidate: public provider PR #22 merged after full Public provider CI run 34755109028 PASS; preserves strict pool extra-spec policy while accepting only GARM-generated non-empty runner_install_template metadata during CreateInstance. Provider binary hash intentionally retains predecessor value until deterministic pinned appliance build discovers the new hash."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -40,7 +40,7 @@
     ]
   },
   "publication": {
-    "immutable_tag_prefix": "controller-078ccc0d-provider-6be24c54",
+    "immutable_tag_prefix": "controller-078ccc0d-provider-c367c95a",
     "mutable_alias": "mvp"
   },
   "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
