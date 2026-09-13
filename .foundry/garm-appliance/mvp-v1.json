@@ -15,7 +15,7 @@
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
     "sha": "c367c95a5cc746db5f8ed3a518c4514919985b8b",
     "interface_version": "v0.1.1",
-    "qualification_note": "Stage 5 C5 source-first compatibility candidate: public provider PR #22 merged after full Public provider CI run 34755109028 PASS; preserves strict pool extra-spec policy while accepting only GARM-generated non-empty runner_install_template metadata during CreateInstance. Provider binary hash intentionally retains predecessor value until deterministic pinned appliance build discovers the new hash."
+    "qualification_note": "Stage 5 C5 source-first compatibility candidate: public provider PR #22 merged after full Public provider CI run 34755109028 PASS; preserves strict pool extra-spec policy while accepting only GARM-generated non-empty runner_install_template metadata during CreateInstance; pinned Foundry discovery build run 34755436624 established the deterministic provider binary hash."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,7 +27,7 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "fc58e4734ee437e64c28b2145bfd5ac07ac9724d01a51f0f4fafedbf4d74f1a0",
+    "garm_provider_truenas_sha256": "99c2aee177f34985e69d521f5a0f019a2e2648ba111a3f7f67177f1069e46fb2",
     "controller_observations": [
       {
         "run": 33098960208,
