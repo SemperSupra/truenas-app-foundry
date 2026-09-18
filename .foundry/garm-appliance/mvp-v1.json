@@ -15,7 +15,7 @@
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
     "sha": "6a28ea5c614dce67efb16ca004271ff01e9bff61",
     "interface_version": "v0.1.1",
-    "qualification_note": "Stage 5 C5 Compose-interpolation remediation candidate: public provider PR #24 qualified exact source 87cd5bf72c2ba8b29c786f7733a8eb0161cf2d70 in Public provider CI run 35308305880 PASS and merged as 6a28ea5c614dce67efb16ca004271ff01e9bff61; escapes Compose-layer dollars so the unchanged bootstrap shell program expands runner variables only inside the container."
+    "qualification_note": "Stage 5 C5 Compose-interpolation remediation candidate: public provider PR #24 qualified exact source 87cd5bf72c2ba8b29c786f7733a8eb0161cf2d70 in Public provider CI run 35308305880 PASS and merged as 6a28ea5c614dce67efb16ca004271ff01e9bff61; escapes Compose-layer dollars so the unchanged bootstrap shell program expands runner variables only inside the container; Foundry discovery build run 35308872538 established deterministic provider binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,7 +27,7 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "99c2aee177f34985e69d521f5a0f019a2e2648ba111a3f7f67177f1069e46fb2",
+    "garm_provider_truenas_sha256": "3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935",
     "controller_observations": [
       {
         "run": 33098960208,
