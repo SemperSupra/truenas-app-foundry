@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "1c7663958b2430a8f36a3d3f187fc001beb27dea",
+  "sha": "3ab5eeedf0d1b659fbeea64b105d89749869fc78",
   "upstream_repository": "cloudbase/garm",
   "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
   "fork_pr": "SemperSupra/garm#8",
-  "purpose": "GREEN qualification of restart-safe Scale Set materialization failure budgeting across provider errors and pre-active runner failure paths for the Stage 5 C5 controller candidate",
+  "purpose": "GREEN qualification of final pre-merge Scale Set materialization failure budget candidate for Stage 5 C5",
   "execution_class": "public-hosted"
 }
