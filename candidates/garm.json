@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+  "sha": "678d04c195fc47aaa806dd402e9929e6ed74aa06",
   "upstream_repository": "cloudbase/garm",
-  "prior_qualified_sha": "dd9eb09d6ffc6cfd395b93c5f886472ee918a275",
-  "fork_pr": "SemperSupra/garm#1",
-  "purpose": "GREEN qualification of watcher safety plus v0.1.1 external-provider ListInstances correctness for the controller candidate",
+  "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+  "fork_pr": "SemperSupra/garm#8",
+  "purpose": "GREEN qualification of restart-safe Scale Set provider-materialization attempt budgeting and circuit-breaker behavior for the Stage 5 C5 controller candidate",
   "execution_class": "public-hosted"
 }
