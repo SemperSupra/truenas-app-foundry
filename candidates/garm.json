@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "678d04c195fc47aaa806dd402e9929e6ed74aa06",
+  "sha": "2bfd20c18b892899b4ded42e31459de3336d4b8c",
   "upstream_repository": "cloudbase/garm",
   "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
   "fork_pr": "SemperSupra/garm#8",
-  "purpose": "GREEN qualification of restart-safe Scale Set provider-materialization attempt budgeting and circuit-breaker behavior for the Stage 5 C5 controller candidate",
+  "purpose": "GREEN qualification of corrected restart-safe Scale Set provider-materialization attempt budgeting and circuit-breaker behavior for the Stage 5 C5 controller candidate",
   "execution_class": "public-hosted"
 }
