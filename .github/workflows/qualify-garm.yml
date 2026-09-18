@@ -25,6 +25,22 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: garm
+          POSTGRES_PASSWORD: garmpassword
+          POSTGRES_DB: garm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --tmpfs /var/lib/postgresql/data
+
     steps:
       - name: Checkout Foundry
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -71,6 +87,12 @@ jobs:
 
       - name: Run GARM Go tests
         working-directory: garm
+        run: make go-test
+
+      - name: Run GARM Go tests on PostgreSQL
+        working-directory: garm
+        env:
+          GARM_TEST_POSTGRES_DSN: "postgres://garm:garmpassword@localhost:5432/garm?sslmode=disable"
         run: make go-test
 
       - name: Build GARM and CLI
