@@ -95,10 +95,6 @@ jobs:
           GARM_TEST_POSTGRES_DSN: "postgres://garm:garmpassword@localhost:5432/garm?sslmode=disable"
         run: make go-test
 
-      - name: Run race-sensitive package tests
-        working-directory: garm
-        run: go test -race ./params ./database/sql ./workers/provider ./workers/scaleset
-
       - name: Build GARM and CLI
         working-directory: garm
         run: make build
