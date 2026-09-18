@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "ac2c341c4892b690e3f5d30fb0841031d2780f78",
+  "sha": "7820a10ecb14bc7b9d5450c40f720b7d6f23ed90",
   "upstream_repository": "cloudbase/garm",
   "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
   "fork_pr": "SemperSupra/garm#8",
-  "purpose": "GREEN exact qualification of frozen Scale Set materialization attempt-budget candidate with race-enabled SQLite/default and PostgreSQL test lanes",
+  "purpose": "GREEN exact qualification of frozen Scale Set materialization attempt-budget candidate after JobStarted test-fixture repair",
   "execution_class": "public-hosted"
 }
