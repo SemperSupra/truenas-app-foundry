@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "041d1433eb141f6891381e874f62dd581b0627e3",
+  "sha": "8a72cb23deacc712786945ac5e7ee63f8b4976d6",
   "upstream_repository": "cloudbase/garm",
-  "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+  "prior_qualified_sha": "041d1433eb141f6891381e874f62dd581b0627e3",
   "fork_pr": "SemperSupra/garm#8",
-  "purpose": "GREEN final exact hardened qualification of Scale Set materialization attempt budgeting after test-only import repair",
+  "purpose": "GREEN exact post-merge qualification of Scale Set materialization attempt budgeting before appliance admission",
   "execution_class": "public-hosted"
 }
