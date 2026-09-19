@@ -6,9 +6,9 @@
   },
   "controller": {
     "repository": "https://github.com/SemperSupra/garm.git",
-    "sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
-    "version_label": "v0.2.1-semper.078ccc0d",
-    "qualification_run": 33097979555,
+    "sha": "8a72cb23deacc712786945ac5e7ee63f8b4976d6",
+    "version_label": "v0.2.1-semper.8a72cb23",
+    "qualification_run": 35420114185,
     "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names"
   },
   "truenas_provider": {
@@ -28,20 +28,11 @@
   },
   "expected_binaries": {
     "garm_provider_truenas_sha256": "3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935",
-    "controller_observations": [
-      {
-        "run": 33098960208,
-        "sha256": "6b46d51086d4adca05dd3b826ddc9cc793cf673a9fc696391ed7ae52f4f4888e"
-      },
-      {
-        "run": 33099425686,
-        "sha256": "8d316d9e20d5733ecef5fc501c1bc3fa61452a50b6f4dc8c523f1e8c7d25c1ab"
-      }
-    ]
+    "controller_observations": []
   },
   "publication": {
-    "immutable_tag_prefix": "controller-078ccc0d-provider-6a28ea5c",
+    "immutable_tag_prefix": "controller-8a72cb23-provider-6a28ea5c",
     "mutable_alias": "mvp"
   },
-  "claim_boundary": "MVP controller image assembly only. Controller identity is exact source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
+  "claim_boundary": "MVP controller image assembly only. Controller identity is exact qualified merged source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. TrueNAS provider remains exact source 6a28ea5c614dce67efb16ca004271ff01e9bff61 with reproducible binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
 }
