@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "repository": "SemperSupra/garm",
-  "sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+  "sha": "e15d833b077192cb45275f9528a14b8932ef92de",
   "upstream_repository": "cloudbase/garm",
-  "prior_qualified_sha": "dd9eb09d6ffc6cfd395b93c5f886472ee918a275",
-  "fork_pr": "SemperSupra/garm#1",
-  "purpose": "GREEN qualification of watcher safety plus v0.1.1 external-provider ListInstances correctness for the controller candidate",
+  "prior_qualified_sha": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
+  "fork_pr": "SemperSupra/garm#8",
+  "purpose": "GREEN exact hardened qualification of Scale Set materialization attempt-budget candidate after regression-test fixture compile repair",
   "execution_class": "public-hosted"
 }
