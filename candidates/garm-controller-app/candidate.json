@@ -11,10 +11,10 @@
     "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
   },
   "appliance": {
-    "reference": "ghcr.io/sempersupra/garm-appliance@sha256:6e54a4c39b88266196971fc20e62d603b4d670100b827ff534edfe0cbeb6f9b0",
-    "controller_source": "078ccc0d9b95ac4c93ac57cf8fab967146fb1019",
-    "truenas_provider_source": "6d2036723b9a6a3b2add7e041cc0f10d98de3ac6",
-    "publication_run": 33171118898
+    "reference": "ghcr.io/sempersupra/garm-appliance@sha256:81bc23f585a371a29027aa3acbc2d45ade54a888aa08923831bcfb4f4a687917",
+    "controller_source": "8a72cb23deacc712786945ac5e7ee63f8b4976d6",
+    "truenas_provider_source": "6a28ea5c614dce67efb16ca004271ff01e9bff61",
+    "publication_run": 35421233701
   },
   "invariants": {
     "persistent_path": "/etc/garm",
@@ -26,5 +26,5 @@
     "no_new_privileges": true,
     "config_seed": "create-if-absent; fail if present-but-empty; never overwrite non-empty config"
   },
-  "claim_boundary": "Source/render qualification only until a separately authorized TrueNAS HIL run proves controller lifecycle on the target NAS."
+  "claim_boundary": "Public source/render qualification of the exact post-C5 appliance candidate. Runtime realization and site-sensitive materialization remain separate private/HIL concerns."
 }

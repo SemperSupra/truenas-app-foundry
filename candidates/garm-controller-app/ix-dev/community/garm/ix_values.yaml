@@ -1,7 +1,7 @@
 images:
   image:
     repository: ghcr.io/sempersupra/garm-appliance@sha256
-    tag: 6e54a4c39b88266196971fc20e62d603b4d670100b827ff534edfe0cbeb6f9b0
+    tag: 81bc23f585a371a29027aa3acbc2d45ade54a888aa08923831bcfb4f4a687917
 
 consts:
   controller_container_name: garm
