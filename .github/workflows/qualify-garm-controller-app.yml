@@ -148,7 +148,7 @@ jobs:
             --evidence garm-controller-app-evidence.json
 
       - name: Capture controller startup diagnostics on qualification failure
-        if: failure()
+        if: failure() && steps.appliance.outputs.image != ''
         env:
           IMAGE: ${{ steps.appliance.outputs.image }}
         shell: bash
