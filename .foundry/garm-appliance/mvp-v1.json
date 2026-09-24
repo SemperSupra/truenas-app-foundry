@@ -13,9 +13,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "6a28ea5c614dce67efb16ca004271ff01e9bff61",
+    "sha": "14535745dc3aa3c0b5466da7c704bca4d23dcec5",
     "interface_version": "v0.1.1",
-    "qualification_note": "Stage 5 C5 Compose-interpolation remediation candidate: public provider PR #24 qualified exact source 87cd5bf72c2ba8b29c786f7733a8eb0161cf2d70 in Public provider CI run 35308305880 PASS and merged as 6a28ea5c614dce67efb16ca004271ff01e9bff61; escapes Compose-layer dollars so the unchanged bootstrap shell program expands runner variables only inside the container; Foundry discovery build run 35308872538 established deterministic provider binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935."
+    "qualification_note": "Post-C5 realized-profile adoption hardening: public provider PR #25 merged as 14535745dc3aa3c0b5466da7c704bca4d23dcec5 after Public provider CI run 36020361192 PASS. This revision revalidates the full returned Compose/runtime profile during Get/List/adoption and classifies managed drift fail-closed before delete authority. Capacity remains one pending private HIL."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,11 +27,11 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935",
+    "garm_provider_truenas_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "controller_observations": []
   },
   "publication": {
-    "immutable_tag_prefix": "controller-8a72cb23-provider-6a28ea5c",
+    "immutable_tag_prefix": "controller-8a72cb23-provider-14535745",
     "mutable_alias": "mvp"
   },
   "claim_boundary": "MVP controller image assembly only. Controller identity is exact qualified merged source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. TrueNAS provider remains exact source 6a28ea5c614dce67efb16ca004271ff01e9bff61 with reproducible binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
