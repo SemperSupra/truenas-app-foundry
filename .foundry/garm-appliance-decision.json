@@ -13,9 +13,12 @@
     "custom_runner_groups_required": false
   },
   "current_truenas_runner_backend": "apps",
-  "future_truenas_runner_backends": ["containers", "vms"],
+  "future_truenas_runner_backends": [
+    "containers",
+    "vms"
+  ],
   "claims": {
-    "controller_app_implemented": false,
+    "controller_app_implemented": true,
     "controller_app_hil_qualified": false,
     "containers_backend_implemented": false,
     "vms_backend_implemented": false
