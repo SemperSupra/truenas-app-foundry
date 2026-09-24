@@ -95,7 +95,7 @@ def candidate_source(manifest: dict[str, Any]) -> tuple[Path, str, str]:
     require(source.is_dir(), "candidate source directory is missing")
     require(REPO_ROOT.resolve() in source.parents, "candidate source escapes repository")
     app = source.name
-    train = source.parent.parent.name
+    train = source.parent.name
     require(app and train, "candidate app/train identity is invalid")
     return source, train, app
 
