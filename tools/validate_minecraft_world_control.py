@@ -81,8 +81,38 @@ def validate():
         if f"lib_version_hash: {pin['library_hash']}" not in app_yaml:
             raise ValidationError("library hash drift")
 
+        resolved = tmp / "resolved.json"
+        resolved.write_text(json.dumps({
+            "ix_volumes": {
+                "data": {
+                    "host_path": "/opt/tests/collage-server-data",
+                    "properties": {}
+                }
+            }
+        }), encoding="utf-8")
+        normalized = tmp / "normalized-values.yaml"
+        platform_plan = tmp / "platform-plan.json"
+        run([
+            "python3", str(ROOT / "tools" / "prepare_truenas_platform_values.py"),
+            "--questions", str(app / "questions.yaml"),
+            "--values", str(VALUES),
+            "--resolved", str(resolved),
+            "--output-values", str(normalized),
+            "--plan", str(platform_plan),
+        ], ROOT)
+        plan = json.loads(platform_plan.read_text(encoding="utf-8"))
+        actions = plan.get("actions") or []
+        if not any(
+            action.get("action") == "ensure-ix-volume"
+            and action.get("dataset_name") == "data"
+            for action in actions
+        ):
+            raise ValidationError("platform normalization did not plan the base data ixVolume")
+        if "/opt/tests/collage-server-data" in json.dumps(plan, sort_keys=True):
+            raise ValidationError("sanitized platform plan leaked the resolved host path")
+
         test_name="collage-paper-world-hostpath-values.yaml"
-        shutil.copyfile(VALUES, app/"templates"/"test_values"/test_name)
+        shutil.copyfile(normalized, app/"templates"/"test_values"/test_name)
         run([
             "python3",".github/scripts/ci.py",
             "--app","minecraft","--train",pin["train"],
@@ -139,6 +169,10 @@ def validate():
                 "type":env.get("TYPE"),
                 "base_data_mount":data[0],
                 "world_mount":world[0],
+            },
+            "platform_normalization":{
+                "dependency_identity_sha256":plan.get("dependency_identity_sha256"),
+                "actions":actions,
             },
             "non_claims":[
                 "no live TrueNAS qualification",
