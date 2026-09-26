@@ -1,0 +1,37 @@
+name: Validate Minecraft world-only storage control
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/truenas-apps-upstream.json'
+      - '.foundry/controls/minecraft-paper-world-hostpath-values.yaml'
+      - 'tools/validate_minecraft_world_control.py'
+      - '.github/workflows/validate-minecraft-world-control.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate world-only external storage
+        run: python3 tools/validate_minecraft_world_control.py
+      - name: Publish evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### COLLAGE H3 — world-only storage source-render control'
+            if [[ -f minecraft-world-control-evidence.json ]]; then
+              echo 'BEGIN_JSON'
+              cat minecraft-world-control-evidence.json
+              echo 'END_JSON'
+            else
+              echo 'No PASS evidence file was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
