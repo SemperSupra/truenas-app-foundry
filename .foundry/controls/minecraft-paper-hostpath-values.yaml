@@ -8,7 +8,7 @@ TZ: Etc/UTC
 minecraft:
   image_selector: image
   eula: true
-  version: LATEST
+  version: 1.21.11
   type: PAPER
   motd: COLLAGE EXP-001
   difficulty: normal
