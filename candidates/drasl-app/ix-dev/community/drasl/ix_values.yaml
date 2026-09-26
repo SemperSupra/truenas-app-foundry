@@ -1,0 +1,16 @@
+images:
+  image:
+    repository: unmojang/drasl
+    tag: 4.0.1
+  container_utils_image:
+    repository: ixsystems/container-utils
+    tag: 1.0.2
+
+consts:
+  drasl_container_name: drasl
+  perms_container_name: permissions
+  config_path: /etc/drasl/config.toml
+  state_path: /var/lib/drasl
+  internal_http_port: 25585
+  run_as_uid: 568
+  run_as_gid: 568
