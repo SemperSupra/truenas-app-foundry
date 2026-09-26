@@ -1,0 +1,57 @@
+name: Validate Minecraft control
+
+on:
+  pull_request:
+    paths:
+      - '.foundry/truenas-apps-upstream.json'
+      - '.foundry/controls/minecraft-paper-hostpath-values.yaml'
+      - 'tools/validate_minecraft_control.py'
+      - '.github/workflows/validate-minecraft-control.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minecraft-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  minecraft-control:
+    name: COLLAGE EXP-001 source-render control
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+
+      - name: Render and validate upstream Minecraft Paper control
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_control.py
+
+      - name: Record public-safe evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### COLLAGE EXP-001 — upstream Minecraft source-render control'
+            if [[ -f minecraft-control-evidence.json ]]; then
+              echo '```json'
+              cat minecraft-control-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed validation step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
