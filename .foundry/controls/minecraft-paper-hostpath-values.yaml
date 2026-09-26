@@ -1,0 +1,66 @@
+resources:
+  limits:
+    cpus: 2
+    memory: 4096
+
+TZ: Etc/UTC
+
+minecraft:
+  image_selector: image
+  eula: true
+  version: LATEST
+  type: PAPER
+  motd: COLLAGE EXP-001
+  difficulty: normal
+  mode: survival
+  server_name: COLLAGE EXP-001
+  max_players: 10
+  max_world_size: 10000
+  allow_nether: true
+  announce_player_achievements: true
+  enable_command_block: false
+  force_game_mode: false
+  generate_structures: true
+  hardcore: false
+  max_build_height: 256
+  spawn_animals: true
+  spawn_monsters: true
+  spawn_npcs: true
+  spawn_protection: 0
+  view_distance: 10
+  pvp: true
+  level_type: minecraft:default
+  allow_flight: false
+  online_mode: true
+  max_tick_time: 60000
+  enable_rcon: false
+  rcon_password: ""
+  seed: null
+  ops: []
+  whitelist: []
+  enable_auto_pause: false
+  additional_envs: []
+
+network:
+  host_network: false
+  server_port:
+    bind_mode: published
+    port_number: 25565
+  rcon_port:
+    bind_mode: published
+    port_number: 25575
+  additional_ports: []
+
+run_as:
+  user: 568
+  group: 568
+
+storage:
+  data:
+    type: host_path
+    host_path_config:
+      acl_enable: false
+      path: /opt/tests/collage-world
+  additional_storage: []
+
+labels: []
