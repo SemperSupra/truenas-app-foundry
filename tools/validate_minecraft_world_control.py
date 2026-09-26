@@ -83,6 +83,7 @@ def validate():
 
         resolved = tmp / "resolved.json"
         resolved.write_text(json.dumps({
+            "timezones": {"Etc/UTC": "Etc/UTC"},
             "ix_volumes": {
                 "data": {
                     "host_path": "/opt/tests/collage-server-data",
