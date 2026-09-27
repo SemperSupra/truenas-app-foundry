@@ -1,0 +1,54 @@
+TZ: Europe/Berlin
+gateway:
+  admin_user: printadmin
+  admin_password: PublicQualificationOnly123!
+  mdns_hostname: document-gateway-ci
+  pdf_queue: Save_to_Documents
+  pdf_display_name: Save to Documents
+printers: []
+usb_enabled: false
+intake:
+  scan_enabled: true
+  fax_mode: disabled
+naming:
+  style: readable
+  preserve_original_name: true
+  sidecars: false
+  stable_seconds: 1
+network:
+  mode: external_lan
+  ipp_port:
+    bind_mode: published
+    port_number: 30631
+    container_port: 631
+    host_ips: []
+  external_network:
+    name: document-gateway-ci-lan
+    ipv4_address: 172.30.80.10
+
+resources:
+  limits:
+    cpus: 2.0
+    memory: 2048
+
+ix_volumes:
+  document-gateway-config: /tmp/document-gateway-ci/config
+  document-gateway-spool: /tmp/document-gateway-ci/spool
+  document-gateway-documents: /tmp/document-gateway-ci/documents
+
+storage:
+  config:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-config
+      create_host_path: true
+  spool:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-spool
+      create_host_path: true
+  documents:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-documents
+      create_host_path: true
