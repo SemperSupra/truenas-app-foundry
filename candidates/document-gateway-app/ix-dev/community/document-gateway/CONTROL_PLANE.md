@@ -310,9 +310,19 @@ management clients.
 
 ## Source of truth
 
-TrueNAS App questions configure bootstrap/runtime necessities such as storage,
-ports, credentials, and initial destinations.
+The runtime is stateless/disposable. Persistent desired state and user data are
+external to every runtime instance.
 
-Dynamic gateway state belongs to the control-plane desired-state store.
-Runtime discovery/observed state is separate from desired state.  The WebUI,
-CLI, API, MCP, and agents all mutate the same desired resources.
+TrueNAS App questions (or an equivalent Docker/Podman/OCI materializer)
+configure deployment/bootstrap necessities such as persistent stores, ports,
+networking, secret sources, and initial bootstrap state. The running container
+filesystem is never a durable authority.
+
+Dynamic gateway state belongs to the external control-plane desired-state
+store. Runtime discovery/observed state is separate from desired state. The
+WebUI, CLI, API, MCP, and agents all mutate the same persistent desired
+resources.
+
+Any process-local cache or generated file outside the declared persistent roots
+must be safe to lose at any time. A freshly created runtime attached to the same
+persistent stores must converge to the same intended service state.
