@@ -187,8 +187,9 @@ def assert_basic(compose: dict[str, Any]) -> None:
 
     for needle in (
         "lpadmin", "cups-pdf:/", "printer-is-shared", "/spool/pdf",
-        "desired.json", "reconcile", "BrowseLocalProtocols=none",
-        "BrowseLocalProtocols=dnssd", "BrowseDNSSDSubTypes=_print,_universal",
+        "desired.json", "reconcile", "BrowseLocalProtocols none",
+        "BrowseLocalProtocols dnssd", "BrowseDNSSDSubTypes _print,_universal",
+        "/run/cups/cups.sock", "cups_local_env",
     ):
         if needle not in gateway_py:
             raise ValidationError(f"CUPS gateway script missing {needle!r}")
