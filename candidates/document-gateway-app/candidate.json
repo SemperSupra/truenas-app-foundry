@@ -23,7 +23,10 @@
     "normalized_output": "/data/output",
     "machine_contract": "/data/.document-gateway/contract.json",
     "machine_status": "/data/.document-gateway/status.json",
-    "event_journal": "/data/.document-gateway/events.jsonl"
+    "event_journal": "/data/.document-gateway/events.jsonl",
+    "fax_outbox_pending": "/data/outgoing/fax/pending/<job-id>",
+    "fax_sender_status": "/data/.document-gateway/fax-sender.json",
+    "fax_sender_plugin_api": "document-gateway.fax-sender/v1"
   },
-  "claim_boundary": "Public source/render/smoke candidate. Exact OCI digest binding, TrueNAS runtime realization, LAN discovery, Brother hardware interoperability, FRITZ!Box interoperability, and site-specific storage/network materialization remain private HIL gates."
+  "claim_boundary": "Public source/render/smoke candidate. The outbound fax channel is backend-neutral and the only qualified sender is a non-transmitting null plugin. Exact OCI digest binding, TrueNAS runtime realization, LAN discovery, Brother hardware interoperability, FRITZ!Box interoperability/sending, and site-specific storage/network materialization remain private HIL gates."
 }
