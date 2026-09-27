@@ -126,12 +126,13 @@ questions:
                 schema:
                   type: boolean
                   default: true
-        - variable: usb_enabled
-          label: Allow USB Printers
-          description: Pass the USB bus into CUPS. Leave off for normal network-connected Brother printers.
-          schema:
-            type: boolean
-            default: false
+  - variable: usb_enabled
+    label: Allow USB Printers
+    group: Physical Printers
+    description: Pass the USB bus into CUPS. Leave off for normal network-connected Brother printers.
+    schema:
+      type: boolean
+      default: false
 
   - variable: intake
     label: ""
