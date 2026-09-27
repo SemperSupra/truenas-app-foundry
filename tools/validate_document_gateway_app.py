@@ -138,10 +138,11 @@ def config_content(compose: dict[str, Any], name: str) -> str:
 
 def assert_basic(compose: dict[str, Any]) -> None:
     services = compose.get("services") or {}
-    if set(services) != {"cups", "normalizer"}:
+    if set(services) != {"cups", "normalizer", "fax-sender"}:
         raise ValidationError(f"unexpected service inventory: {sorted(services)}")
     cups = services["cups"]
     norm = services["normalizer"]
+    fax_sender = services["fax-sender"]
     for name, svc in services.items():
         if svc.get("image") != IMAGE:
             raise ValidationError(f"{name}: image drift {svc.get('image')!r}")
@@ -154,16 +155,22 @@ def assert_basic(compose: dict[str, Any]) -> None:
         raise ValidationError("safe default did not publish CUPS/IPP target 631")
     if norm.get("network_mode") != "none":
         raise ValidationError("normalizer must have network disabled")
+    if fax_sender.get("network_mode") != "none":
+        raise ValidationError("null fax sender must have network disabled")
 
     cups_mounts = service_mounts(cups)
     norm_mounts = service_mounts(norm)
+    fax_mounts = service_mounts(fax_sender)
     if set(cups_mounts) != {"/config", "/spool"}:
         raise ValidationError(f"CUPS mount contract drift: {sorted(cups_mounts)}")
     if set(norm_mounts) != {"/data", "/spool"}:
         raise ValidationError(f"normalizer mount contract drift: {sorted(norm_mounts)}")
+    if set(fax_mounts) != {"/data"}:
+        raise ValidationError(f"fax sender mount contract drift: {sorted(fax_mounts)}")
 
     gateway_py = config_content(compose, "document-gateway-cups-script")
     norm_py = config_content(compose, "document-gateway-normalizer-script")
+    fax_py = config_content(compose, "document-gateway-fax-sender-script")
     gateway_cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
     norm_cfg = json.loads(config_content(compose, "document-gateway-normalizer-config"))
 
@@ -185,6 +192,14 @@ def assert_basic(compose: dict[str, Any]) -> None:
             raise ValidationError(f"normalizer contract missing {needle!r}")
     if norm_cfg["fax_mode"] != "data_folder" or norm_cfg["sidecars"] is not True:
         raise ValidationError("basic normalizer configuration drift")
+    if norm_cfg.get("fax_outbox_enabled") is not True or norm_cfg.get("fax_sender") != "null":
+        raise ValidationError("fax outbox bootstrap configuration drift")
+    fax_cfg = json.loads(config_content(compose, "document-gateway-fax-sender-config"))
+    if fax_cfg != {"plugin_api": "document-gateway.fax-sender/v1", "sender": "null"}:
+        raise ValidationError(f"fax sender config drift: {fax_cfg!r}")
+    for needle in ("class NullSender", "can_transmit = False", "pending_valid", "job.json", "application/pdf"):
+        if needle not in fax_py:
+            raise ValidationError(f"null fax sender contract missing {needle!r}")
 
 
 def assert_host_mdns(compose: dict[str, Any]) -> None:
@@ -250,7 +265,7 @@ def assert_ux_contract() -> dict[str, Any]:
     data = yaml.safe_load((SOURCE / "questions.yaml").read_text(encoding="utf-8"))
     groups = {g["name"] for g in data.get("groups") or []}
     expected_groups = {
-        "Gateway Basics", "Physical Printers", "Document Intake", "File Naming",
+        "Gateway Basics", "Physical Printers", "Document Intake", "Fax Outbox", "File Naming",
         "Network & Discovery", "Storage", "Resources",
     }
     if groups != expected_groups:
@@ -261,6 +276,7 @@ def assert_ux_contract() -> dict[str, Any]:
     printers = find_question(questions, "printers")
     usb = find_question(questions, "usb_enabled")
     intake = find_question(questions, "intake")
+    fax_outbox = find_question(questions, "fax_outbox")
     naming = find_question(questions, "naming")
     network = find_question(questions, "network")
     storage = find_question(questions, "storage")
@@ -271,6 +287,10 @@ def assert_ux_contract() -> dict[str, Any]:
         raise ValidationError("safe IPP mode must remain default")
     if (find_attr(intake, "fax_mode").get("schema") or {}).get("default") != "data_folder":
         raise ValidationError("simple shared-folder fax intake must remain default")
+    if (find_attr(fax_outbox, "sender").get("schema") or {}).get("default") != "null":
+        raise ValidationError("null fax sender must remain the public default")
+    if (find_attr(fax_outbox, "enabled").get("schema") or {}).get("default") is not True:
+        raise ValidationError("fax outbox must be enabled by default")
     if (find_attr(naming, "style").get("schema") or {}).get("default") != "readable":
         raise ValidationError("human-readable naming must remain default")
     if (find_attr(naming, "sidecars").get("schema") or {}).get("default") is not False:
@@ -309,6 +329,7 @@ def assert_ux_contract() -> dict[str, Any]:
         "human_groups": sorted(groups),
         "safe_network_default": "published_ipp",
         "fax_default": "data_folder",
+        "fax_sender_default": "null",
         "naming_default": "readable",
         "agent_contract_files": [
             "/data/.document-gateway/contract.json",
@@ -391,6 +412,20 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
         (scan / "Brother Scan 001.pdf").write_bytes(b"%PDF-1.4\\n% scan smoke\\n")
         (fax / "FRITZ Fax 001.pdf").write_bytes(b"%PDF-1.4\\n% fax smoke\\n")
 
+        fax_job = CI_STATE / "documents" / "outgoing" / "fax" / "pending" / "fax-smoke-001"
+        fax_job.mkdir(parents=True, exist_ok=True)
+        fax_doc = fax_job / "document.pdf"
+        fax_doc.write_bytes(b"%PDF-1.4\\n% outbound fax smoke\\n")
+        (fax_job / "job.json").write_text(json.dumps({
+            "schema_version": 1,
+            "channel": "fax",
+            "job_id": "fax-smoke-001",
+            "to": "+497031234567",
+            "created_at": "2026-09-27T12:00:00+02:00",
+            "document": "document.pdf",
+            "media_type": "application/pdf",
+        }, indent=2) + "\\n", encoding="utf-8")
+
         out = CI_STATE / "documents" / "output"
         def outputs_ready():
             files = [p.name for p in out.glob("*") if p.is_file() and not p.name.endswith(".json")]
@@ -401,16 +436,27 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
         status_path = CI_STATE / "documents" / ".document-gateway" / "status.json"
         contract_path = CI_STATE / "documents" / ".document-gateway" / "contract.json"
         journal_path = CI_STATE / "documents" / ".document-gateway" / "events.jsonl"
-        for p in (status_path, contract_path, journal_path):
+        fax_sender_status_path = CI_STATE / "documents" / ".document-gateway" / "fax-sender.json"
+        for p in (status_path, contract_path, journal_path, fax_sender_status_path):
             if not p.is_file():
                 raise ValidationError(f"machine-readable contract artifact missing: {p}")
 
         status = load_json(status_path)
         contract = load_json(contract_path)
+        fax_sender_status = load_json(fax_sender_status_path)
         if status.get("processed", 0) < 3 or status.get("errors") != 0:
             raise ValidationError(f"unexpected normalizer status: {status}")
         if contract.get("paths", {}).get("normalized_output") != "/data/output":
             raise ValidationError("runtime contract output path drift")
+        if contract.get("fax_sender", {}).get("plugin_api") != "document-gateway.fax-sender/v1":
+            raise ValidationError("fax sender plugin contract missing from runtime contract")
+        if fax_sender_status.get("plugin") != "null" or fax_sender_status.get("can_transmit") is not False:
+            raise ValidationError(f"null fax sender status drift: {fax_sender_status}")
+        valid_ids = {j.get("job_id") for j in fax_sender_status.get("pending_valid", [])}
+        if "fax-smoke-001" not in valid_ids:
+            raise ValidationError(f"null fax sender did not validate pending job: {fax_sender_status}")
+        if not fax_job.is_dir():
+            raise ValidationError("null fax sender consumed or moved the pending fax job")
 
         out_names = sorted(p.name for p in out.glob("*") if p.is_file() and not p.name.endswith(".json"))
         pattern = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}__(print|scan|fax)__.+")
@@ -435,6 +481,9 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
             "machine_contract": "PASS",
             "event_journal": "PASS",
             "sidecars": "PASS",
+            "fax_outbox": "PASS",
+            "fax_sender_plugin": "null",
+            "fax_sender_can_transmit": False,
         }
     finally:
         dc("down", "-v", "--remove-orphans", check=False)
