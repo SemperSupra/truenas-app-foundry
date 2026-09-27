@@ -147,6 +147,17 @@ def configure_discovery(config):
         dnssd_subtypes=subtypes,
     )
 
+def harden_upstream_entrypoint():
+    path = Path("/root/run_cups.sh")
+    if not path.is_file():
+        raise RuntimeError("expected upstream CUPS entrypoint missing")
+    text = path.read_text(encoding="utf-8")
+    # Upstream enables shell tracing while handling CUPSPASSWORD.  Never permit
+    # credential-bearing commands to be echoed into runtime logs.
+    text = re.sub(r"(?m)^set -x\\s*$", "set +x", text)
+    path.write_text(text, encoding="utf-8")
+    emit("upstream_entrypoint_hardened", shell_trace=False)
+
 def cups_pdf_model():
     # The selected image explicitly installs the Alpine cups-pdf package.
     # Avoid lpinfo model discovery here: some CUPS 2.4 client/server startup
@@ -259,6 +270,7 @@ def main():
     patch_pdf_backend()
     bootstrap_desired(config)
     configure_discovery(config)
+    harden_upstream_entrypoint()
 
     child = subprocess.Popen(["/root/run_cups.sh"], env=os.environ.copy())
     def stop(signum, frame):
@@ -982,8 +994,6 @@ if __name__ == "__main__":
 {% do cups.environment.add_env("CUPSADMIN", values.gateway.admin_user) %}
 {% do cups.environment.add_env("CUPSPASSWORD", values.gateway.admin_password) %}
 {% do cups.environment.add_env("AVAHI_HOSTNAME", values.gateway.mdns_hostname) %}
-{# Force libcups client commands onto the daemon's TCP listener instead of relying on an internal Unix-domain socket. #}
-{% do cups.environment.add_env("CUPS_SERVER", "127.0.0.1:631") %}
 {% do cups.configs.add("document-gateway-cups-script", gateway_script, values.consts.gateway_script_path, "0555") %}
 {% do cups.configs.add("document-gateway-cups-config", gateway_config | tojson, values.consts.gateway_config_path, "0400") %}
 {% do cups.set_entrypoint(["python3", values.consts.gateway_script_path]) %}
