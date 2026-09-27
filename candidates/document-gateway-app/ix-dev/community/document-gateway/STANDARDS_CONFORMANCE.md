@@ -77,6 +77,34 @@ This is the fast continuous gate:
 
 It runs before the full PWG suite so protocol regressions fail quickly.
 
+## Renderer/output-format conformance
+
+Renderer plugins inherit the core ABI gate and add a validator appropriate to
+their claimed output.  The validator version becomes part of qualification
+evidence.
+
+Initial mapping:
+
+| Output claim | Standard/profile | Qualification oracle |
+| --- | --- | --- |
+| EPUB | W3C EPUB | W3C EPUBCheck official conformance checker |
+| Markdown | CommonMark profile | CommonMark specification test corpus for the chosen parser/round-trip contract |
+| ALTO XML | ALTO schema | Library of Congress current ALTO XML Schema validation |
+| JSON/JSONL | project schema | JSON Schema validation plus canonical/provenance checks |
+| PDF/A | ISO 19005 profile | veraPDF profile validation |
+| PDF/UA, when implemented | ISO 14289 profile | veraPDF PDF/UA validation plus accessibility/HIL evidence |
+| HTML | declared HTML profile | standards validator plus browser/accessibility qualification |
+| PWG Raster | PWG 5102.4 | IPP Everywhere document tests / PWG raster tooling |
+
+A renderer does not become qualified merely because an output file opens in a
+viewer.  The result must pass the declared structural/profile oracle and the
+plugin's fidelity/provenance tests.
+
+EPUBCheck is the W3C-owned official EPUB conformance checker.  CommonMark's
+specification embeds its examples as executable conformance tests.  ALTO schema
+authority is the Library of Congress.  Profile validators are pinned by exact
+version/digest in CI when their renderer is promoted.
+
 ## TrueNAS catalog gate
 
 TrueNAS catalog readiness is a separate packaging/contribution gate:
