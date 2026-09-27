@@ -7,6 +7,9 @@ gateway:
   pdf_display_name: Save to Documents
 printers: []
 usb_enabled: false
+fax_outbox:
+  enabled: true
+  sender: "null"
 intake:
   scan_enabled: true
   fax_mode: data_folder
