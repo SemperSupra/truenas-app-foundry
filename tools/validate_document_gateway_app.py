@@ -212,9 +212,18 @@ def assert_cifs(compose: dict[str, Any]) -> None:
     fax = mounts.get("/fax-source")
     if not fax or fax.get("read_only") is not True:
         raise ValidationError("CIFS fax source must be mounted read-only")
-    text = json.dumps(compose)
-    if "type=cifs" not in text or "192.0.2.1" not in text:
-        raise ValidationError("CIFS fax volume did not materialize")
+
+    source = str(fax.get("source") or "")
+    volume = (compose.get("volumes") or {}).get(source) or {}
+    opts = volume.get("driver_opts") or {}
+    if opts.get("type") != "cifs":
+        raise ValidationError(f"CIFS fax volume type did not materialize: {opts!r}")
+    if opts.get("device") != "//192.0.2.1/fritz/fax":
+        raise ValidationError(f"CIFS fax device drift: {opts.get('device')!r}")
+    mount_opts = str(opts.get("o") or "")
+    if "user=faxreader" not in mount_opts or "password=PublicQualificationOnly456!" not in mount_opts:
+        raise ValidationError("CIFS fax credentials/options did not materialize in the qualification fixture")
+
     cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
     printers = cfg.get("printers") or []
     if len(printers) != 1 or printers[0].get("queue_name") != "Brother_Office":
