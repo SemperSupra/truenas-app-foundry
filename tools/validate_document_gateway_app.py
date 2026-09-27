@@ -353,7 +353,17 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
 
         def cups_ready():
             cp = dc("exec", "-T", "cups", "lpstat", "-p", "Save_to_Documents", check=False)
-            return (cp.returncode == 0, (cp.stderr or cp.stdout)[-1000:])
+            if cp.returncode == 0:
+                return (True, cp.stdout[-1000:])
+            state = dc("ps", "cups", check=False)
+            logs = dc("logs", "--tail", "80", "cups", check=False)
+            detail = "\n".join([
+                (cp.stderr or cp.stdout)[-1000:],
+                state.stdout[-1500:],
+                logs.stdout[-5000:],
+                logs.stderr[-2000:],
+            ])
+            return (False, detail)
         wait_for(cups_ready, 120, "virtual CUPS-PDF queue")
 
         print_cp = dc(
