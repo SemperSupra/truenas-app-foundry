@@ -63,6 +63,26 @@ def run(args, check=True):
         raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {(cp.stderr or cp.stdout).strip()}")
     return cp
 
+def run_retry(args, attempts=20, delay=1.0):
+    last = None
+    for attempt in range(1, attempts + 1):
+        cp = run(args, check=False)
+        if cp.returncode == 0:
+            if attempt > 1:
+                emit("command_recovered", command=args[0], attempts=attempt)
+            return cp
+        last = (cp.stderr or cp.stdout or "").strip()
+        transient = (
+            "Bad file descriptor" in last
+            or "Unable to connect to server" in last
+            or "Connection refused" in last
+        )
+        if not transient or attempt == attempts:
+            raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {last}")
+        emit("command_retry", command=args[0], attempt=attempt, error=last)
+        time.sleep(delay)
+    raise RuntimeError(f"{args[0]} failed after retries: {last}")
+
 def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -101,7 +121,7 @@ def cups_pdf_model():
 
 def provision_pdf(config):
     model = cups_pdf_model()
-    run([
+    run_retry([
         "lpadmin", "-p", config["pdf_queue"], "-E",
         "-v", "cups-pdf:/", "-m", model,
         "-D", config["pdf_display_name"],
@@ -144,7 +164,7 @@ def apply_destination(printer):
         model = str(printer.get("model", "")).strip()
         if not model:
             raise RuntimeError(f"custom model missing for {printer['id']}")
-    run([
+    run_retry([
         "lpadmin", "-p", printer["id"], "-E",
         "-v", printer["device_uri"], "-m", model,
         "-D", printer["display_name"],
