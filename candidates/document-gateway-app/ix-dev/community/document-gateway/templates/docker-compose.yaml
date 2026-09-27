@@ -364,6 +364,7 @@ if __name__ == "__main__":
 
 {% do normalizer.set_user(0, 0) %}
 {% do normalizer.set_network_mode("none") %}
+{% do normalizer.healthcheck.disable() %}
 {% do normalizer.configs.add("document-gateway-normalizer-script", normalizer_script, values.consts.normalizer_script_path, "0555") %}
 {% do normalizer.configs.add("document-gateway-normalizer-config", normalizer_config | tojson, values.consts.normalizer_config_path, "0444") %}
 {% do normalizer.set_entrypoint(["python3", values.consts.normalizer_script_path]) %}
