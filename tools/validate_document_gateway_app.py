@@ -282,8 +282,8 @@ def assert_ux_contract() -> dict[str, Any]:
     data = yaml.safe_load((SOURCE / "questions.yaml").read_text(encoding="utf-8"))
     groups = {g["name"] for g in data.get("groups") or []}
     expected_groups = {
-        "Gateway Basics", "Management", "Physical Printers", "Document Intake", "Fax Outbox", "File Naming",
-        "Network & Discovery", "Storage", "Resources",
+        "Document Gateway Configuration", "Network Configuration",
+        "Storage Configuration", "Resources Configuration",
     }
     if groups != expected_groups:
         raise ValidationError(f"human-facing group drift: {sorted(groups)}")
