@@ -279,6 +279,34 @@ HIL:
 
 Hosted-environment limitations are `BLOCKED` or `HIL_REQUIRED`, never PASS.
 
+## Qualification rule: native path and optional-client path are separate
+
+A client component must never become a test escape hatch.
+
+For each platform record two independent result families:
+
+1. **native/stock path**
+   - stock discovery where the hosted network can represent it;
+   - directed printer creation where supported;
+   - system print UI/stack;
+   - real job submission;
+   - resulting artifact verified at the printer/gateway endpoint;
+
+2. **Document Gateway client path**
+   - install/activate the optional PSA, PrintService, PrintServiceExtension, or
+     companion;
+   - enumerate the same gateway destinations/presets;
+   - submit a real job;
+   - verify result and route metadata;
+   - remove the client and prove no durable gateway authority was lost.
+
+A PASS in the optional-client lane does not upgrade a native-path FAIL/BLOCKED.
+
+The optional clients are particularly useful in hosted CI because they can
+provide a deterministic integration surface where multicast discovery or
+interactive picker automation is constrained, while still exercising the
+platform's supported print-extension architecture.
+
 ## Implementation priority
 
 1. standards-facing server endpoint and direct IPP conformance;
