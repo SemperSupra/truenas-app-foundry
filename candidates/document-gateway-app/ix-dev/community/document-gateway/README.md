@@ -27,9 +27,15 @@ Received fax files can use `incoming/fax`, an existing host path, or a direct re
 
 Outbound fax is deliberately separate from FRITZ!Box transmission. Jobs are queued under `outgoing/fax/pending/<job-id>`. The initial `null` sender validates and reports them but never transmits, deletes, or marks them sent. A later FRITZ!Box sender can implement the same sender ABI.
 
-CUPS also exposes its native administration WebUI on the CUPS portal. It is useful for low-level printer/job diagnostics, but the Document Gateway control plane is intended to be the normal source of truth so WebUI, CLI, API, MCP, automation, and agents do not each implement their own management behavior.
+CUPS also exposes its native administration WebUI on the CUPS portal. It is useful for low-level printer/job diagnostics.
+
+The candidate now also exposes a **Document Gateway WebUI/API** (default published port 30880). It is the normal management surface. The WebUI calls the same `document-gateway.control/v1` JSON API that future CLI, MCP, native GUI, automation, and agents will use. Destination create/update is an idempotent `PUT`; deletion is idempotent; a desired-state generation is reconciled into CUPS rather than having each frontend invoke CUPS administration independently.
+
+The initial WebUI/API uses the configured CUPS administrator credentials via HTTP Basic authentication. Treat the public candidate as trusted-LAN/HIL material; use a protected bind address and add TLS/reverse-proxy hardening before exposing management beyond a trusted network.
 
 ### Automation
+
+The management API is versioned as `document-gateway.control/v1`. Current implemented endpoints include capability/status/plugin reads plus idempotent physical-destination `PUT` and `DELETE`. The WebUI is intentionally only a client of this API.
 
 Stable paths and config keys are intentional API surface:
 
