@@ -113,22 +113,25 @@ def wait_for_cups(timeout=75):
 
 def configure_discovery(config):
     mode = config.get("network_mode", "published_ipp")
-    args = ["cupsctl", "--share-printers"]
-    if mode == "published_ipp":
-        args.append("BrowseLocalProtocols=none")
-        profile = "off"
+    profile = "off" if mode == "published_ipp" else "driverless"
+    target = Path("/config/cupsd.conf") if Path("/config/cupsd.conf").is_file() else Path("/etc/cups/cupsd.conf")
+    text = target.read_text(encoding="utf-8")
+    text = re.sub(r"(?m)^\\s*BrowseLocalProtocols\\s+.*$\\n?", "", text)
+    text = re.sub(r"(?m)^\\s*BrowseDNSSDSubTypes\\s+.*$\\n?", "", text)
+    text = re.sub(r"(?m)^\\s*Browsing\\s+.*$\\n?", "", text)
+    if profile == "off":
+        text += "\nBrowsing Off\nBrowseLocalProtocols none\n"
+        subtypes = []
     else:
-        args.extend([
-            "BrowseLocalProtocols=dnssd",
-            "BrowseDNSSDSubTypes=_print,_universal",
-        ])
-        profile = "driverless"
-    run_retry(args)
+        text += "\nBrowsing On\nBrowseLocalProtocols dnssd\nBrowseDNSSDSubTypes _print,_universal\n"
+        subtypes = ["_print", "_universal"]
+    target.write_text(text, encoding="utf-8")
     emit(
         "discovery_configured",
         network_mode=mode,
         profile=profile,
-        dnssd_subtypes=[] if profile == "off" else ["_print", "_universal"],
+        config_path=str(target),
+        dnssd_subtypes=subtypes,
     )
 
 def cups_pdf_model():
@@ -242,6 +245,7 @@ def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     patch_pdf_backend()
     bootstrap_desired(config)
+    configure_discovery(config)
 
     child = subprocess.Popen(["/root/run_cups.sh"], env=os.environ.copy())
     def stop(signum, frame):
@@ -253,7 +257,6 @@ def main():
 
     try:
         wait_for_cups()
-        configure_discovery(config)
         provision_pdf(config)
         generation = None
         emit("ready", queue=config["pdf_queue"], desired_state=str(DESIRED))
