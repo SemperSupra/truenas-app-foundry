@@ -1,4 +1,5 @@
 name: Qualify Document Gateway Standards
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('sidecar:{0}:{1}:{2}', inputs.workset_id, inputs.delegation_id, inputs.assignment_id) || format('Document Gateway standards {0}', github.sha) }}
 
 on:
   pull_request:
@@ -17,6 +18,19 @@ on:
       - 'tools/validate_document_gateway_app.py'
       - '.github/workflows/qualify-document-gateway-standards.yml'
   workflow_dispatch:
+    inputs:
+      workset_id:
+        description: Agent Dispatch workset correlation id
+        required: false
+        type: string
+      delegation_id:
+        description: Agent Dispatch delegation correlation id
+        required: false
+        type: string
+      assignment_id:
+        description: Agent Dispatch assignment correlation id
+        required: false
+        type: string
 
 permissions:
   contents: read
