@@ -1,6 +1,9 @@
 {% set tpl = ix_lib.base.render.Render(values) %}
 {% set cups = tpl.add_container(values.consts.cups_container_name, "image") %}
 {% set normalizer = tpl.add_container(values.consts.normalizer_container_name, "image") %}
+{% if values.fax_outbox.enabled %}
+  {% set fax_sender = tpl.add_container(values.consts.fax_sender_container_name, "image") %}
+{% endif %}
 
 {% set gateway_config = {
   "pdf_queue": values.gateway.pdf_queue,
@@ -10,10 +13,16 @@
 {% set normalizer_config = {
   "scan_enabled": values.intake.scan_enabled,
   "fax_mode": values.intake.fax_mode,
+  "fax_outbox_enabled": values.fax_outbox.enabled,
+  "fax_sender": values.fax_outbox.sender,
   "naming_style": values.naming.style,
   "preserve_original_name": values.naming.preserve_original_name,
   "sidecars": values.naming.sidecars,
   "stable_seconds": values.naming.stable_seconds
+} %}
+{% set fax_sender_config = {
+  "plugin_api": "document-gateway.fax-sender/v1",
+  "sender": values.fax_outbox.sender
 } %}
 
 {% set gateway_script %}
@@ -145,6 +154,7 @@ LEDGER = SPOOL / "state" / "normalizer.json"
 STATUS = META / "status.json"
 CONTRACT = META / "contract.json"
 JOURNAL = META / "events.jsonl"
+FAX_OUTBOX = DATA / "outgoing" / "fax"
 
 def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,8 +221,18 @@ def write_contract(config, sources):
             "scan_ingress": "/data/incoming/scan",
             "fax_ingress": sources.get("fax", {}).get("path"),
             "normalized_output": "/data/output",
+            "fax_outbox_pending": "/data/outgoing/fax/pending",
+            "fax_outbox_sent": "/data/outgoing/fax/sent",
+            "fax_outbox_failed": "/data/outgoing/fax/failed",
+            "fax_sender_status": "/data/.document-gateway/fax-sender.json",
             "status": "/data/.document-gateway/status.json",
             "events": "/data/.document-gateway/events.jsonl",
+        },
+        "fax_sender": {
+            "plugin_api": "document-gateway.fax-sender/v1",
+            "selected": config.get("fax_sender", "null"),
+            "canonical_media_type": "application/pdf",
+            "transport_specific_conversion": "sender_plugin",
         },
         "naming": {
             "style": config["naming_style"],
@@ -239,6 +259,9 @@ def main():
     (SPOOL / "pdf").mkdir(parents=True, exist_ok=True)
     (SPOOL / "state").mkdir(parents=True, exist_ok=True)
     META.mkdir(parents=True, exist_ok=True)
+    if config.get("fax_outbox_enabled", False):
+        for state in ("pending", "sent", "failed"):
+            (FAX_OUTBOX / state).mkdir(parents=True, exist_ok=True)
 
     sources = {
         "print": {"path": "/spool/pdf", "destructive": True},
@@ -334,6 +357,156 @@ if __name__ == "__main__":
     main()
 {% endset %}
 
+{% set fax_sender_script %}
+import hashlib
+import json
+import os
+import time
+from datetime import datetime
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/fax-sender.json")
+DATA = Path("/data")
+META = DATA / ".document-gateway"
+OUTBOX = DATA / "outgoing" / "fax"
+PENDING = OUTBOX / "pending"
+STATUS = META / "fax-sender.json"
+JOURNAL = META / "events.jsonl"
+PLUGIN_API = "document-gateway.fax-sender/v1"
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def emit(event, **fields):
+    record = {
+        "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "component": "fax-sender",
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(record, sort_keys=True), flush=True)
+    META.mkdir(parents=True, exist_ok=True)
+    with JOURNAL.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
+
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+def load_job(job_dir):
+    manifest_path = job_dir / "job.json"
+    if not manifest_path.is_file():
+        raise ValueError("job.json missing")
+    job = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if job.get("schema_version") != 1:
+        raise ValueError("unsupported job schema_version")
+    if job.get("channel") != "fax":
+        raise ValueError("channel must be fax")
+    if job.get("job_id") != job_dir.name:
+        raise ValueError("job_id must match queue directory")
+    if not isinstance(job.get("to"), str) or not job["to"].strip():
+        raise ValueError("fax destination 'to' is required")
+    if not isinstance(job.get("created_at"), str) or not job["created_at"].strip():
+        raise ValueError("created_at is required")
+    if job.get("media_type", "application/pdf") != "application/pdf":
+        raise ValueError("v1 fax queue canonical media type is application/pdf")
+    document_name = job.get("document")
+    if not isinstance(document_name, str) or not document_name:
+        raise ValueError("document is required")
+    document = (job_dir / document_name).resolve()
+    root = job_dir.resolve()
+    if document == root or root not in document.parents:
+        raise ValueError("document must stay inside the job directory")
+    if document.suffix.lower() != ".pdf" or not document.is_file():
+        raise ValueError("document must be an existing PDF")
+    with document.open("rb") as fh:
+        if fh.read(5) != b"%PDF-":
+            raise ValueError("document does not have a PDF signature")
+    digest = sha256(document)
+    expected = job.get("sha256")
+    if expected and expected != digest:
+        raise ValueError("sha256 mismatch")
+    return {
+        "job_id": job["job_id"],
+        "to": job["to"],
+        "document": document_name,
+        "media_type": "application/pdf",
+        "sha256": digest,
+        "created_at": job["created_at"],
+    }
+
+class NullSender:
+    name = "null"
+    can_transmit = False
+
+    def inspect(self, job):
+        return {
+            "state": "pending",
+            "disposition": "deferred",
+            "reason": "null sender never transmits or consumes queued jobs",
+            "job_id": job["job_id"],
+        }
+
+SENDERS = {"null": NullSender}
+
+def main():
+    if hasattr(time, "tzset"):
+        time.tzset()
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    if config.get("plugin_api") != PLUGIN_API:
+        raise RuntimeError("fax sender plugin API mismatch")
+    sender_name = config.get("sender", "null")
+    sender_type = SENDERS.get(sender_name)
+    if sender_type is None:
+        raise RuntimeError(f"unknown fax sender plugin: {sender_name}")
+    sender = sender_type()
+
+    PENDING.mkdir(parents=True, exist_ok=True)
+    (OUTBOX / "sent").mkdir(parents=True, exist_ok=True)
+    (OUTBOX / "failed").mkdir(parents=True, exist_ok=True)
+    META.mkdir(parents=True, exist_ok=True)
+    last_snapshot = None
+    emit("fax_sender_ready", plugin=sender.name, plugin_api=PLUGIN_API, can_transmit=sender.can_transmit)
+
+    while True:
+        valid = []
+        invalid = []
+        for job_dir in sorted(PENDING.iterdir()):
+            if not job_dir.is_dir() or job_dir.name.startswith("."):
+                continue
+            try:
+                job = load_job(job_dir)
+                result = sender.inspect(job)
+                valid.append({**job, "sender": sender.name, "sender_result": result})
+            except Exception as exc:
+                invalid.append({"job_id": job_dir.name, "error": str(exc)})
+        snapshot = {
+            "schema_version": 1,
+            "plugin_api": PLUGIN_API,
+            "plugin": sender.name,
+            "can_transmit": sender.can_transmit,
+            "pending_valid": valid,
+            "pending_invalid": invalid,
+            "counts": {"valid": len(valid), "invalid": len(invalid)},
+        }
+        encoded = json.dumps(snapshot, sort_keys=True)
+        if encoded != last_snapshot:
+            atomic_json(STATUS, snapshot)
+            emit("fax_outbox_observed", plugin=sender.name, valid=len(valid), invalid=len(invalid))
+            last_snapshot = encoded
+        time.sleep(2)
+
+if __name__ == "__main__":
+    main()
+{% endset %}
+
 {% do cups.set_user(0, 0) %}
 {# CUPS binds privileged port 631 and drops privileges to service users; keep cap_drop=ALL and restore only these runtime needs. #}
 {% do cups.add_caps(["CHOWN", "DAC_OVERRIDE", "NET_BIND_SERVICE", "SETGID", "SETUID"]) %}
@@ -389,6 +562,17 @@ if __name__ == "__main__":
     "cifs_config": values.intake.fax_cifs
   } %}
   {% do normalizer.add_storage(values.consts.fax_source_path, fax_storage) %}
+{% endif %}
+
+{% if values.fax_outbox.enabled %}
+  {% do fax_sender.set_user(0, 0) %}
+  {% do fax_sender.set_network_mode("none") %}
+  {% do fax_sender.healthcheck.disable() %}
+  {% do fax_sender.configs.add("document-gateway-fax-sender-script", fax_sender_script, values.consts.fax_sender_script_path, "0555") %}
+  {% do fax_sender.configs.add("document-gateway-fax-sender-config", fax_sender_config | tojson, values.consts.fax_sender_config_path, "0444") %}
+  {% do fax_sender.set_entrypoint(["python3", values.consts.fax_sender_script_path]) %}
+  {% do fax_sender.set_command(["run"]) %}
+  {% do fax_sender.add_storage(values.consts.data_path, values.storage.documents) %}
 {% endif %}
 
 {{ tpl.render() | tojson }}
