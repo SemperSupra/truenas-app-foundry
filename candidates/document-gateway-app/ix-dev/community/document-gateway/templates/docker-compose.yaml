@@ -946,6 +946,10 @@ def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     if config.get("api_version") != API_VERSION:
         raise RuntimeError("control API version mismatch")
+    config["admin_user"] = os.environ.get("DOCUMENT_GATEWAY_ADMIN_USER", config.get("admin_user", ""))
+    config["admin_password"] = os.environ.get("DOCUMENT_GATEWAY_ADMIN_PASSWORD", config.get("admin_password", ""))
+    if not config["admin_user"] or not config["admin_password"]:
+        raise RuntimeError("control-plane administrator credentials are required")
     bootstrap(config)
     server = ThreadingHTTPServer(("0.0.0.0", 8080), Handler)
     server.config = config
