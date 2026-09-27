@@ -6,12 +6,15 @@ images:
 consts:
   cups_container_name: cups
   normalizer_container_name: normalizer
+  fax_sender_container_name: fax-sender
   cups_config_path: /config
   spool_path: /spool
   data_path: /data
   fax_source_path: /fax-source
   gateway_script_path: /opt/document-gateway/gateway.py
   normalizer_script_path: /opt/document-gateway/normalizer.py
+  fax_sender_script_path: /opt/document-gateway/fax-sender.py
   gateway_config_path: /opt/document-gateway/gateway.json
   normalizer_config_path: /opt/document-gateway/normalizer.json
+  fax_sender_config_path: /opt/document-gateway/fax-sender.json
   cups_pdf_config_path: /etc/cups/cups-pdf.conf
