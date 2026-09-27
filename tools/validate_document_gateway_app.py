@@ -357,12 +357,23 @@ def assert_ux_contract() -> dict[str, Any]:
         if heading not in readme:
             raise ValidationError(f"developer experience contract missing {heading}")
 
+    output_abi = (SOURCE / "OUTPUT_PLUGIN_ABI.md").read_text(encoding="utf-8")
+    if "document-gateway.renderer/v1" not in output_abi:
+        raise ValidationError("renderer/output-format ABI contract missing")
+
+    discovery = (SOURCE / "DISCOVERY_CONTRACT.md").read_text(encoding="utf-8")
+    for needle in ("_print._sub._ipp._tcp", "_universal._sub._ipp._tcp", "Windows", "Android"):
+        if needle not in discovery:
+            raise ValidationError(f"cross-platform discovery contract missing {needle!r}")
+
     return {
         "human_groups": sorted(groups),
         "safe_network_default": "published_ipp",
         "management_default": "enabled",
         "fax_default": "data_folder",
         "fax_sender_default": "null",
+        "renderer_abi": "document-gateway.renderer/v1",
+        "discovery_profile": "driverless on LAN discovery modes",
         "naming_default": "readable",
         "agent_contract_files": [
             "/data/.document-gateway/contract.json",
