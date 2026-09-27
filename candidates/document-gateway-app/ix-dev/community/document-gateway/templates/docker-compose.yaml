@@ -58,16 +58,25 @@ def emit(event, **fields):
     record = {"component": "cups", "event": event, **fields}
     print(json.dumps(record, sort_keys=True), flush=True)
 
-def run(args, check=True):
-    cp = subprocess.run(args, text=True, capture_output=True)
+def run(args, check=True, env=None):
+    cp = subprocess.run(args, text=True, capture_output=True, env=env)
     if check and cp.returncode:
         raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {(cp.stderr or cp.stdout).strip()}")
     return cp
 
-def run_retry(args, attempts=20, delay=1.0):
+def cups_local_env():
+    env = os.environ.copy()
+    socket = Path("/run/cups/cups.sock")
+    if socket.exists():
+        env["CUPS_SERVER"] = str(socket)
+    else:
+        env.pop("CUPS_SERVER", None)
+    return env
+
+def run_retry(args, attempts=20, delay=1.0, env=None):
     last = None
     for attempt in range(1, attempts + 1):
-        cp = run(args, check=False)
+        cp = run(args, check=False, env=env)
         if cp.returncode == 0:
             if attempt > 1:
                 emit("command_recovered", command=args[0], attempts=attempt)
@@ -103,11 +112,15 @@ def patch_pdf_backend():
 def wait_for_cups(timeout=75):
     deadline = time.time() + timeout
     last = ""
+    socket = Path("/run/cups/cups.sock")
     while time.time() < deadline:
-        cp = run(["lpstat", "-r"], check=False)
-        if cp.returncode == 0 and "running" in cp.stdout.lower():
-            return
-        last = (cp.stderr or cp.stdout).strip()
+        if socket.exists():
+            cp = run(["lpstat", "-r"], check=False, env=cups_local_env())
+            if cp.returncode == 0 and "running" in cp.stdout.lower():
+                return
+            last = (cp.stderr or cp.stdout).strip()
+        else:
+            last = "waiting for /run/cups/cups.sock"
         time.sleep(1)
     raise RuntimeError(f"CUPS did not become ready: {last}")
 
@@ -150,7 +163,7 @@ def provision_pdf(config):
         "-v", "cups-pdf:/", "-m", model,
         "-D", config["pdf_display_name"],
         "-o", "printer-is-shared=true",
-    ])
+    ], env=cups_local_env())
     emit("queue_ready", queue=config["pdf_queue"], kind="pdf", model=model)
 
 def bootstrap_desired(config):
@@ -193,7 +206,7 @@ def apply_destination(printer):
         "-v", printer["device_uri"], "-m", model,
         "-D", printer["display_name"],
         "-o", "printer-is-shared=" + ("true" if printer.get("shared", True) else "false"),
-    ])
+    ], env=cups_local_env())
     emit("queue_ready", queue=printer["id"], kind="physical", driver=model)
 
 def reconcile(config, last_generation=None):
@@ -207,7 +220,7 @@ def reconcile(config, last_generation=None):
     managed = set(load_json(MANAGED, {"queues": []}).get("queues") or [])
 
     for queue in sorted(managed - wanted):
-        run(["lpadmin", "-x", queue], check=False)
+        run(["lpadmin", "-x", queue], check=False, env=cups_local_env())
         emit("queue_removed", queue=queue)
 
     errors = {}
