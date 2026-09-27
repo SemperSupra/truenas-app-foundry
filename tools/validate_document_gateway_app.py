@@ -360,6 +360,31 @@ def assert_ux_contract() -> dict[str, Any]:
     }
 
 
+def management_auth_header() -> str:
+    fixture = yaml.safe_load((SOURCE / "templates" / "test_values" / "basic-values.yaml").read_text(encoding="utf-8"))
+    user = fixture["gateway"]["admin_user"]
+    secret = fixture["gateway"]["admin_password"]
+    token = base64.b64encode(f"{user}:{secret}".encode()).decode()
+    return "Basic " + token
+
+
+def http_json(method: str, path: str, body: dict[str, Any] | None = None) -> tuple[int, Any]:
+    url = "http://127.0.0.1:30880" + path
+    data = None
+    headers = {"Authorization": management_auth_header()}
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = response.read()
+            return response.status, json.loads(payload) if payload else None
+    except urllib.error.HTTPError as exc:
+        payload = exc.read().decode(errors="replace")
+        raise ValidationError(f"management API {method} {path} failed: {exc.code} {payload}") from exc
+
+
 def wait_for(predicate, timeout: float, description: str) -> None:
     deadline = time.time() + timeout
     last = ""
@@ -417,6 +442,52 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
             ])
             return (False, detail)
         wait_for(cups_ready, 120, "virtual CUPS-PDF queue")
+
+        def control_ready():
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:30880/health", timeout=5) as response:
+                    body = json.loads(response.read())
+                    ok = response.status == 200 and body.get("api_version") == "document-gateway.control/v1"
+                    return (ok, json.dumps(body))
+            except Exception as exc:
+                return (False, str(exc))
+        wait_for(control_ready, 60, "Document Gateway management API")
+
+        status_code, first = http_json("GET", "/api/v1/destinations")
+        if status_code != 200:
+            raise ValidationError("management destinations read failed")
+        initial_generation = int(first.get("generation", 0))
+
+        synthetic = {
+            "id": "Automation_PDF",
+            "kind": "physical-print",
+            "display_name": "Automation PDF",
+            "device_uri": "cups-pdf:/",
+            "driver": "custom",
+            "model": "drv:///cups-pdf.drv/Generic-CUPS-PDF-Printer.ppd",
+            "shared": False,
+        }
+        _, put1 = http_json("PUT", "/api/v1/destinations/Automation_PDF", synthetic)
+        _, put2 = http_json("PUT", "/api/v1/destinations/Automation_PDF", synthetic)
+        if put1.get("changed") is not True or put2.get("changed") is not False:
+            raise ValidationError(f"idempotent destination PUT contract failed: {put1!r} {put2!r}")
+        if int(put2.get("generation", 0)) != int(put1.get("generation", 0)):
+            raise ValidationError("idempotent destination PUT changed generation on retry")
+        if int(put1.get("generation", 0)) <= initial_generation:
+            raise ValidationError("destination PUT did not advance desired generation")
+
+        def synthetic_ready():
+            cp = dc("exec", "-T", "cups", "lpstat", "-p", "Automation_PDF", check=False)
+            return (cp.returncode == 0, (cp.stderr or cp.stdout)[-1000:])
+        wait_for(synthetic_ready, 30, "control-plane destination reconciliation")
+
+        http_json("DELETE", "/api/v1/destinations/Automation_PDF")
+        http_json("DELETE", "/api/v1/destinations/Automation_PDF")
+
+        def synthetic_removed():
+            cp = dc("exec", "-T", "cups", "lpstat", "-p", "Automation_PDF", check=False)
+            return (cp.returncode != 0, (cp.stderr or cp.stdout)[-1000:])
+        wait_for(synthetic_removed, 30, "idempotent destination removal")
 
         print_cp = dc(
             "exec", "-T", "cups", "sh", "-ec",
@@ -505,6 +576,9 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
             "fax_outbox": "PASS",
             "fax_sender_plugin": "null",
             "fax_sender_can_transmit": False,
+            "management_api": "PASS",
+            "management_webui": "PASS",
+            "idempotent_destination_put_delete": "PASS",
         }
     finally:
         dc("down", "-v", "--remove-orphans", check=False)
