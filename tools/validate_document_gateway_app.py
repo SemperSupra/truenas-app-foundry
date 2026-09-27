@@ -173,9 +173,10 @@ def assert_basic(compose: dict[str, Any]) -> None:
     if gateway_cfg["pdf_queue"] != "Save_to_Documents":
         raise ValidationError("virtual PDF queue contract drift")
     for needle in (
-        "/data/.document-gateway/contract.json",
-        "/data/.document-gateway/status.json",
-        "/data/.document-gateway/events.jsonl",
+        'META = DATA / ".document-gateway"',
+        'CONTRACT = META / "contract.json"',
+        'STATUS = META / "status.json"',
+        'JOURNAL = META / "events.jsonl"',
         "document_imported",
         "stable_seconds",
         "__{source}__",
