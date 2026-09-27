@@ -1,0 +1,169 @@
+{
+  "schema_version": "document-gateway.surface/1",
+  "status": "candidate",
+  "principle": "one fact graph, audience-appropriate projections",
+  "brand": {
+    "project_identity_first": true,
+    "supracraft_brand_inherited": false,
+    "note": "Reuse the validated surface-governance method, not SupraCraft visual identity. Product/portfolio placement is separate governance."
+  },
+  "audiences": {
+    "human": {
+      "primary": [
+        "TrueNAS install/edit form for deployment/bootstrap",
+        "Document Gateway WebUI for day-to-day management",
+        "IPP/OS print dialogs for job options and device status"
+      ],
+      "secondary": [
+        "TrueNAS Web Portal link",
+        "CUPS Admin as advanced diagnostics only"
+      ],
+      "requirements": [
+        "task-oriented language",
+        "progressive disclosure",
+        "status conveyed in text not color alone",
+        "keyboard operable",
+        "WCAG 2.2 A/AA automated evidence plus manual review",
+        "320px reflow without ordinary-control horizontal overflow",
+        "system/light/dark and forced-colors legibility",
+        "reduced-motion safe",
+        "destructive actions explicit",
+        "external handoffs visually and programmatically identified",
+        "basic status/orientation available without JavaScript where practical"
+      ]
+    },
+    "deterministic_automation": {
+      "primary": [
+        "versioned JSON REST API",
+        "OpenAPI/schema artifacts",
+        "desired/observed state",
+        "stable event and status schemas"
+      ],
+      "requirements": [
+        "no HTML scraping",
+        "idempotent create/update/delete",
+        "client-selected job ids for exactly-once intent",
+        "ETag/If-Match planned for concurrent writers",
+        "machine-safe stable identifiers",
+        "structured errors and capability discovery"
+      ]
+    },
+    "agent": {
+      "primary": [
+        "same REST API and schemas as automation",
+        "capabilities/status/events",
+        "machine-readable surface contract",
+        "future MCP adapter over the REST API"
+      ],
+      "requirements": [
+        "no privileged UI-only actions",
+        "no visual-position semantics",
+        "explicit safety/side-effect metadata",
+        "dry-run/preview for material routing changes",
+        "provenance and observed-vs-desired state",
+        "bounded authority per credential"
+      ]
+    }
+  },
+  "surfaces": {
+    "truenas_catalog": {
+      "purpose": "deployment/bootstrap only",
+      "authority": "TrueNAS questions.yaml and rendering library",
+      "desired_groups": [
+        "Document Gateway Configuration",
+        "Network Configuration",
+        "Storage Configuration",
+        "Resources Configuration"
+      ],
+      "rules": [
+        "sensible defaults",
+        "clear descriptions",
+        "show_if for irrelevant settings",
+        "private fields are UI masking only",
+        "web portals for app UI",
+        "dynamic operational state should not be duplicated here"
+      ]
+    },
+    "ipp_projection": {
+      "purpose": "native printer/device experience",
+      "attributes": [
+        "printer-info",
+        "printer-location",
+        "printer-more-info",
+        "printer-icons",
+        "document-format-supported",
+        "media-supported/media-ready/media-col-database",
+        "sides-supported",
+        "print-color-mode-supported",
+        "printer-resolution-supported",
+        "finishings-supported when available"
+      ],
+      "management_link": {
+        "ipp": "printer-more-info",
+        "dnssd": "adminurl",
+        "behavior": "best-effort client affordance; clients are not required to expose or auto-open it"
+      }
+    },
+    "webui": {
+      "purpose": "primary day-to-day human management",
+      "api_dependency": "document-gateway.control/v1",
+      "views": [
+        "overview/status",
+        "destinations",
+        "jobs and route legs",
+        "output profiles/presets",
+        "scanner/fax intake",
+        "fax/email outboxes and plugins",
+        "network/discovery",
+        "events/provenance",
+        "advanced diagnostics handoff"
+      ]
+    },
+    "api": {
+      "version": "document-gateway.control/v1",
+      "source_of_truth": true,
+      "clients": [
+        "webui",
+        "cli",
+        "mcp",
+        "automation",
+        "agents",
+        "future native gui"
+      ]
+    },
+    "cups_admin": {
+      "purpose": "advanced diagnostics/compatibility",
+      "source_of_truth": false,
+      "primary_navigation": false
+    }
+  },
+  "validation": {
+    "deterministic": [
+      "schema and cross-surface fact consistency",
+      "API idempotency",
+      "route containment and allowed handoffs",
+      "no console/page errors",
+      "responsive overflow and minimum target checks",
+      "axe WCAG A/AA checks",
+      "capability/schema endpoint checks",
+      "TrueNAS source render/test fixtures"
+    ],
+    "browser_matrix": [
+      "Chromium desktop",
+      "Firefox desktop",
+      "WebKit desktop",
+      "320px narrow/reflow",
+      "touch-oriented viewport"
+    ],
+    "manual": [
+      "keyboard journey",
+      "screen-reader semantics sampling",
+      "forced-colors/high-contrast",
+      "200%-400% zoom where applicable",
+      "human copy/factuality",
+      "visual hierarchy and destructive-action clarity",
+      "printer-dialog behavior on target Windows/macOS/iOS/Android clients"
+    ],
+    "evidence_rule": "automation is evidence, not full accessibility/usability certification"
+  }
+}
