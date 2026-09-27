@@ -1,0 +1,176 @@
+name: Qualify Document Gateway Standards
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/document-gateway-app/**'
+      - 'tools/materialize_document_gateway_conformance_target.py'
+      - 'tools/run_pwg_document_gateway_conformance.py'
+      - 'tools/validate_document_gateway_app.py'
+      - '.github/workflows/qualify-document-gateway-standards.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/document-gateway-app/**'
+      - 'tools/materialize_document_gateway_conformance_target.py'
+      - 'tools/run_pwg_document_gateway_conformance.py'
+      - 'tools/validate_document_gateway_app.py'
+      - '.github/workflows/qualify-document-gateway-standards.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: document-gateway-standards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pwg:
+    name: PWG IPP Everywhere engineering conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout public Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install open standards test prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf \
+            avahi-daemon \
+            avahi-utils \
+            build-essential \
+            cups-client \
+            cups-ipp-utils \
+            git \
+            libavahi-client-dev \
+            libgnutls28-dev \
+            libnss-mdns \
+            zlib1g-dev
+          python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+          sudo systemctl start avahi-daemon || true
+          docker version
+          docker compose version
+          ipptool --version
+          ippfind --version
+
+      - name: Materialize reference runtime from TrueNAS source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/document-gateway-conformance
+          python3 tools/materialize_document_gateway_conformance_target.py \
+            --profile host_mdns \
+            --prepare-state \
+            --output /tmp/document-gateway-conformance/compose.json \
+            --evidence /tmp/document-gateway-conformance/materialization.json
+
+      - name: Start isolated gateway target
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p document-gateway-standards \
+            -f /tmp/document-gateway-conformance/compose.json \
+            up -d
+
+          for n in $(seq 1 90); do
+            if docker compose \
+              -p document-gateway-standards \
+              -f /tmp/document-gateway-conformance/compose.json \
+              exec -T cups lpstat -p Save_to_Documents >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker compose \
+            -p document-gateway-standards \
+            -f /tmp/document-gateway-conformance/compose.json \
+            ps
+          docker compose \
+            -p document-gateway-standards \
+            -f /tmp/document-gateway-conformance/compose.json \
+            logs cups
+          exit 1
+
+      - name: Fast direct IPP protocol gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_ROOT="$(dirname "$(find /usr/share/cups -type f -name get-printer-attributes.test -print -quit)")"
+          test -n "${TEST_ROOT}" -a -d "${TEST_ROOT}"
+          URI='ipp://127.0.0.1:631/ipp/print/Save_to_Documents'
+
+          ipptool -tv "${URI}" "${TEST_ROOT}/get-printer-attributes.test"
+          if [[ -f "${TEST_ROOT}/ipp-2.0.test" ]]; then
+            ipptool -tv "${URI}" "${TEST_ROOT}/ipp-2.0.test"
+          fi
+          if [[ -f "${TEST_ROOT}/validate-job.test" ]]; then
+            ipptool -tv "${URI}" "${TEST_ROOT}/validate-job.test"
+          fi
+
+      - name: Build pinned PWG IPP Everywhere v1.1 tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          PWG=/tmp/ippeveselfcert
+          git init --quiet "${PWG}"
+          git -C "${PWG}" remote add origin https://github.com/istopwg/ippeveselfcert.git
+          git -C "${PWG}" fetch --quiet --depth 1 origin af2b5887854e86888b8bed25bf2c0dd3c5c25614
+          git -C "${PWG}" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "${PWG}" rev-parse HEAD)" = af2b5887854e86888b8bed25bf2c0dd3c5c25614
+          git -C "${PWG}" submodule update --init --recursive
+          cd "${PWG}"
+          ./configure
+          make -j2
+
+      - name: Run official PWG self-certification suites as engineering evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/run_pwg_document_gateway_conformance.py \
+            --selfcert /tmp/ippeveselfcert \
+            --evidence document-gateway-pwg-conformance.json
+
+      - name: Publish conformance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: document-gateway-standards-evidence
+          if-no-files-found: warn
+          path: |
+            document-gateway-pwg-conformance.json
+            /tmp/document-gateway-conformance/materialization.json
+            /tmp/ippeveselfcert/tests/*Results.plist
+
+      - name: Publish qualification summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Document Gateway standards qualification'
+            echo
+            echo 'PWG IPP Everywhere v1.1 source-built tools are engineering evidence only; this is not a certification claim.'
+            if [[ -f document-gateway-pwg-conformance.json ]]; then
+              echo '~~~json'
+              cat document-gateway-pwg-conformance.json
+              echo '~~~'
+            else
+              echo 'No terminal PWG evidence file was produced; inspect the failed step/logs.'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Stop qualification target
+        if: always()
+        shell: bash
+        run: |
+          docker compose \
+            -p document-gateway-standards \
+            -f /tmp/document-gateway-conformance/compose.json \
+            down -v --remove-orphans || true
