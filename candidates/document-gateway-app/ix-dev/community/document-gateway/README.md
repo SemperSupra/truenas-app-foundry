@@ -6,7 +6,10 @@ A public-safe TrueNAS App candidate that turns CUPS into a small home document g
 - optional **physical Brother/other printers** -> CUPS queues, driverless IPP by default;
 - **scanner inbox** -> `/data/incoming/scan`;
 - **FRITZ!Box fax inbox** -> main data folder, a read-only TrueNAS host path, or a read-only SMB/CIFS share;
+- **Fax Outbox** -> backend-neutral durable fax jobs with a pluggable sender API; the public candidate ships only a non-transmitting `null` sender;
 - deterministic naming, collision handling, checksums, optional JSON sidecars, and an always-on hidden JSONL event journal.
+
+See [CONTROL_PLANE.md](CONTROL_PLANE.md) for the format/export model and the planned common idempotent management API used by WebUI, CLI, API clients, MCP, and future native GUIs.
 
 ## Three audiences
 
@@ -22,6 +25,10 @@ For scanner intake, expose the selected Document Library through the normal True
 
 Received fax files can use `incoming/fax`, an existing host path, or a direct read-only FRITZ!Box SMB/CIFS source.
 
+Outbound fax is deliberately separate from FRITZ!Box transmission. Jobs are queued under `outgoing/fax/pending/<job-id>`. The initial `null` sender validates and reports them but never transmits, deletes, or marks them sent. A later FRITZ!Box sender can implement the same sender ABI.
+
+CUPS also exposes its native administration WebUI on the CUPS portal. It is useful for low-level printer/job diagnostics, but the Document Gateway control plane is intended to be the normal source of truth so WebUI, CLI, API, MCP, automation, and agents do not each implement their own management behavior.
+
 ### Automation
 
 Stable paths and config keys are intentional API surface:
@@ -31,6 +38,8 @@ Stable paths and config keys are intentional API surface:
 | PDF print spool | `/spool/pdf` |
 | scanner ingress | `/data/incoming/scan` |
 | data-folder fax ingress | `/data/incoming/fax` |
+| outbound fax pending | `/data/outgoing/fax/pending/<job-id>` |
+| fax sender status | `/data/.document-gateway/fax-sender.json` |
 | normalized output | `/data/output` |
 | runtime contract | `/data/.document-gateway/contract.json` |
 | status | `/data/.document-gateway/status.json` |
