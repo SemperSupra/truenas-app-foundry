@@ -1,6 +1,6 @@
 groups:
   - name: Gateway Basics
-    description: The few settings most homes need: administrator login, timezone, and the PDF printer name.
+    description: "The few settings most homes need: administrator login, timezone, and the PDF printer name."
   - name: Physical Printers
     description: Optional Brother or other printers that this gateway should expose through CUPS/IPP.
   - name: Document Intake
