@@ -65,7 +65,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:30880/health
-          ipptool -tv ipp://127.0.0.1:30631/ipp/print/Save_to_Documents \
+          ipptool -tv ipp://127.0.0.1:30631/printers/Save_to_Documents \
             "$(find /usr/share/cups -type f -name get-printer-attributes.test -print -quit)"
           docker compose -p document-gateway-engine -f "${COMPOSE}" ps
 
@@ -121,7 +121,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:30880/health
-          ipptool -tv ipp://127.0.0.1:30631/ipp/print/Save_to_Documents \
+          ipptool -tv ipp://127.0.0.1:30631/printers/Save_to_Documents \
             "$(find /usr/share/cups -type f -name get-printer-attributes.test -print -quit)"
           podman ps --format json > /tmp/document-gateway-engine/podman-ps.json
 
