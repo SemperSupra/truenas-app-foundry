@@ -47,7 +47,15 @@
       "spool": "/spool",
       "data": "/data"
     },
-    "runtime_replacement_invariant": "Destroy and recreate all runtime containers without persistent-store loss; desired state, user data, identities, outboxes, ledgers, and reconciliation must recover."
+    "runtime_replacement_invariant": "Destroy and recreate all runtime containers without persistent-store loss; desired state, user data, identities, outboxes, ledgers, and reconciliation must recover.",
+    "client_integration_strategy": "driverless-first; optional modern platform extensions only where they add capability",
+    "client_integrations": {
+      "windows": "Microsoft IPP Class Driver + optional Print Support App / Print Support Virtual Printer",
+      "android": "Default Print Service first; optional Document Gateway PrintService",
+      "ios_ipados": "AirPrint first; optional UIPrintServiceExtension + companion/share extension",
+      "macos": "AirPrint/IPP Everywhere; optional companion/provisioning utility; no custom driver",
+      "linux": "driverless CUPS/IPP Everywhere; optional CLI/tray companion; no gateway driver"
+    }
   },
   "claim_boundary": "Public source/render/smoke candidate. The outbound fax channel is backend-neutral and the only qualified sender is a non-transmitting null plugin. Renderer/export ABI is document-gateway.renderer/v1. LAN discovery modes target driverless IPP Everywhere/AirPrint DNS-SD publication, but Windows/Android automatic discovery, Mopria/WPP compatibility, macOS/Linux client behavior, TrueNAS runtime realization, Brother hardware interoperability, FRITZ!Box interoperability/sending, and site-specific storage/network materialization remain HIL gates. No Mopria certification is claimed. The initial management WebUI/API is trusted-LAN material and requires TLS/reverse-proxy hardening before untrusted-network exposure. Exact OCI digest binding remains a promotion gate."
 }
