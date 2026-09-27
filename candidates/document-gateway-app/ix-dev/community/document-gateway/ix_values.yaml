@@ -1,0 +1,17 @@
+images:
+  image:
+    repository: chuckcharlie/cups-avahi-airprint
+    tag: "2.1.3"
+
+consts:
+  cups_container_name: cups
+  normalizer_container_name: normalizer
+  cups_config_path: /config
+  spool_path: /spool
+  data_path: /data
+  fax_source_path: /fax-source
+  gateway_script_path: /opt/document-gateway/gateway.py
+  normalizer_script_path: /opt/document-gateway/normalizer.py
+  gateway_config_path: /opt/document-gateway/gateway.json
+  normalizer_config_path: /opt/document-gateway/normalizer.json
+  cups_pdf_config_path: /etc/cups/cups-pdf.conf
