@@ -336,6 +336,8 @@ if __name__ == "__main__":
 {% endset %}
 
 {% do cups.set_user(0, 0) %}
+{# CUPS binds privileged port 631 and drops privileges to service users; keep cap_drop=ALL and restore only these runtime needs. #}
+{% do cups.add_caps(["CHOWN", "DAC_OVERRIDE", "NET_BIND_SERVICE", "SETGID", "SETUID"]) %}
 {% do cups.environment.add_env("CUPSADMIN", values.gateway.admin_user) %}
 {% do cups.environment.add_env("CUPSPASSWORD", values.gateway.admin_password) %}
 {% do cups.environment.add_env("AVAHI_HOSTNAME", values.gateway.mdns_hostname) %}
