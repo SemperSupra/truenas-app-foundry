@@ -119,7 +119,7 @@ jobs:
           set -euo pipefail
           TEST_ROOT="$(dirname "$(find /usr/share/cups -type f -name get-printer-attributes.test -print -quit)")"
           test -n "${TEST_ROOT}" -a -d "${TEST_ROOT}"
-          URI='ipp://127.0.0.1:631/ipp/print/Save_to_Documents'
+          URI='ipp://127.0.0.1:631/printers/Save_to_Documents'
 
           ipptool -tv "${URI}" "${TEST_ROOT}/get-printer-attributes.test"
           if [[ -f "${TEST_ROOT}/ipp-2.0.test" ]]; then
