@@ -5,6 +5,8 @@ groups:
     description: Optional Brother or other printers that this gateway should expose through CUPS/IPP.
   - name: Document Intake
     description: Scanner, fax, and document-library settings. All sources are normalized into one output directory.
+  - name: Fax Outbox
+    description: Queue outbound fax jobs independently from any specific fax transport or device.
   - name: File Naming
     description: Human-readable deterministic output naming and optional metadata sidecars.
   - name: Network & Discovery
@@ -224,6 +226,29 @@ questions:
                 schema:
                   type: string
                   default: ""
+
+  - variable: fax_outbox
+    label: ""
+    group: Fax Outbox
+    schema:
+      type: dict
+      attrs:
+        - variable: enabled
+          label: Enable Fax Outbox
+          description: Create and monitor durable outbound fax jobs under /data/outgoing/fax. This does not transmit a fax.
+          schema:
+            type: boolean
+            default: true
+        - variable: sender
+          label: Fax Sender Plugin
+          description: Sender plugins consume the backend-neutral fax job contract. Only the Null sender is implemented in this candidate.
+          schema:
+            type: string
+            default: "null"
+            required: true
+            enum:
+              - value: "null"
+                description: Null sender - validate and observe jobs but leave them pending for a future real sender
 
   - variable: naming
     label: ""
