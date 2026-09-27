@@ -231,6 +231,9 @@ def assert_host_mdns(compose: dict[str, Any]) -> None:
         raise ValidationError("host_mdns profile did not materialize host networking")
     if cups.get("ports"):
         raise ValidationError("host_mdns profile must not publish duplicate ports")
+    cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
+    if cfg.get("network_mode") != "host_mdns":
+        raise ValidationError("host_mdns discovery intent missing from CUPS config")
 
 
 def assert_external_lan(compose: dict[str, Any]) -> None:
@@ -242,6 +245,9 @@ def assert_external_lan(compose: dict[str, Any]) -> None:
     top = (compose.get("networks") or {}).get("document-gateway-ci-lan") or {}
     if top.get("external") is not True:
         raise ValidationError("dedicated LAN network was not materialized as external")
+    cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
+    if cfg.get("network_mode") != "external_lan":
+        raise ValidationError("external LAN discovery intent missing from CUPS config")
 
 
 def assert_cifs(compose: dict[str, Any]) -> None:
