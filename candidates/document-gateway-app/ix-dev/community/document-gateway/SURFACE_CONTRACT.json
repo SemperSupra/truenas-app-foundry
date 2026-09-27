@@ -135,6 +135,31 @@
       "purpose": "advanced diagnostics/compatibility",
       "source_of_truth": false,
       "primary_navigation": false
+    },
+    "client_integrations": {
+      "principle": "optional clients project the same gateway facts and authority; they do not own durable server state",
+      "windows": [
+        "IPP Class Driver",
+        "Print Support App candidate",
+        "Print Support Virtual Printer candidate"
+      ],
+      "android": [
+        "Default Print Service",
+        "optional PrintService"
+      ],
+      "ios_ipados": [
+        "AirPrint",
+        "optional UIPrintServiceExtension",
+        "optional Share extension for non-print routing"
+      ],
+      "macos": [
+        "AirPrint/IPP",
+        "optional provisioning/management companion"
+      ],
+      "linux": [
+        "driverless CUPS/IPP",
+        "optional CLI/tray companion"
+      ]
     }
   },
   "validation": {
