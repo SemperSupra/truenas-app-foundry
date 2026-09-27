@@ -346,7 +346,7 @@ if __name__ == "__main__":
 {% do cups.set_command(["run"]) %}
 {% do cups.add_storage(values.consts.cups_config_path, values.storage.config) %}
 {% do cups.add_storage(values.consts.spool_path, values.storage.spool) %}
-{% if values.printers.usb_enabled is defined and values.printers.usb_enabled %}
+{% if values.usb_enabled %}
   {% do cups.add_usb_bus() %}
 {% endif %}
 {% do cups.healthcheck.set_test("wget", {"port": 631, "path": "/", "scheme": "http", "spider": true}) %}
