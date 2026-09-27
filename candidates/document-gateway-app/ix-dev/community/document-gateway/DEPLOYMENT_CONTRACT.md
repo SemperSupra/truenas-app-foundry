@@ -21,6 +21,78 @@ Supported portable deployment targets:
 A deployment model MUST NOT fork the control API, job model, plugin ABIs,
 document semantics, or qualification criteria.
 
+## Hard invariant: stateless disposable runtimes
+
+Every runtime container/process is replaceable compute only.
+
+A container restart, recreation, image upgrade, host reboot, or complete
+replacement of the runtime filesystem MUST NOT lose or redefine persistent
+configuration or user data.
+
+All durable state lives outside the runtime image/container on explicit
+persistent stores or external secret/config providers.
+
+Durable classes include:
+
+- desired gateway configuration and generations;
+- destination/queue definitions;
+- output profiles/presets and routing policy;
+- user documents and derived artifacts;
+- print/scan/fax/email outboxes and queued jobs;
+- delivery/retry state that must survive restart;
+- event/provenance journals according to retention policy;
+- CUPS queue state/PPDs needed by qualified legacy paths;
+- stable gateway/printer identity and TLS key material;
+- plugin configuration and qualified plugin-selection state;
+- persistent normalization/import ledgers;
+- credentials/secrets, via an external secret/config mechanism rather than the
+  writable container filesystem.
+
+The runtime filesystem MAY contain only:
+
+- immutable application code and packaged dependencies;
+- generated caches/scratch files that are safe to discard;
+- process-local temporary files;
+- derived runtime configuration that is deterministically regenerated from
+  external durable/bootstrap state on every start.
+
+If loss of a file inside a container changes durable behavior after recreation,
+that file is in the wrong place.
+
+### Persistent logical roots
+
+The current candidate uses three explicit durable roots:
+
+- `/config` — CUPS persistent configuration, PPD state, stable TLS/identity
+  material, and other deployment-owned persistent service configuration;
+- `/spool` — gateway desired/reconciliation state and durable work queues or
+  ledgers that must survive runtime replacement;
+- `/data` — user documents, inboxes/outboxes, artifacts, machine-readable
+  status/event/provenance data, and retained delivery state.
+
+Future project-owned images MAY refine these into narrower mounts, but may not
+move durable state back into the image/container layer.
+
+External read-only inputs such as a scanner/fax share remain external sources
+and are not copied into runtime-local persistence.
+
+### Runtime replacement qualification
+
+Every materializer MUST pass a disposable-runtime test:
+
+1. materialize external persistent stores;
+2. start fresh runtime instances;
+3. create representative persistent configuration and user/job state;
+4. verify normal operation;
+5. destroy the runtime instances **without deleting persistent stores**;
+6. create new instances from the same or upgraded qualified image;
+7. verify desired state, identities, documents, outboxes, ledgers and
+   reconciliation recover correctly;
+8. verify no hidden container-local state was required;
+9. separately test explicit backup/restore into fresh persistent stores.
+
+A materializer cannot be called supported if it only passes restart-in-place.
+
 ## Stable runtime contract
 
 All materializers expose the same logical services:
