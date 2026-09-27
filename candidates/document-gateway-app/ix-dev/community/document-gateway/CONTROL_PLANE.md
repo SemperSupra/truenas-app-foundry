@@ -59,6 +59,70 @@ Do not build the conversion architecture around `cupsfilter`; it is a useful
 compatibility tool but is deprecated.  Conversion providers belong behind a
 gateway renderer/export plugin boundary.
 
+## Routed job model
+
+A gateway job represents one user intent and can fan out to multiple independent
+delivery legs.  A single action such as **Print + archive + email me** MUST be
+one job with three legs rather than three unrelated operations.
+
+Core resources:
+
+- **Artifact** — immutable original, canonical, or derived content with digest,
+  MIME type, provenance, and transformation history.
+- **Job** — immutable submitted intent plus stable client-selected job id.
+- **Route leg** — one requested output from the job to one destination.
+- **Destination** — stable endpoint configuration.
+- **Output profile** — page/media/rendering/transformation policy.
+- **Delivery attempt** — one try for one route leg.
+- **Event** — append-only machine-facing lifecycle evidence.
+
+Each leg has independent state such as `queued`, `rendering`, `delivering`,
+`succeeded`, `failed`, or `deferred`.  Retrying one failed leg MUST NOT
+duplicate already-successful legs.
+
+Example:
+
+```json
+{
+  "job_id": "01K...",
+  "artifact": "sha256:...",
+  "routes": [
+    {"id": "paper", "destination": "brother-office", "profile": "office-a4"},
+    {"id": "archive", "destination": "documents", "profile": "archive-pdfa"},
+    {"id": "mail", "destination": "email-me", "profile": "email-pdf"}
+  ]
+}
+```
+
+This is the core abstraction that lets an ordinary desktop print operation
+become a reusable document-routing action without coupling CUPS to email,
+archive, fax, or future outputs.
+
+## Email output channel
+
+Email is a first-class output channel, not a CUPS notifier.  CUPS mail
+notification features report job events; they are not the document-delivery
+contract for this gateway.
+
+An email destination should support a sender plugin boundary and a durable
+outbox.  The route leg owns:
+
+- recipients (To/Cc/Bcc according to policy);
+- subject/body template;
+- attachment profile (canonical PDF, archival PDF, original, or selected
+  derivatives);
+- stable delivery id/message identity for retry de-duplication;
+- attachment-size and recipient policy;
+- observed send/bounce/deferred state where the backend exposes it.
+
+Initial implementation SHOULD use a non-transmitting `null` email sender before
+SMTP or provider-specific backends are qualified.  Future backends can include
+SMTP, Gmail, Microsoft Graph, or another mail relay without changing job
+producers.
+
+An email delivery failure MUST NOT change the success state of an already
+completed physical print or archive leg, and vice versa.
+
 ## Destination model
 
 A destination is a stable resource, not just a CUPS queue.
@@ -68,7 +132,10 @@ Suggested kinds:
 - `physical-print`
 - `archive`
 - `fax-outbox`
+- `email`
 - `export`
+- `file/archive`
+- `webhook` (disabled by default until SSRF policy is explicitly configured)
 
 Each destination publishes:
 
@@ -127,8 +194,10 @@ The control plane follows desired-state reconciliation:
 - `PUT /api/v1/destinations/{id}`: complete idempotent create/update.
 - `DELETE /api/v1/destinations/{id}`: idempotent removal; absent is success.
 - `PUT /api/v1/output-profiles/{id}`: idempotent create/update.
-- `PUT /api/v1/fax/jobs/{job-id}`: client-selected job id prevents duplicate
-  fax enqueue on retry.
+- `PUT /api/v1/jobs/{job-id}`: client-selected job id prevents duplicate
+  routed-job creation on retry.
+- `PUT /api/v1/fax/jobs/{job-id}`: compatibility/convenience facade over a
+  routed job with a fax-outbox leg.
 - imperative actions, where unavoidable, require an `Idempotency-Key`.
 - resources carry `generation`; observed resources carry
   `observed_generation`.
@@ -152,8 +221,10 @@ Write:
 - `PUT /api/v1/destinations/{id}`
 - `DELETE /api/v1/destinations/{id}`
 - `PUT /api/v1/output-profiles/{id}`
+- `PUT /api/v1/jobs/{job-id}`
 - `PUT /api/v1/fax/jobs/{job-id}`
 - `PUT /api/v1/settings/{section}`
+- future `PUT /api/v1/policies/{id}` for reusable routing/security policy
 
 ## User interfaces
 
@@ -196,6 +267,37 @@ Tools map to stable resources/actions and return the same machine schemas.
 
 Any future desktop/mobile GUI consumes the same API and therefore has no
 special management authority.
+
+## Rendering and media capability policy
+
+The gateway MUST keep **document/page intent** separate from **physical media**
+and from **screen presentation**.
+
+For physical IPP destinations, populate controls from observed capabilities
+(`media-supported`, `media-ready`, `media-col-database`, sides, resolution,
+finishings, color modes, output bins, etc.) rather than maintaining a
+US/EU-centric hard-coded list.
+
+Output profiles MAY specify:
+
+- named or custom media size, orientation, margins and scaling;
+- source tray/media type and output bin;
+- simplex/duplex and binding edge;
+- copies, collation, page ranges, N-up, booklet, reverse order;
+- color/grayscale/monochrome, resolution and rendering intent;
+- finishings such as staple, punch, fold and bind when observed as supported;
+- roll/custom media for labels, receipts and large format;
+- bleed/crop marks where a renderer/output workflow supports them.
+
+For screen/reflow outputs, preserve semantics where they exist and prefer
+responsive HTML or reflowable EPUB.  Fixed-layout PDF/EPUB remains appropriate
+when exact page geometry is part of the content.
+
+Font handling is a preflight concern.  Prefer embedded fonts.  A profile SHOULD
+have an explicit missing-font policy (`fail`, `warn-and-substitute`, or
+`substitute`) and record every substitution plus missing-glyph result in
+provenance.  Silent substitution is not acceptable for archival, legal,
+multilingual, or high-fidelity output.
 
 ## CUPS reconciliation
 
