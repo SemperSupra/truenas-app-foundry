@@ -587,6 +587,89 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
         if {e.get("source") for e in imported} != {"print", "scan", "fax"}:
             raise ValidationError("event journal lacks all three source classes")
 
+        # Hard deployment invariant: the runtime is disposable compute only.
+        # Destroy every container, keep the three external persistent roots,
+        # then recreate the service graph and prove durable intent/data recover.
+        desired_path = CI_STATE / "spool" / "control" / "desired.json"
+        cups_conf_path = CI_STATE / "config" / "cupsd.conf"
+        if not desired_path.is_file():
+            raise ValidationError("persistent desired-state file missing before runtime replacement")
+        if not cups_conf_path.is_file():
+            raise ValidationError("persistent CUPS configuration missing before runtime replacement")
+
+        desired_before = desired_path.read_bytes()
+        cups_conf_before = cups_conf_path.read_bytes()
+        fax_job_before = (fax_job / "job.json").read_bytes()
+        document_before = fax_doc.read_bytes()
+        output_before = {
+            p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out.glob("*")
+            if p.is_file()
+        }
+
+        ssl_root = CI_STATE / "config" / "ssl"
+        ssl_before = {
+            str(p.relative_to(ssl_root)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in ssl_root.rglob("*")
+            if p.is_file()
+        } if ssl_root.exists() else {}
+
+        ids_before = dc("ps", "-q").stdout.split()
+        if not ids_before:
+            raise ValidationError("runtime replacement test had no live container ids")
+
+        dc("down", "--remove-orphans")
+        if any((CI_STATE / sub).exists() is False for sub in ("config", "spool", "documents")):
+            raise ValidationError("runtime removal deleted an external persistent root")
+
+        dc("up", "-d")
+
+        def cups_recovered():
+            cp = dc("exec", "-T", "cups", "lpstat", "-p", "Save_to_Documents", check=False)
+            return (cp.returncode == 0, (cp.stderr or cp.stdout)[-1000:])
+        wait_for(cups_recovered, 120, "CUPS recovery after complete runtime replacement")
+        wait_for(control_ready, 60, "control API recovery after complete runtime replacement")
+
+        def fax_sender_recovered():
+            try:
+                value = load_json(fax_sender_status_path)
+                valid = {j.get("job_id") for j in value.get("pending_valid", [])}
+                return ("fax-smoke-001" in valid, json.dumps(value)[-2000:])
+            except Exception as exc:
+                return (False, str(exc))
+        wait_for(fax_sender_recovered, 60, "fax outbox recovery after complete runtime replacement")
+
+        ids_after = dc("ps", "-q").stdout.split()
+        if not ids_after or set(ids_before) & set(ids_after):
+            raise ValidationError("runtime replacement did not create a fresh container set")
+
+        if desired_path.read_bytes() != desired_before:
+            raise ValidationError("persistent desired state changed across runtime replacement")
+        if cups_conf_path.read_bytes() != cups_conf_before:
+            raise ValidationError("persistent CUPS configuration drifted across runtime replacement")
+        if (fax_job / "job.json").read_bytes() != fax_job_before or fax_doc.read_bytes() != document_before:
+            raise ValidationError("durable fax outbox job changed across runtime replacement")
+
+        output_after = {
+            p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out.glob("*")
+            if p.is_file()
+        }
+        if output_after != output_before:
+            raise ValidationError("user document/artifact set changed across runtime replacement")
+
+        ssl_after = {
+            str(p.relative_to(ssl_root)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in ssl_root.rglob("*")
+            if p.is_file()
+        } if ssl_root.exists() else {}
+        if ssl_after != ssl_before:
+            raise ValidationError("stable CUPS TLS/identity material changed across runtime replacement")
+
+        _, after_state = http_json("GET", "/api/v1/destinations")
+        if after_state.get("destinations") != first.get("destinations"):
+            raise ValidationError("control-plane desired resources did not recover across runtime replacement")
+
         return {
             "image_repo_digests": repo_digests,
             "virtual_pdf_queue": "PASS",
@@ -602,6 +685,9 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
             "management_api": "PASS",
             "management_webui": "PASS",
             "idempotent_destination_put_delete": "PASS",
+            "stateless_disposable_runtime": "PASS",
+            "persistent_roots": ["/config", "/spool", "/data"],
+            "container_replacement_recovery": "PASS",
         }
     finally:
         dc("down", "-v", "--remove-orphans", check=False)
