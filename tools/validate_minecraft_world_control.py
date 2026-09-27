@@ -14,6 +14,14 @@ ROOT = Path(__file__).resolve().parents[1]
 PIN = ROOT / ".foundry" / "truenas-apps-upstream.json"
 VALUES = ROOT / ".foundry" / "controls" / "minecraft-paper-world-hostpath-values.yaml"
 WORLD_SOURCE = "/opt/tests/collage-world-only"
+OWNERSHIP_ENV = {
+    "SUPRACRAFT_COLLAGE_MANAGED": "true",
+    "SUPRACRAFT_COLLAGE_SCHEMA": "1",
+    "SUPRACRAFT_COLLAGE_MANAGER_ID": "manager-rdte",
+    "SUPRACRAFT_COLLAGE_FLEET_ID": "rdte",
+    "SUPRACRAFT_COLLAGE_SERVICE_ID": "11111111-1111-4111-8111-111111111111",
+    "SUPRACRAFT_COLLAGE_WORLD_ID": "world-rdte-001",
+}
 
 class ValidationError(RuntimeError):
     pass
@@ -134,6 +142,14 @@ def validate():
         env=envmap(service)
         if env.get("TYPE")!="PAPER":
             raise ValidationError("TYPE=PAPER not preserved")
+        observed_ownership={
+            key:value for key,value in env.items()
+            if key.startswith("SUPRACRAFT_COLLAGE_")
+        }
+        if observed_ownership != OWNERSHIP_ENV:
+            raise ValidationError(
+                f"COLLAGE ownership metadata drift: {observed_ownership!r}"
+            )
 
         all_mounts=mounts(service)
         data=[m for m in all_mounts if m["target"]=="/data"]
@@ -158,7 +174,7 @@ def validate():
         return {
             "result":"PASS",
             "experiment":"COLLAGE H3 world-only source-render control",
-            "trust_claim":"Pinned upstream TrueNAS Minecraft app can keep ordinary /data on App storage while independently mounting a writable external world at /data/world",
+            "trust_claim":"Pinned upstream TrueNAS Minecraft app can keep ordinary /data on App storage, independently mount a writable external world at /data/world, and carry bounded non-secret COLLAGE ownership/adoption metadata through its supported additional_envs surface",
             "upstream":{
                 "repository":pin["repository"],
                 "ref":ref,
@@ -170,6 +186,7 @@ def validate():
                 "type":env.get("TYPE"),
                 "base_data_mount":data[0],
                 "world_mount":world[0],
+                "ownership_metadata":observed_ownership,
             },
             "platform_normalization":{
                 "dependency_identity_sha256":plan.get("dependency_identity_sha256"),
@@ -179,6 +196,7 @@ def validate():
                 "no live TrueNAS qualification",
                 "no proof yet that Paper creates/loads the world successfully through the nested mount",
                 "no snapshot/clone or single-writer qualification",
+                "no proof yet that TrueNAS app.query/GetAppWithConfig returns the persisted ownership metadata after live install or controller restart",
             ],
             "compose_sha256":hashlib.sha256(canonical).hexdigest(),
         }
