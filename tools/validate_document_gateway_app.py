@@ -337,7 +337,17 @@ def runtime_smoke(checkout: Path, app_dir: Path) -> dict[str, Any]:
     render(checkout, app_dir, "basic-values.yaml")
     rendered = app_dir / "templates" / "rendered" / "docker-compose.yaml"
 
-    run(["docker", "pull", IMAGE])
+    pull_error = ""
+    for attempt in range(1, 4):
+        cp = run(["docker", "pull", IMAGE], check=False)
+        if cp.returncode == 0:
+            break
+        pull_error = (cp.stderr or cp.stdout or "")[-3000:]
+        if attempt < 3:
+            time.sleep(attempt * 3)
+    else:
+        raise ValidationError(f"image pull failed after 3 attempts: {pull_error}")
+
     digests_raw = run(["docker", "image", "inspect", IMAGE, "--format", "{{json .RepoDigests}}"]).stdout.strip()
     try:
         repo_digests = json.loads(digests_raw)
