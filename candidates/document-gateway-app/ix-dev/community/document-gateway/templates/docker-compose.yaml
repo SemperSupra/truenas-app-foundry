@@ -200,6 +200,7 @@ def reconcile(config, last_generation=None):
 def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     patch_pdf_backend()
+    bootstrap_desired(config)
 
     child = subprocess.Popen(["/root/run_cups.sh"], env=os.environ.copy())
     def stop(signum, frame):
@@ -212,7 +213,6 @@ def main():
     try:
         wait_for_cups()
         provision_pdf(config)
-        bootstrap_desired(config)
         generation = None
         emit("ready", queue=config["pdf_queue"], desired_state=str(DESIRED))
         while child.poll() is None:
@@ -641,8 +641,10 @@ def load_json(path, default):
 
 def bootstrap(config):
     CONTROL.mkdir(parents=True, exist_ok=True)
-    if DESIRED.exists():
-        return
+    for _ in range(150):
+        if DESIRED.exists():
+            return
+        time.sleep(0.1)
     destinations = {}
     for printer in config.get("bootstrap_printers", []):
         queue = printer["queue_name"]
@@ -655,11 +657,12 @@ def bootstrap(config):
             "model": printer.get("model", ""),
             "shared": bool(printer.get("shared", True)),
         }
-    atomic_json(DESIRED, {
-        "schema_version": 1,
-        "generation": 1,
-        "destinations": destinations,
-    })
+    if not DESIRED.exists():
+        atomic_json(DESIRED, {
+            "schema_version": 1,
+            "generation": 1,
+            "destinations": destinations,
+        })
 
 def validate_destination(resource_id, body):
     if not ID_RE.fullmatch(resource_id):
