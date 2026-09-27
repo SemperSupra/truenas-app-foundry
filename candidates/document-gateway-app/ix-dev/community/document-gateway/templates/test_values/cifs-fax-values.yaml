@@ -13,6 +13,9 @@ printers:
     model: ""
     shared: true
 usb_enabled: false
+fax_outbox:
+  enabled: true
+  sender: "null"
 intake:
   scan_enabled: true
   fax_mode: cifs
