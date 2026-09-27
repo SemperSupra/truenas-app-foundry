@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -12,6 +13,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -138,11 +141,12 @@ def config_content(compose: dict[str, Any], name: str) -> str:
 
 def assert_basic(compose: dict[str, Any]) -> None:
     services = compose.get("services") or {}
-    if set(services) != {"cups", "normalizer", "fax-sender"}:
+    if set(services) != {"cups", "normalizer", "fax-sender", "control"}:
         raise ValidationError(f"unexpected service inventory: {sorted(services)}")
     cups = services["cups"]
     norm = services["normalizer"]
     fax_sender = services["fax-sender"]
+    control = services["control"]
     for name, svc in services.items():
         if svc.get("image") != IMAGE:
             raise ValidationError(f"{name}: image drift {svc.get('image')!r}")
@@ -157,24 +161,31 @@ def assert_basic(compose: dict[str, Any]) -> None:
         raise ValidationError("normalizer must have network disabled")
     if fax_sender.get("network_mode") != "none":
         raise ValidationError("null fax sender must have network disabled")
+    control_ports = control.get("ports") or []
+    if not any(isinstance(p, dict) and int(p.get("target", 0)) == 8080 for p in control_ports):
+        raise ValidationError("management API target 8080 was not published")
 
     cups_mounts = service_mounts(cups)
     norm_mounts = service_mounts(norm)
     fax_mounts = service_mounts(fax_sender)
+    control_mounts = service_mounts(control)
     if set(cups_mounts) != {"/config", "/spool"}:
         raise ValidationError(f"CUPS mount contract drift: {sorted(cups_mounts)}")
     if set(norm_mounts) != {"/data", "/spool"}:
         raise ValidationError(f"normalizer mount contract drift: {sorted(norm_mounts)}")
     if set(fax_mounts) != {"/data"}:
         raise ValidationError(f"fax sender mount contract drift: {sorted(fax_mounts)}")
+    if set(control_mounts) != {"/data", "/spool"}:
+        raise ValidationError(f"control-plane mount contract drift: {sorted(control_mounts)}")
 
     gateway_py = config_content(compose, "document-gateway-cups-script")
     norm_py = config_content(compose, "document-gateway-normalizer-script")
     fax_py = config_content(compose, "document-gateway-fax-sender-script")
+    control_py = config_content(compose, "document-gateway-control-script")
     gateway_cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
     norm_cfg = json.loads(config_content(compose, "document-gateway-normalizer-config"))
 
-    for needle in ("lpadmin", "cups-pdf:/", "printer-is-shared", "/spool/pdf"):
+    for needle in ("lpadmin", "cups-pdf:/", "printer-is-shared", "/spool/pdf", "desired.json", "reconcile"):
         if needle not in gateway_py:
             raise ValidationError(f"CUPS gateway script missing {needle!r}")
     if gateway_cfg["pdf_queue"] != "Save_to_Documents":
@@ -200,6 +211,12 @@ def assert_basic(compose: dict[str, Any]) -> None:
     for needle in ("class NullSender", "can_transmit = False", "pending_valid", "job.json", "application/pdf"):
         if needle not in fax_py:
             raise ValidationError(f"null fax sender contract missing {needle!r}")
+    control_cfg = json.loads(config_content(compose, "document-gateway-control-config"))
+    if control_cfg.get("api_version") != "document-gateway.control/v1":
+        raise ValidationError("control API version drift")
+    for needle in ("/api/v1/destinations", "do_PUT", "do_DELETE", "changed", "generation", "document-gateway.control/v1"):
+        if needle not in control_py:
+            raise ValidationError(f"control-plane contract missing {needle!r}")
 
 
 def assert_host_mdns(compose: dict[str, Any]) -> None:
@@ -265,7 +282,7 @@ def assert_ux_contract() -> dict[str, Any]:
     data = yaml.safe_load((SOURCE / "questions.yaml").read_text(encoding="utf-8"))
     groups = {g["name"] for g in data.get("groups") or []}
     expected_groups = {
-        "Gateway Basics", "Physical Printers", "Document Intake", "Fax Outbox", "File Naming",
+        "Gateway Basics", "Management", "Physical Printers", "Document Intake", "Fax Outbox", "File Naming",
         "Network & Discovery", "Storage", "Resources",
     }
     if groups != expected_groups:
@@ -273,6 +290,7 @@ def assert_ux_contract() -> dict[str, Any]:
 
     questions = data.get("questions") or []
     gateway = find_question(questions, "gateway")
+    management = find_question(questions, "management")
     printers = find_question(questions, "printers")
     usb = find_question(questions, "usb_enabled")
     intake = find_question(questions, "intake")
@@ -283,6 +301,8 @@ def assert_ux_contract() -> dict[str, Any]:
 
     if not (find_attr(gateway, "admin_password").get("schema") or {}).get("private"):
         raise ValidationError("CUPS password is not private in UI schema")
+    if (find_attr(management, "enabled").get("schema") or {}).get("default") is not True:
+        raise ValidationError("common management WebUI/API must be enabled by default")
     if (find_attr(network, "mode").get("schema") or {}).get("default") != "published_ipp":
         raise ValidationError("safe IPP mode must remain default")
     if (find_attr(intake, "fax_mode").get("schema") or {}).get("default") != "data_folder":
@@ -328,6 +348,7 @@ def assert_ux_contract() -> dict[str, Any]:
     return {
         "human_groups": sorted(groups),
         "safe_network_default": "published_ipp",
+        "management_default": "enabled",
         "fax_default": "data_folder",
         "fax_sender_default": "null",
         "naming_default": "readable",
