@@ -5,6 +5,13 @@ gateway:
   mdns_hostname: document-gateway-ci
   pdf_queue: Save_to_Documents
   pdf_display_name: Save to Documents
+management:
+  enabled: true
+  port:
+    bind_mode: published
+    port_number: 30880
+    container_port: 8080
+    host_ips: []
 printers:
   - queue_name: Brother_Office
     display_name: Brother Office
