@@ -1,27 +1,17 @@
 groups:
-  - name: Gateway Basics
-    description: "The few settings most homes need: administrator login, timezone, and the PDF printer name."
-  - name: Management
-    description: Versioned control API and WebUI. Uses the CUPS administrator credentials for the initial candidate.
-  - name: Physical Printers
-    description: Optional Brother or other printers that this gateway should expose through CUPS/IPP.
-  - name: Document Intake
-    description: Scanner, fax, and document-library settings. All sources are normalized into one output directory.
-  - name: Fax Outbox
-    description: Queue outbound fax jobs independently from any specific fax transport or device.
-  - name: File Naming
-    description: Human-readable deterministic output naming and optional metadata sidecars.
-  - name: Network & Discovery
-    description: Choose safe explicit IPP access or enable LAN discovery when your network supports it.
-  - name: Storage
-    description: Persistent CUPS state, working spool, and the final document library.
-  - name: Resources
+  - name: Document Gateway Configuration
+    description: Bootstrap settings for the gateway. Routine queue, job, route, and output management belongs in the Document Gateway WebUI.
+  - name: Network Configuration
+    description: Published ports, management access, and optional printer discovery networking.
+  - name: Storage Configuration
+    description: Persistent CUPS state, working spool, document library, and optional external fax intake.
+  - name: Resources Configuration
     description: CPU and memory limits.
 
 questions:
   - variable: TZ
     label: Timezone
-    group: Gateway Basics
+    group: Document Gateway Configuration
     schema:
       type: string
       default: Europe/Berlin
@@ -31,7 +21,7 @@ questions:
 
   - variable: gateway
     label: ""
-    group: Gateway Basics
+    group: Document Gateway Configuration
     schema:
       type: dict
       attrs:
@@ -76,7 +66,7 @@ questions:
 
   - variable: management
     label: ""
-    group: Management
+    group: Network Configuration
     schema:
       type: dict
       attrs:
@@ -133,7 +123,7 @@ questions:
 
   - variable: printers
     label: Physical Printers
-    group: Physical Printers
+    group: Document Gateway Configuration
     schema:
       type: list
       default: []
@@ -189,7 +179,7 @@ questions:
                   default: true
   - variable: usb_enabled
     label: Allow USB Printers
-    group: Physical Printers
+    group: Document Gateway Configuration
     description: Pass the USB bus into CUPS. Leave off for normal network-connected Brother printers.
     schema:
       type: boolean
@@ -197,7 +187,7 @@ questions:
 
   - variable: intake
     label: ""
-    group: Document Intake
+    group: Document Gateway Configuration
     schema:
       type: dict
       attrs:
@@ -288,7 +278,7 @@ questions:
 
   - variable: fax_outbox
     label: ""
-    group: Fax Outbox
+    group: Document Gateway Configuration
     schema:
       type: dict
       attrs:
@@ -311,7 +301,7 @@ questions:
 
   - variable: naming
     label: ""
-    group: File Naming
+    group: Document Gateway Configuration
     schema:
       type: dict
       attrs:
@@ -350,7 +340,7 @@ questions:
 
   - variable: network
     label: ""
-    group: Network & Discovery
+    group: Network Configuration
     schema:
       type: dict
       attrs:
@@ -433,7 +423,7 @@ questions:
 
   - variable: storage
     label: ""
-    group: Storage
+    group: Storage Configuration
     schema:
       type: dict
       attrs:
@@ -590,7 +580,7 @@ questions:
 
   - variable: resources
     label: ""
-    group: Resources
+    group: Resources Configuration
     schema:
       type: dict
       attrs:
