@@ -11,7 +11,8 @@
 {% set gateway_config = {
   "pdf_queue": values.gateway.pdf_queue,
   "pdf_display_name": values.gateway.pdf_display_name,
-  "printers": values.printers
+  "printers": values.printers,
+  "network_mode": values.network.mode
 } %}
 {% set normalizer_config = {
   "scan_enabled": values.intake.scan_enabled,
@@ -109,6 +110,26 @@ def wait_for_cups(timeout=75):
         last = (cp.stderr or cp.stdout).strip()
         time.sleep(1)
     raise RuntimeError(f"CUPS did not become ready: {last}")
+
+def configure_discovery(config):
+    mode = config.get("network_mode", "published_ipp")
+    args = ["cupsctl", "--share-printers"]
+    if mode == "published_ipp":
+        args.append("BrowseLocalProtocols=none")
+        profile = "off"
+    else:
+        args.extend([
+            "BrowseLocalProtocols=dnssd",
+            "BrowseDNSSDSubTypes=_print,_universal",
+        ])
+        profile = "driverless"
+    run_retry(args)
+    emit(
+        "discovery_configured",
+        network_mode=mode,
+        profile=profile,
+        dnssd_subtypes=[] if profile == "off" else ["_print", "_universal"],
+    )
 
 def cups_pdf_model():
     # The selected image explicitly installs the Alpine cups-pdf package.
@@ -232,6 +253,7 @@ def main():
 
     try:
         wait_for_cups()
+        configure_discovery(config)
         provision_pdf(config)
         generation = None
         emit("ready", queue=config["pdf_queue"], desired_state=str(DESIRED))
