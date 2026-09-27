@@ -62,14 +62,13 @@ def wait_for_cups(timeout=75):
     raise RuntimeError(f"CUPS did not become ready: {last}")
 
 def cups_pdf_model():
-    cp = run(["lpinfo", "-m"])
-    for line in cp.stdout.splitlines():
-        lower = line.lower()
-        if "cups-pdf" in lower or "cups pdf" in lower:
-            return line.split(None, 1)[0]
-    fallback = "drv:///cups-pdf.drv/Generic-CUPS-PDF-Printer.ppd"
-    emit("pdf_model_fallback", model=fallback)
-    return fallback
+    # The selected image explicitly installs the Alpine cups-pdf package.
+    # Avoid lpinfo model discovery here: some CUPS 2.4 client/server startup
+    # combinations return EBADF even after lpstat reports the scheduler running.
+    # The live print smoke below proves this fixed driver path on every candidate.
+    model = "drv:///cups-pdf.drv/Generic-CUPS-PDF-Printer.ppd"
+    emit("pdf_model_selected", model=model)
+    return model
 
 def provision(config):
     model = cups_pdf_model()
