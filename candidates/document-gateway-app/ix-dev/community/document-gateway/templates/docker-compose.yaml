@@ -340,6 +340,8 @@ if __name__ == "__main__":
 {% do cups.environment.add_env("CUPSADMIN", values.gateway.admin_user) %}
 {% do cups.environment.add_env("CUPSPASSWORD", values.gateway.admin_password) %}
 {% do cups.environment.add_env("AVAHI_HOSTNAME", values.gateway.mdns_hostname) %}
+{# Force libcups client commands onto the daemon's TCP listener instead of relying on an internal Unix-domain socket. #}
+{% do cups.environment.add_env("CUPS_SERVER", "127.0.0.1:631") %}
 {% do cups.configs.add("document-gateway-cups-script", gateway_script, values.consts.gateway_script_path, "0555") %}
 {% do cups.configs.add("document-gateway-cups-config", gateway_config | tojson, values.consts.gateway_config_path, "0400") %}
 {% do cups.set_entrypoint(["python3", values.consts.gateway_script_path]) %}
