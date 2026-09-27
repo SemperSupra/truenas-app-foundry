@@ -9,7 +9,7 @@ A public-safe TrueNAS App candidate that turns CUPS into a small home document g
 - **Fax Outbox** -> backend-neutral durable fax jobs with a pluggable sender API; the public candidate ships only a non-transmitting `null` sender;
 - deterministic naming, collision handling, checksums, optional JSON sidecars, and an always-on hidden JSONL event journal.
 
-See [CONTROL_PLANE.md](CONTROL_PLANE.md) for the format/export model and the planned common idempotent management API used by WebUI, CLI, API clients, MCP, and future native GUIs.
+See [CONTROL_PLANE.md](CONTROL_PLANE.md) for the common idempotent management model, [OUTPUT_PLUGIN_ABI.md](OUTPUT_PLUGIN_ABI.md) for the renderer/export ABI, and [DISCOVERY_CONTRACT.md](DISCOVERY_CONTRACT.md) for Windows/Linux/macOS/iOS/Android virtual-printer discovery targets.
 
 ## Three audiences
 
@@ -65,9 +65,11 @@ Sources are `print`, `scan`, and `fax`. Name collisions append `__02`, `__03`, a
 
 ## Network modes
 
-- **Published IPP** — safe default; CUPS is exposed on a chosen TrueNAS host port. Clients add the queue by address. No claim of automatic mDNS discovery.
-- **Dedicated LAN identity** — best fit for AirPrint/Mopria discovery. Requires a pre-created external Docker/macvlan network and reserved IP; HIL qualification is required.
-- **Host network mDNS** — compatibility fallback. Upstream warns that NAS-host Avahi and container Avahi can collide on UDP 5353, so this is not the default.
+- **Published IPP** — safe default; CUPS is exposed on a chosen TrueNAS host port. Clients add the queue by address. DNS-SD publication is disabled for this profile.
+- **Dedicated LAN identity** — preferred auto-discovery target. CUPS advertises shared queues through DNS-SD as driverless IPP Everywhere/AirPrint (`_print` + `_universal` subtypes). Requires a pre-created external Docker/macvlan network and reserved IP; HIL qualification is required.
+- **Host network mDNS** — same driverless DNS-SD target as above, but a compatibility fallback because NAS-host Avahi and container Avahi can collide on UDP 5353.
+
+The protocol target is intentionally broader than the certification claim: Apple/Linux are direct IPP/DNS-SD targets; Windows Ready Print and Android Default Print Service/Mopria behavior require device HIL, and the project does not claim Mopria certification.
 
 ## Qualification boundary
 
