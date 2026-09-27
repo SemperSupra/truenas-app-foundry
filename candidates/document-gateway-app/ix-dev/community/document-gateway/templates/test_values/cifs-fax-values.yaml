@@ -1,0 +1,63 @@
+TZ: Europe/Berlin
+gateway:
+  admin_user: printadmin
+  admin_password: PublicQualificationOnly123!
+  mdns_hostname: document-gateway-ci
+  pdf_queue: Save_to_Documents
+  pdf_display_name: Save to Documents
+printers:
+  - queue_name: Brother_Office
+    display_name: Brother Office
+    device_uri: ipp://192.0.2.10/ipp/print
+    driver: everywhere
+    model: ""
+    shared: true
+usb_enabled: false
+intake:
+  scan_enabled: true
+  fax_mode: cifs
+  fax_cifs:
+    server: 192.0.2.1
+    path: fritz/fax
+    username: faxreader
+    password: PublicQualificationOnly456!
+    domain: ""
+naming:
+  style: readable
+  preserve_original_name: true
+  sidecars: false
+  stable_seconds: 1
+network:
+  mode: published_ipp
+  ipp_port:
+    bind_mode: published
+    port_number: 30631
+    container_port: 631
+    host_ips: []
+
+resources:
+  limits:
+    cpus: 2.0
+    memory: 2048
+
+ix_volumes:
+  document-gateway-config: /tmp/document-gateway-ci/config
+  document-gateway-spool: /tmp/document-gateway-ci/spool
+  document-gateway-documents: /tmp/document-gateway-ci/documents
+
+storage:
+  config:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-config
+      create_host_path: true
+  spool:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-spool
+      create_host_path: true
+  documents:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: document-gateway-documents
+      create_host_path: true
