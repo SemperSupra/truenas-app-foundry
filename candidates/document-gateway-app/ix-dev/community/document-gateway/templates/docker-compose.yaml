@@ -1,0 +1,392 @@
+{% set tpl = ix_lib.base.render.Render(values) %}
+{% set cups = tpl.add_container(values.consts.cups_container_name, "image") %}
+{% set normalizer = tpl.add_container(values.consts.normalizer_container_name, "image") %}
+
+{% set gateway_config = {
+  "pdf_queue": values.gateway.pdf_queue,
+  "pdf_display_name": values.gateway.pdf_display_name,
+  "printers": values.printers
+} %}
+{% set normalizer_config = {
+  "scan_enabled": values.intake.scan_enabled,
+  "fax_mode": values.intake.fax_mode,
+  "naming_style": values.naming.style,
+  "preserve_original_name": values.naming.preserve_original_name,
+  "sidecars": values.naming.sidecars,
+  "stable_seconds": values.naming.stable_seconds
+} %}
+
+{% set gateway_script %}
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/gateway.json")
+PDF_CONFIG = Path("/etc/cups/cups-pdf.conf")
+SPOOL = Path("/spool/pdf")
+
+def emit(event, **fields):
+    record = {"component": "cups", "event": event, **fields}
+    print(json.dumps(record, sort_keys=True), flush=True)
+
+def run(args, check=True):
+    cp = subprocess.run(args, text=True, capture_output=True)
+    if check and cp.returncode:
+        raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {(cp.stderr or cp.stdout).strip()}")
+    return cp
+
+def patch_pdf_backend():
+    SPOOL.mkdir(parents=True, exist_ok=True)
+    text = PDF_CONFIG.read_text(encoding="utf-8")
+    if re.search(r"(?m)^\s*Out\s+", text):
+        text = re.sub(r"(?m)^\s*Out\s+.*$", "Out /spool/pdf", text)
+    else:
+        text += "\nOut /spool/pdf\n"
+    PDF_CONFIG.write_text(text, encoding="utf-8")
+    emit("pdf_backend_configured", output=str(SPOOL))
+
+def wait_for_cups(timeout=75):
+    deadline = time.time() + timeout
+    last = ""
+    while time.time() < deadline:
+        cp = run(["lpstat", "-r"], check=False)
+        if cp.returncode == 0 and "running" in cp.stdout.lower():
+            return
+        last = (cp.stderr or cp.stdout).strip()
+        time.sleep(1)
+    raise RuntimeError(f"CUPS did not become ready: {last}")
+
+def cups_pdf_model():
+    cp = run(["lpinfo", "-m"])
+    for line in cp.stdout.splitlines():
+        lower = line.lower()
+        if "cups-pdf" in lower or "cups pdf" in lower:
+            return line.split(None, 1)[0]
+    fallback = "drv:///cups-pdf.drv/Generic-CUPS-PDF-Printer.ppd"
+    emit("pdf_model_fallback", model=fallback)
+    return fallback
+
+def provision(config):
+    model = cups_pdf_model()
+    run([
+        "lpadmin", "-p", config["pdf_queue"], "-E",
+        "-v", "cups-pdf:/", "-m", model,
+        "-D", config["pdf_display_name"],
+        "-o", "printer-is-shared=true",
+    ])
+    emit("queue_ready", queue=config["pdf_queue"], kind="pdf", model=model)
+
+    for printer in config.get("printers", []):
+        model = "everywhere"
+        if printer.get("driver") == "custom":
+            model = printer.get("model", "").strip()
+            if not model:
+                raise RuntimeError(f"custom model missing for {printer['queue_name']}")
+        args = [
+            "lpadmin", "-p", printer["queue_name"], "-E",
+            "-v", printer["device_uri"], "-m", model,
+            "-D", printer["display_name"],
+            "-o", "printer-is-shared=" + ("true" if printer.get("shared", True) else "false"),
+        ]
+        run(args)
+        emit("queue_ready", queue=printer["queue_name"], kind="physical", driver=model)
+
+def main():
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    patch_pdf_backend()
+
+    child = subprocess.Popen(["/root/run_cups.sh"], env=os.environ.copy())
+    def stop(signum, frame):
+        emit("signal", signal=signum)
+        if child.poll() is None:
+            child.terminate()
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    try:
+        wait_for_cups()
+        provision(config)
+        emit("ready", queues=[config["pdf_queue"]] + [p["queue_name"] for p in config.get("printers", [])])
+        return child.wait()
+    except Exception as exc:
+        emit("fatal", error=str(exc))
+        if child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+        return 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+{% endset %}
+
+{% set normalizer_script %}
+import hashlib
+import json
+import os
+import re
+import shutil
+import time
+from datetime import datetime
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/normalizer.json")
+DATA = Path("/data")
+SPOOL = Path("/spool")
+META = DATA / ".document-gateway"
+OUTPUT = DATA / "output"
+LEDGER = SPOOL / "state" / "normalizer.json"
+STATUS = META / "status.json"
+CONTRACT = META / "contract.json"
+JOURNAL = META / "events.jsonl"
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def emit(event, **fields):
+    record = {
+        "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "component": "normalizer",
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(record, sort_keys=True), flush=True)
+    META.mkdir(parents=True, exist_ok=True)
+    with JOURNAL.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
+
+def load_ledger():
+    try:
+        return json.loads(LEDGER.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"fax_fingerprints": {}}
+
+def save_ledger(ledger):
+    atomic_json(LEDGER, ledger)
+
+def safe_stem(value):
+    value = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())
+    value = re.sub(r"-+", "-", value).strip("-._")
+    return value[:96] or "document"
+
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+def target_name(path, source, style, preserve):
+    ts = datetime.fromtimestamp(path.stat().st_mtime).astimezone()
+    stamp = ts.strftime("%Y-%m-%d_%H-%M-%S" if style == "readable" else "%Y%m%dT%H%M%S")
+    suffix = path.suffix.lower()
+    if preserve:
+        base = safe_stem(path.stem)
+        name = f"{stamp}__{source}__{base}{suffix}"
+    else:
+        name = f"{stamp}__{source}{suffix}"
+    candidate = OUTPUT / name
+    n = 2
+    while candidate.exists():
+        candidate = OUTPUT / f"{Path(name).stem}__{n:02d}{suffix}"
+        n += 1
+    return candidate
+
+def write_contract(config, sources):
+    atomic_json(CONTRACT, {
+        "schema_version": 1,
+        "service": "document-gateway",
+        "paths": {
+            "print_ingress": "/spool/pdf",
+            "scan_ingress": "/data/incoming/scan",
+            "fax_ingress": sources.get("fax", {}).get("path"),
+            "normalized_output": "/data/output",
+            "status": "/data/.document-gateway/status.json",
+            "events": "/data/.document-gateway/events.jsonl",
+        },
+        "naming": {
+            "style": config["naming_style"],
+            "preserve_original_name": config["preserve_original_name"],
+            "collision_suffix": "__NN",
+        },
+        "sources": sorted(sources),
+    })
+
+def iter_files(root):
+    if not root.exists():
+        return
+    for path in root.rglob("*"):
+        if path.is_file() and not path.name.startswith("."):
+            yield path
+
+def main():
+    if hasattr(time, "tzset"):
+        time.tzset()
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (DATA / "incoming" / "scan").mkdir(parents=True, exist_ok=True)
+    (DATA / "incoming" / "fax").mkdir(parents=True, exist_ok=True)
+    (SPOOL / "pdf").mkdir(parents=True, exist_ok=True)
+    (SPOOL / "state").mkdir(parents=True, exist_ok=True)
+    META.mkdir(parents=True, exist_ok=True)
+
+    sources = {
+        "print": {"path": "/spool/pdf", "destructive": True},
+    }
+    if config.get("scan_enabled", True):
+        sources["scan"] = {"path": "/data/incoming/scan", "destructive": True}
+    fax_mode = config.get("fax_mode", "disabled")
+    if fax_mode == "data_folder":
+        sources["fax"] = {"path": "/data/incoming/fax", "destructive": True}
+    elif fax_mode in {"host_path", "cifs"}:
+        sources["fax"] = {"path": "/fax-source", "destructive": False}
+
+    write_contract(config, sources)
+    ledger = load_ledger()
+    stable = {}
+    counters = {"processed": 0, "errors": 0}
+    last_event = emit("ready", sources=sources, output="/data/output")
+
+    while True:
+        seen = set()
+        for source, spec in sources.items():
+            root = Path(spec["path"])
+            for path in iter_files(root) or []:
+                key = f"{source}:{path}"
+                seen.add(key)
+                try:
+                    st = path.stat()
+                except FileNotFoundError:
+                    continue
+                signature = (st.st_size, st.st_mtime_ns)
+                old = stable.get(key)
+                now = time.monotonic()
+                if not old or old["signature"] != signature:
+                    stable[key] = {"signature": signature, "since": now}
+                    continue
+                if now - old["since"] < config["stable_seconds"]:
+                    continue
+
+                try:
+                    digest = sha256(path)
+                    fingerprint = f"{path}:{st.st_size}:{st.st_mtime_ns}:{digest}"
+                    if not spec["destructive"] and ledger["fax_fingerprints"].get(str(path)) == fingerprint:
+                        stable.pop(key, None)
+                        continue
+
+                    target = target_name(
+                        path, source, config["naming_style"], config["preserve_original_name"]
+                    )
+                    tmp = target.with_name("." + target.name + ".partial")
+                    shutil.copy2(path, tmp)
+                    os.replace(tmp, target)
+                    meta = {
+                        "source": source,
+                        "original_path": str(path),
+                        "original_name": path.name,
+                        "output_name": target.name,
+                        "size": target.stat().st_size,
+                        "sha256": digest,
+                        "imported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                    }
+                    if config.get("sidecars"):
+                        atomic_json(target.with_suffix(target.suffix + ".json"), meta)
+                    if spec["destructive"]:
+                        try:
+                            path.unlink()
+                        except FileNotFoundError:
+                            pass
+                    else:
+                        ledger["fax_fingerprints"][str(path)] = fingerprint
+                        save_ledger(ledger)
+                    counters["processed"] += 1
+                    last_event = emit("document_imported", **meta)
+                    stable.pop(key, None)
+                except Exception as exc:
+                    counters["errors"] += 1
+                    last_event = emit("import_error", source=source, path=str(path), error=str(exc))
+                    stable.pop(key, None)
+
+        for key in list(stable):
+            if key not in seen:
+                stable.pop(key, None)
+
+        atomic_json(STATUS, {
+            "schema_version": 1,
+            "state": "running",
+            "processed": counters["processed"],
+            "errors": counters["errors"],
+            "last_event": last_event,
+        })
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
+{% endset %}
+
+{% do cups.set_user(0, 0) %}
+{% do cups.environment.add_env("CUPSADMIN", values.gateway.admin_user) %}
+{% do cups.environment.add_env("CUPSPASSWORD", values.gateway.admin_password) %}
+{% do cups.environment.add_env("AVAHI_HOSTNAME", values.gateway.mdns_hostname) %}
+{% do cups.environment.add_env("TZ", values.TZ) %}
+{% do cups.configs.add("document-gateway-cups-script", gateway_script, values.consts.gateway_script_path, "0555") %}
+{% do cups.configs.add("document-gateway-cups-config", gateway_config | tojson, values.consts.gateway_config_path, "0400") %}
+{% do cups.set_entrypoint(["python3", values.consts.gateway_script_path]) %}
+{% do cups.set_command(["run"]) %}
+{% do cups.add_storage(values.consts.cups_config_path, values.storage.config) %}
+{% do cups.add_storage(values.consts.spool_path, values.storage.spool) %}
+{% if values.printers.usb_enabled is defined and values.printers.usb_enabled %}
+  {% do cups.add_usb_bus() %}
+{% endif %}
+{% do cups.healthcheck.set_test("wget", {"port": 631, "path": "/", "scheme": "http", "spider": true}) %}
+{% do cups.healthcheck.set_start_period(45) %}
+{% do cups.healthcheck.set_retries(10) %}
+
+{% if values.network.mode == "published_ipp" %}
+  {% do cups.add_port(values.network.ipp_port) %}
+  {% do tpl.portals.add(values.network.ipp_port, {"name": "CUPS Admin", "scheme": "http"}) %}
+{% elif values.network.mode == "host_mdns" %}
+  {% do cups.set_network_mode("host") %}
+{% elif values.network.mode == "external_lan" %}
+  {% do tpl.networks.register(values.network.external_network.name) %}
+  {% do cups.add_network(values.network.external_network.name, {"ipv4_address": values.network.external_network.ipv4_address}) %}
+{% endif %}
+
+{% do normalizer.set_user(0, 0) %}
+{% do normalizer.set_network_mode("none") %}
+{% do normalizer.environment.add_env("TZ", values.TZ) %}
+{% do normalizer.configs.add("document-gateway-normalizer-script", normalizer_script, values.consts.normalizer_script_path, "0555") %}
+{% do normalizer.configs.add("document-gateway-normalizer-config", normalizer_config | tojson, values.consts.normalizer_config_path, "0444") %}
+{% do normalizer.set_entrypoint(["python3", values.consts.normalizer_script_path]) %}
+{% do normalizer.set_command(["run"]) %}
+{% do normalizer.add_storage(values.consts.spool_path, values.storage.spool) %}
+{% do normalizer.add_storage(values.consts.data_path, values.storage.documents) %}
+
+{% if values.intake.fax_mode == "host_path" %}
+  {% set fax_storage = {
+    "type": "host_path",
+    "read_only": true,
+    "host_path_config": values.intake.fax_host_path
+  } %}
+  {% do normalizer.add_storage(values.consts.fax_source_path, fax_storage) %}
+{% elif values.intake.fax_mode == "cifs" %}
+  {% set fax_storage = {
+    "type": "cifs",
+    "read_only": true,
+    "cifs_config": values.intake.fax_cifs
+  } %}
+  {% do normalizer.add_storage(values.consts.fax_source_path, fax_storage) %}
+{% endif %}
+
+{{ tpl.render() | tojson }}
