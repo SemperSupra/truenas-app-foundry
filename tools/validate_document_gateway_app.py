@@ -185,11 +185,17 @@ def assert_basic(compose: dict[str, Any]) -> None:
     gateway_cfg = json.loads(config_content(compose, "document-gateway-cups-config"))
     norm_cfg = json.loads(config_content(compose, "document-gateway-normalizer-config"))
 
-    for needle in ("lpadmin", "cups-pdf:/", "printer-is-shared", "/spool/pdf", "desired.json", "reconcile"):
+    for needle in (
+        "lpadmin", "cups-pdf:/", "printer-is-shared", "/spool/pdf",
+        "desired.json", "reconcile", "BrowseLocalProtocols=none",
+        "BrowseLocalProtocols=dnssd", "BrowseDNSSDSubTypes=_print,_universal",
+    ):
         if needle not in gateway_py:
             raise ValidationError(f"CUPS gateway script missing {needle!r}")
     if gateway_cfg["pdf_queue"] != "Save_to_Documents":
         raise ValidationError("virtual PDF queue contract drift")
+    if gateway_cfg.get("network_mode") != "published_ipp":
+        raise ValidationError("basic profile discovery/network intent drift")
     for needle in (
         'META = DATA / ".document-gateway"',
         'CONTRACT = META / "contract.json"',
