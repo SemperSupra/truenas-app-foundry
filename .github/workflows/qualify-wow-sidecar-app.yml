@@ -1,0 +1,97 @@
+name: Qualify WOW Sidecar TrueNAS App
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/wow-sidecar-app/**'
+      - 'tools/validate_wow_sidecar_candidate.py'
+      - 'tools/validate_wow_sidecar_app.py'
+      - 'tests/test_wow_sidecar_candidate.py'
+      - '.github/workflows/qualify-wow-sidecar-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Validate candidate state and falsifiers
+        run: |
+          set -euo pipefail
+          python3 tools/validate_wow_sidecar_candidate.py --candidate candidates/wow-sidecar-app/candidate.json
+          python3 -m unittest -v tests.test_wow_sidecar_candidate
+
+      - name: Resolve permissions helper candidate
+        id: helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$(python3 - <<'PY'
+          import json
+          d=json.load(open("candidates/wow-sidecar-app/candidate.json"))
+          print(d["permissions_helper"]["reference"] or "")
+          PY
+          )"
+          if [[ -z "$ref" ]]; then
+            docker pull ixsystems/container-utils:1.0.2 >/dev/null
+            candidate="$(docker image inspect ixsystems/container-utils:1.0.2 --format '{{index .RepoDigests 0}}')"
+            echo "PERMISSIONS-HELPER-CANDIDATE:$candidate"
+            echo "Pin this exact digest in candidate.json and ix_values.yaml before render qualification." >&2
+            exit 3
+          fi
+          echo "reference=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Pull exact WOW and helper images
+        id: pull
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          wow="$(python3 - <<'PY'
+          import json
+          d=json.load(open("candidates/wow-sidecar-app/candidate.json"))
+          print(d["container"]["registry_reference"])
+          PY
+          )"
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          if docker pull "$wow"; then
+            echo 'public_pull=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'public_pull=false' >> "$GITHUB_OUTPUT"
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$wow"
+          fi
+          docker pull "${{ steps.helper.outputs.reference }}"
+
+      - name: Qualify pinned TrueNAS render and seed behavior
+        shell: bash
+        env:
+          PUBLIC_PULL: ${{ steps.pull.outputs.public_pull }}
+        run: |
+          set -euo pipefail
+          sudo -n python3 tools/validate_wow_sidecar_app.py             --public-pull "$PUBLIC_PULL"             --evidence wow-sidecar-app-evidence.json
+
+      - name: Record public-safe qualification evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### WOW Sidecar TrueNAS App qualification'
+            if [[ -f wow-sidecar-app-evidence.json ]]; then
+              echo '~~~json'
+              cat wow-sidecar-app-evidence.json
+              echo '~~~'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed qualification step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
