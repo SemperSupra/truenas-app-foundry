@@ -12,6 +12,7 @@ from typing import Any
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 IMAGE_RE = re.compile(r"^ghcr\.io/sempersupra/wow-sidecar@sha256:[0-9a-f]{64}$")
+PRIVATE_REPO_RE = re.compile(r"(?:https://github\.com/)?SemperSupra/[A-Za-z0-9_.-]+-private\\b", re.IGNORECASE)
 
 
 class ValidationError(RuntimeError):
@@ -132,15 +133,14 @@ def validate(value: dict[str, Any]) -> dict[str, Any]:
     if gates.get("state_preserving_cutover_qualified") is True:
         require(gates.get("private_truenas_hil_qualified") is True, "cutover cannot precede private HIL")
 
-    rendered = json.dumps(value, sort_keys=True).lower()
-    for forbidden in (
-        "agent-dispatch-private",
-        "agent-dispatch-execution-control-private",
-        "garm-provider-truenas-private",
-        "/opt/wow-sidecar",
-        "systemd",
-    ):
-        require(forbidden not in rendered, f"private or legacy identity leaked into public candidate: {forbidden}")
+    rendered = json.dumps(value, sort_keys=True)
+    require(
+        PRIVATE_REPO_RE.search(rendered) is None,
+        "private repository identity leaked into public candidate",
+    )
+    lowered = rendered.lower()
+    for forbidden in ("/opt/wow-sidecar", "systemd"):
+        require(forbidden not in lowered, f"legacy deployment assumption leaked into public candidate: {forbidden}")
 
     return {
         "result": "PASS",
