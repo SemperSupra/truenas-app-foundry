@@ -1,6 +1,6 @@
 # WOW Sidecar TrueNAS candidate — source-qualified frontier
 
-Tracker: `SemperSupra/truenas-app-foundry-private#259`
+Private Foundry tracker retained outside the public projection.
 
 This candidate is intentionally **not yet an App package**. It freezes the source/build facts that Foundry may consume and makes later HIL eligibility mechanically fail closed.
 
