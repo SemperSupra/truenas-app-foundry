@@ -36,7 +36,7 @@
   },
   "permissions_helper": {
     "candidate": "ixsystems/container-utils:1.0.2",
-    "reference": null
+    "reference": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
   },
   "truenas_contract": {
     "deployment_kind": "custom-app",
