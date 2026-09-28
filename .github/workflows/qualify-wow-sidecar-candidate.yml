@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          published='8c2949691265027acd039fec674787da05c4fd99'
-          qualified='246a7f635c70cf93803b1932ef4129040f6ff458'
-          expected_tree='5d43ddcfb8d36748448d8c3bebef0c4abfd12f0f'
+          published='8826acc6ee5d739ba302144dd912798fda7ed424'
+          qualified='58e3936e241e0af072b43928f7b9d4e938912b18'
+          expected_tree='94c66182806260a16202982bd8fadb99f1531719'
           repo='https://github.com/SemperSupra/wow-sidecar.git'
           tmp="$(mktemp -d)"
           git -C "$tmp" init -q
