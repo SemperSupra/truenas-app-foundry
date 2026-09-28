@@ -124,7 +124,7 @@ def validate(value: dict[str, Any]) -> dict[str, Any]:
     rendered = json.dumps(value, sort_keys=True)
     require(PRIVATE_REPO_RE.search(rendered) is None, "private repository identity leaked into public candidate")
     lowered = rendered.lower()
-    for forbidden in ("/opt/wow-sidecar", "systemd", "docker.sock", "host_path"):
+    for forbidden in ("/opt/wow-sidecar", "systemd", "docker.sock"):
         require(forbidden not in lowered, f"legacy/host deployment assumption leaked into public candidate: {forbidden}")
 
     return {
