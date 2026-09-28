@@ -23,24 +23,27 @@ jobs:
           python-version: '3.12'
       - name: Validate candidate state machine
         run: |
-          python3 tools/validate_wow_sidecar_candidate.py             --candidate candidates/wow-sidecar-app/candidate.json
+          python3 tools/validate_wow_sidecar_candidate.py \
+            --candidate candidates/wow-sidecar-app/candidate.json
           python3 -m unittest -v tests.test_wow_sidecar_candidate
-      - name: Verify published WOW source and qualification-head equivalence
+      - name: Verify published WOW source and qualification-head tree equivalence
         shell: bash
         run: |
           set -euo pipefail
-          published='c68f4250db460d485eb133b763003d3762f7617e'
-          qualified='569142103e8e822a00178104b257e27b6e334638'
+          published='8c2949691265027acd039fec674787da05c4fd99'
+          qualified='246a7f635c70cf93803b1932ef4129040f6ff458'
+          expected_tree='5d43ddcfb8d36748448d8c3bebef0c4abfd12f0f'
           repo='https://github.com/SemperSupra/wow-sidecar.git'
           tmp="$(mktemp -d)"
           git -C "$tmp" init -q
           git -C "$tmp" remote add origin "$repo"
           git -C "$tmp" fetch -q --depth=1 origin "$published"
           test "$(git -C "$tmp" rev-parse FETCH_HEAD)" = "$published"
+          published_tree="$(git -C "$tmp" rev-parse "$published^{tree}")"
           git -C "$tmp" fetch -q --depth=1 origin "$qualified"
-          for path in             Dockerfile             .github/workflows/container-candidate.yml             docs/container-source-contract.md             src/wow_sidecar/container_contract.py             tests/test_container_contract.py
-          do
-            git -C "$tmp" show "$published:$path" > "$tmp/published"
-            git -C "$tmp" show "$qualified:$path" > "$tmp/qualified"
-            cmp -s "$tmp/published" "$tmp/qualified"
-          done
+          qualified_tree="$(git -C "$tmp" rev-parse "$qualified^{tree}")"
+          test "$published_tree" = "$expected_tree"
+          test "$qualified_tree" = "$expected_tree"
+          test "$published_tree" = "$qualified_tree"
+          printf 'WOW tree equivalence PASS tree=%s published=%s qualified=%s\n' \
+            "$expected_tree" "$published" "$qualified"
