@@ -1,0 +1,49 @@
+name: qualify WOW Sidecar TrueNAS source candidate
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/wow-sidecar-app/**'
+      - 'tools/validate_wow_sidecar_candidate.py'
+      - 'tests/test_wow_sidecar_candidate.py'
+      - '.github/workflows/qualify-wow-sidecar-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Validate candidate state machine
+        run: |
+          python3 tools/validate_wow_sidecar_candidate.py \
+            --candidate candidates/wow-sidecar-app/candidate.json
+          python3 -m unittest -v tests.test_wow_sidecar_candidate
+      - name: Verify published WOW source and qualification-head tree equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          published='8c2949691265027acd039fec674787da05c4fd99'
+          qualified='246a7f635c70cf93803b1932ef4129040f6ff458'
+          expected_tree='5d43ddcfb8d36748448d8c3bebef0c4abfd12f0f'
+          repo='https://github.com/SemperSupra/wow-sidecar.git'
+          tmp="$(mktemp -d)"
+          git -C "$tmp" init -q
+          git -C "$tmp" remote add origin "$repo"
+          git -C "$tmp" fetch -q --depth=1 origin "$published"
+          test "$(git -C "$tmp" rev-parse FETCH_HEAD)" = "$published"
+          published_tree="$(git -C "$tmp" rev-parse "$published^{tree}")"
+          git -C "$tmp" fetch -q --depth=1 origin "$qualified"
+          qualified_tree="$(git -C "$tmp" rev-parse "$qualified^{tree}")"
+          test "$published_tree" = "$expected_tree"
+          test "$qualified_tree" = "$expected_tree"
+          test "$published_tree" = "$qualified_tree"
+          printf 'WOW tree equivalence PASS tree=%s published=%s qualified=%s\n' \
+            "$expected_tree" "$published" "$qualified"
