@@ -1,0 +1,35 @@
+app_version: v0.0.1-58e3936e
+capabilities: []
+categories:
+- development
+- productivity
+changelog_url: https://github.com/SemperSupra/wow-sidecar
+date_added: '2026-09-28'
+description: Least-privilege WOW Sidecar trusted-host worker for TrueNAS Apps.
+home: https://github.com/SemperSupra/wow-sidecar
+host_mounts: []
+icon: https://raw.githubusercontent.com/github/explore/main/topics/github-actions/github-actions.png
+keywords:
+- github-actions
+- automation
+- wow-sidecar
+- trusted-host
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+- name: SemperSupra
+  url: https://github.com/SemperSupra
+name: wow-sidecar
+run_as_context:
+- description: WOW Sidecar runs as the fixed non-root runtime identity baked into the qualified image.
+  gid: 10001
+  group_name: wow-sidecar
+  uid: 10001
+  user_name: wow-sidecar
+screenshots: []
+sources:
+- https://github.com/SemperSupra/wow-sidecar
+- https://github.com/SemperSupra/truenas-app-foundry
+title: WOW Sidecar
+train: community
+version: 0.1.0
