@@ -42,6 +42,7 @@ class WowSidecarCandidateTests(unittest.TestCase):
     def test_render_gate_requires_immutable_permissions_helper(self):
         value = copy.deepcopy(self.value)
         value["phase"] = "render-qualified-private-hil-pending"
+        value["permissions_helper"]["reference"] = None
         value["gates"]["public_app_render_qualified"] = True
         value["gates"]["hil_eligible"] = True
         with self.assertRaisesRegex(MODULE.ValidationError, "immutable permissions helper"):
