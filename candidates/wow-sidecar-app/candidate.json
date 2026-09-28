@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "candidate": "wow-sidecar-truenas-app",
+  "phase": "source-qualified-image-unpublished",
+  "wow_source": {
+    "repository": "https://github.com/SemperSupra/wow-sidecar.git",
+    "published_revision": "c68f4250db460d485eb133b763003d3762f7617e",
+    "qualified_candidate_revision": "569142103e8e822a00178104b257e27b6e334638",
+    "qualification_runs": {
+      "compatibility": 36366148367,
+      "container_build": 36366148387
+    },
+    "qualified_container_files_byte_equivalent_to_published_revision": true
+  },
+  "container": {
+    "base_image": "python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+    "qualification_image_id": "sha256:360bd3cdf3dd8e0d0fa68297407d77e461479241bd21c16f51e3027c618badab",
+    "registry_reference": null,
+    "publication_state": "unpublished",
+    "revision_file": "/usr/share/wow-sidecar/source-revision",
+    "entrypoint": "wow-sidecar-worker",
+    "runtime_user": "wow-sidecar:wow-sidecar"
+  },
+  "truenas_contract": {
+    "deployment_kind": "custom-app",
+    "config_storage": "ix_volume",
+    "config_mount": "/etc/wow-sidecar",
+    "config_mount_read_only_for_worker": true,
+    "state_storage": "ix_volume",
+    "state_mount": "/var/lib/wow-sidecar",
+    "root_filesystem_read_only": true,
+    "temporary_filesystem": "/tmp",
+    "cap_drop_all": true,
+    "no_new_privileges": true,
+    "privileged": false,
+    "host_network": false,
+    "host_paths_allowed": false,
+    "container_runtime_socket_allowed": false
+  },
+  "gates": {
+    "public_source_qualified": true,
+    "registry_image_published": false,
+    "public_app_render_qualified": false,
+    "private_truenas_hil_qualified": false,
+    "state_preserving_cutover_qualified": false,
+    "hil_eligible": false
+  },
+  "claim_boundary": "Source/build contract only. No published registry image, TrueNAS render, private HIL, migration cutover, or rollback acceptance is claimed."
+}
