@@ -18,11 +18,11 @@ class WowSidecarCandidateTests(unittest.TestCase):
     def setUp(self):
         self.value = json.loads(CANDIDATE.read_text(encoding="utf-8"))
 
-    def test_image_published_render_unqualified_candidate_passes_but_is_not_hil_eligible(self):
+    def test_image_published_helper_pinned_render_unqualified_candidate_passes_but_is_not_hil_eligible(self):
         result = MODULE.validate(copy.deepcopy(self.value))
         self.assertEqual(result["result"], "PASS")
         self.assertIsNotNone(result["registry_reference"])
-        self.assertFalse(result["permissions_helper_pinned"])
+        self.assertTrue(result["permissions_helper_pinned"])
         self.assertFalse(result["hil_eligible"])
         self.assertFalse(result["private_hil_claimed"])
         self.assertFalse(result["cutover_claimed"])
