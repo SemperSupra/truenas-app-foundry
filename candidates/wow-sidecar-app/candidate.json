@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "candidate": "wow-sidecar-truenas-app",
-  "phase": "image-published-render-unqualified",
+  "phase": "render-qualified-private-hil-pending",
   "wow_source": {
     "repository": "https://github.com/SemperSupra/wow-sidecar.git",
     "published_revision": "8826acc6ee5d739ba302144dd912798fda7ed424",
@@ -64,10 +64,21 @@
   "gates": {
     "public_source_qualified": true,
     "registry_image_published": true,
-    "public_app_render_qualified": false,
+    "public_app_render_qualified": true,
     "private_truenas_hil_qualified": false,
     "state_preserving_cutover_qualified": false,
-    "hil_eligible": false
+    "hil_eligible": true
   },
-  "claim_boundary": "Published image and public App source candidate only. TrueNAS render qualification, private HIL, migration cutover, rollback, and the separately privileged GARM integration remain outside this claim."
+  "claim_boundary": "Published image plus public TrueNAS App render/runtime qualification are accepted. Private TrueNAS HIL, state-preserving migration/cutover, rollback, and the separately privileged GARM integration remain outside this claim.",
+  "public_render_evidence": {
+    "result": "PASS",
+    "run": 36550143870,
+    "qualified_head": "c5aa14ac85482cc093c1e1283b7c8e969d805f0e",
+    "compose_sha256": "46ed8d0a3fdd543b5ad359cd73e2b5bf06b69a65ab4f6312fd5c523d2445ab1a",
+    "ghcr_anonymous_pull": true,
+    "seed_behavior": "PASS:create-once/preserve/fail-partial",
+    "materializer_commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376",
+    "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
+  }
 }
