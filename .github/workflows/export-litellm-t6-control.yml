@@ -1,0 +1,174 @@
+name: Export LiteLLM TrueNAS T6 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export; blank uses this workflow commit
+        required: false
+        type: string
+  push:
+    branches:
+      - prep/litellm-t6-control-export-v1
+    paths:
+      - ".github/workflows/export-litellm-t6-control.yml"
+      - "tools/build_litellm_t6_control.py"
+      - "tests/test_build_litellm_t6_control.py"
+      - "tests/fixtures/litellm/t6-truenas-values.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litellm-t6-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      VALIDATOR: ghcr.io/truenas/apps_validation@sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c
+    steps:
+      - name: Resolve exact Foundry source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          if [[ -z "$ref" ]]; then
+            ref="$GITHUB_SHA"
+          fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact public Foundry source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Verify source and exporter contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tests/test_build_litellm_t6_control.py
+          python3 tools/validate_litellm_candidate.py
+
+      - name: Materialize exact candidate into pinned TrueNAS Apps source
+        id: materialize
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=candidates/litellm-app/candidate.json
+          repo="$(jq -r '.source_materializer.repository' "$manifest")"
+          commit="$(jq -r '.source_materializer.commit' "$manifest")"
+          train="$(jq -r '.source_materializer.train' "$manifest")"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+
+          git init -q /tmp/apps
+          git -C /tmp/apps remote add origin "$repo"
+          git -C /tmp/apps fetch --quiet --depth=1 origin "$commit"
+          git -C /tmp/apps checkout -q -b master FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$commit" ]]
+
+          destination="/tmp/apps/ix-dev/$train/litellm"
+          python3 tools/materialize_truenas_candidate.py             --manifest "$manifest"             --upstream-checkout /tmp/apps             --destination "$destination"             --mode apply             --evidence /tmp/materialize.json
+          jq -e '.status == "APPLIED" and .action == "CREATE"' /tmp/materialize.json >/dev/null
+
+          cp tests/fixtures/litellm/t6-truenas-values.yaml             "$destination/templates/test_values/t6-truenas-values.yaml"
+          echo "train=$train" >> "$GITHUB_OUTPUT"
+
+      - name: Render through the official TrueNAS path
+        working-directory: /tmp/apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$VALIDATOR" >/dev/null
+          python3 - "$VALIDATOR" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(".github/scripts/ci.py")
+          s = p.read_text(encoding="utf-8")
+          old = 'CONTAINER_IMAGE = "ghcr.io/truenas/apps_validation:latest"'
+          new = "CONTAINER_IMAGE = " + repr(sys.argv[1])
+          if old not in s:
+              raise SystemExit("official ci.py validator constant changed")
+          p.write_text(s.replace(old, new), encoding="utf-8")
+          PY
+          python3 ./.github/scripts/ci.py             --train "${{ steps.materialize.outputs.train }}"             --app litellm             --test-file t6-truenas-values.yaml             --render-only=true > /tmp/litellm-t6-rendered.yaml
+          test -s /tmp/litellm-t6-rendered.yaml
+          docker compose -f /tmp/litellm-t6-rendered.yaml config --format json > /tmp/litellm-t6-compose.json
+
+      - name: Assert exact T6 runtime invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(jq -r '.appliance.reference' candidates/litellm-app/candidate.json)"
+          jq -e --arg expected "$expected" '
+            (.services | length) == 1 and
+            ([.services[] | select(.image == $expected)] | length) == 1 and
+            ([.services[]?.volumes[]? |
+              select(.target == "/config" and
+                     .source == "/mnt/rdtepool/litellm-t6/config" and
+                     .read_only == true)] | length) == 1 and
+            ([.services[]?.volumes[]? |
+              select(.target == "/run/secrets/semper-env" and
+                     .source == "/mnt/rdtepool/litellm-t6/secrets" and
+                     .read_only == true)] | length) == 1 and
+            ([.services[]?.ports[]? |
+              select(.target == 4000 and (.published | tostring) == "30401")] | length) == 1
+          ' /tmp/litellm-t6-compose.json >/dev/null
+          ! grep -q 'OPENROUTER_MANAGEMENT_KEY' /tmp/litellm-t6-compose.json
+          ! grep -q 'sk-or-mgmt-' /tmp/litellm-t6-compose.json
+
+      - name: Build reusable T6 control bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/build_litellm_t6_control.py             --candidate candidates/litellm-app/candidate.json             --compose /tmp/litellm-t6-compose.json             --config tests/fixtures/litellm/proxy_server_config.yaml             --values tests/fixtures/litellm/t6-truenas-values.yaml             --output /tmp/litellm-t6-control             --foundry-ref "${{ steps.source.outputs.ref }}"             | tee /tmp/litellm-t6-export-result.json
+          jq -e '
+            .schema == "semper-supra.litellm-truenas-t6-control/1" and
+            .secrets_captured == false and
+            .candidate.appliance_reference ==
+              "ghcr.io/sempersupra/litellm-appliance@sha256:225c899db85865929f6099d3e1fe27097cafaed5af823fa397e75e1eb6ec51ac" and
+            .runtime.guest_port == 30401 and
+            .runtime.config_dir == "/mnt/rdtepool/litellm-t6/config" and
+            .runtime.secret_dir == "/mnt/rdtepool/litellm-t6/secrets"
+          ' /tmp/litellm-t6-control/control.json >/dev/null
+          ! grep -R -q 'fixture-provider-token\|OPENROUTER_MANAGEMENT_KEY\|sk-or-mgmt-' /tmp/litellm-t6-control
+
+      - name: Upload exact Foundry-produced T6 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: litellm-truenas-t6-control
+          path: /tmp/litellm-t6-control/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record public-safe export evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### LiteLLM TrueNAS T6 control export"
+            echo
+            echo "- Foundry source: `${{ steps.source.outputs.ref }}`"
+            if [[ -f /tmp/litellm-t6-control/control.json ]]; then
+              echo "- appliance: `$(jq -r '.candidate.appliance_reference' /tmp/litellm-t6-control/control.json)`"
+              echo "- compose identity: `$(jq -r '.artifacts.compose_canonical_sha256' /tmp/litellm-t6-control/control.json)`"
+              echo "- secret values captured: `$(jq -r '.secrets_captured' /tmp/litellm-t6-control/control.json)`"
+            else
+              echo "- control bundle: not produced"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
