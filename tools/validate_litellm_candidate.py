@@ -39,6 +39,13 @@ def scalar(text: str, key: str) -> str:
     return m.group(1).strip().strip("'\"")
 
 
+def indented_scalar(text: str, key: str) -> str:
+    matches = re.findall(rf"(?m)^\\s+{re.escape(key)}:\\s*([^#\\n]+?)\\s*$", text)
+    if len(matches) != 1:
+        raise ValidationError(f"expected exactly one nested scalar {key}, found {len(matches)}")
+    return matches[0].strip().strip("'\\\"")
+
+
 def load_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
