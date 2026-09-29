@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "exact_version_required_for_mutation": true,
+    "unknown_exact_version": "qualification-only",
+    "floating_nightly_evidence": "prohibited"
+  },
+  "targets": [
+    {
+      "version": "25.04.1",
+      "channel": "deployed-legacy",
+      "profile": ".foundry/truenas-compatibility/25.04.1-apps.json",
+      "middleware_ref": "release/25.04.1",
+      "middleware_commit": "74ab5a2d373be4097dece257d00e1086376333ba",
+      "source_qualification": "qualified",
+      "runtime_qualification": "pending-generic-runtime",
+      "accepted_runtime_rung": null,
+      "apply_qualified": false
+    },
+    {
+      "version": "25.04.2.6",
+      "channel": "prior-hil-anchor",
+      "profile": ".foundry/truenas-compatibility/25.04.2.6-materialization.json",
+      "middleware_ref": "release/25.04.2.6",
+      "middleware_commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6",
+      "source_qualification": "qualified",
+      "runtime_qualification": "consumer-specific-private-hil",
+      "accepted_runtime_rung": "consumer-specific",
+      "apply_qualified": false
+    },
+    {
+      "version": "25.10.7",
+      "channel": "stable",
+      "profile": null,
+      "middleware_ref": "TS-25.10.7",
+      "middleware_commit": "8ede398839710e56893d88ce85088139d8fab18e",
+      "source_qualification": "anchor-resolved-profile-pending",
+      "runtime_qualification": "pending",
+      "accepted_runtime_rung": null,
+      "apply_qualified": false
+    },
+    {
+      "version": "26.0.0-BETA.3",
+      "channel": "early-release",
+      "profile": null,
+      "middleware_ref": "TS-26.0.0-BETA.3",
+      "middleware_commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3",
+      "source_qualification": "source-first-rdte-in-progress",
+      "runtime_qualification": "public-gha-rdte-in-progress",
+      "accepted_runtime_rung": "T3",
+      "apply_qualified": false
+    }
+  ],
+  "future_tracks": [
+    {
+      "selector": "26.0.0-RC.*",
+      "channel": "anticipated-early-release",
+      "mode": "qualification-only-until-exact-profile"
+    },
+    {
+      "selector": "26.0.0-MASTER+*",
+      "channel": "nightly",
+      "mode": "qualification-only-exact-build-required"
+    },
+    {
+      "selector": "27.*",
+      "channel": "nightly-or-future",
+      "mode": "qualification-only-exact-build-required"
+    }
+  ]
+}
