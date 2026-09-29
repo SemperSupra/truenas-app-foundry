@@ -12,8 +12,18 @@ APP = ROOT / "candidates" / "litellm-app" / "ix-dev" / "community" / "litellm" /
 IX_VALUES = ROOT / "candidates" / "litellm-app" / "ix-dev" / "community" / "litellm" / "ix_values.yaml"
 TEMPLATE = ROOT / "candidates" / "litellm-app" / "ix-dev" / "community" / "litellm" / "templates" / "docker-compose.yaml"
 QUESTIONS = ROOT / "candidates" / "litellm-app" / "ix-dev" / "community" / "litellm" / "questions.yaml"
-DOCKERFILE = ROOT / "appliances" / "litellm" / "Dockerfile"
+DOCKERFILE_CANDIDATES = (
+    ROOT / "appliances" / "litellm" / "Dockerfile",
+    ROOT / "images" / "litellm-appliance" / "Dockerfile",
+)
 SCORE = ROOT / "contracts" / "litellm" / "gateway-minimal.score.yaml"
+
+
+def first_existing(paths: tuple[Path, ...], label: str) -> Path:
+    for path in paths:
+        if path.is_file():
+            return path
+    raise ValidationError(f"unable to locate {label}: " + ", ".join(str(p) for p in paths))
 
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -42,7 +52,7 @@ def validate() -> dict[str, Any]:
     ix = IX_VALUES.read_text(encoding="utf-8")
     template = TEMPLATE.read_text(encoding="utf-8")
     questions = QUESTIONS.read_text(encoding="utf-8")
-    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    dockerfile = first_existing(DOCKERFILE_CANDIDATES, "LiteLLM appliance Dockerfile").read_text(encoding="utf-8")
     score = SCORE.read_text(encoding="utf-8")
 
     upstream = candidate.get("upstream") or {}
