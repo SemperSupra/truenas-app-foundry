@@ -24,7 +24,8 @@ class PackageCatalogOverlayTests(unittest.TestCase):
         (self.published / "1.0.0").mkdir(parents=True)
         (self.published / "item.yaml").write_text("name: litellm\n", encoding="utf-8")
         (self.published / "app_versions.json").write_text(
-            '{"1.0.0":{"healthy":true}}\n', encoding="utf-8"
+            '{"1.0.0":{"healthy":true,"last_update":"2026-09-29 11:00:00"}}\n',
+            encoding="utf-8",
         )
         (self.published / "1.0.0" / "app.yaml").write_text(
             "name: litellm\n", encoding="utf-8"
@@ -36,6 +37,7 @@ class PackageCatalogOverlayTests(unittest.TestCase):
                     "name": "litellm",
                     "latest_version": "1.0.0",
                     "healthy": True,
+                    "last_update": "2026-09-29 11:00:00",
                 }
             )
             + "\n",
@@ -80,6 +82,35 @@ class PackageCatalogOverlayTests(unittest.TestCase):
 
         (out / "overlay.json").write_text("{}\n", encoding="utf-8")
         self.assertEqual("DRIFT_REFUSE", m.determine_action(out, fp)[0])
+
+    def test_rejects_missing_catalog_last_update(self):
+        value = json.loads(self.entry.read_text(encoding="utf-8"))
+        value["last_update"] = None
+        self.entry.write_text(json.dumps(value) + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(m.OverlayError, "catalog entry last_update"):
+            m.build_desired(
+                self.published,
+                self.entry,
+                app="litellm",
+                train="community",
+                version="1.0.0",
+                root=self.root / "work",
+            )
+
+    def test_rejects_missing_version_last_update(self):
+        (self.published / "app_versions.json").write_text(
+            '{"1.0.0":{"healthy":true,"last_update":null}}\n',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(m.OverlayError, "published app version last_update"):
+            m.build_desired(
+                self.published,
+                self.entry,
+                app="litellm",
+                train="community",
+                version="1.0.0",
+                root=self.root / "work",
+            )
 
     def test_rejects_wrong_latest_version(self):
         self.entry.write_text(
