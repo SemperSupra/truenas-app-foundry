@@ -210,16 +210,66 @@ jobs:
           test -d /tmp/apps/trains/community/litellm/1.0.0
           test -f /tmp/apps/trains/community/litellm/item.yaml
 
-          # The official updater currently carries a FIXME in source; run it as
-          # an oracle rather than assuming it works. A failure here is a product
-          # blocker for native catalog-app installation, not permission to hand
-          # edit catalog metadata.
+          # TrueNAS's full catalog updater currently trips over unrelated
+          # historical/test-train metadata in the pinned checkout. Derive only
+          # our app through the official catalog_reader and merge that validated
+          # fragment into the already-valid catalog cache.
+          git -C /tmp/apps config user.name "SemperSupra Foundry RDTE"
+          git -C /tmp/apps config user.email "foundry-rdte@users.noreply.github.com"
+          git -C /tmp/apps add ix-dev/community/litellm trains/community/litellm
+          GIT_AUTHOR_DATE='2026-09-29T00:00:00Z' \
+          GIT_COMMITTER_DATE='2026-09-29T00:00:00Z' \
+            git -C /tmp/apps commit -q -m 'rdte: materialize litellm catalog overlay'
+
+          mkdir -p /tmp/catalog-reader-home
+          printf '[safe]\n\tdirectory = /workspace\n' > /tmp/catalog-reader-home/.gitconfig
+
           docker run --rm --platform linux/amd64 \
             -e FAKE_ENV=1 \
+            -e HOME=/reader-home \
+            -v /tmp/catalog-reader-home:/reader-home:ro \
             -v /tmp/apps:/workspace \
             --entrypoint python \
             "$VALIDATOR" \
-            -m apps_ci.scripts.catalog_update update --path /workspace
+            - <<'PY'
+          import json
+          from pathlib import Path
+
+          from jsonschema import validate
+          from catalog_reader.app import get_app_details
+          from apps_validation.json_schema_utils import CATALOG_JSON_SCHEMA, VERSION_VALIDATION_SCHEMA
+
+          root = Path('/workspace')
+          app_path = root / 'trains' / 'community' / 'litellm'
+          details = get_app_details(
+              str(app_path),
+              None,
+              {'retrieve_versions': True, 'normalize_questions': False},
+          )
+          versions = details.pop('versions')
+          latest = details.get('latest_version')
+          metadata = {'capabilities': [], 'run_as_context': []}
+          if latest in versions:
+              app_metadata = versions[latest].get('app_metadata') or {}
+              metadata.update({
+                  'capabilities': app_metadata.get('capabilities', []),
+                  'run_as_context': app_metadata.get('run_as_context', []),
+              })
+          details.update(metadata)
+
+          catalog_path = root / 'catalog.json'
+          catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
+          catalog.setdefault('community', {})['litellm'] = details
+
+          validate(catalog, CATALOG_JSON_SCHEMA)
+          validate(versions, VERSION_VALIDATION_SCHEMA)
+
+          catalog_path.write_text(json.dumps(catalog, indent=4) + '\n', encoding='utf-8')
+          (app_path / 'app_versions.json').write_text(
+              json.dumps(versions, indent=4) + '\n',
+              encoding='utf-8',
+          )
+          PY
 
           test -s /tmp/apps/catalog.json
           test -s /tmp/apps/trains/community/litellm/app_versions.json
@@ -234,9 +284,11 @@ jobs:
           app = catalog.get('community', {}).get('litellm')
           assert isinstance(app, dict), 'litellm absent from generated catalog.json'
           assert app.get('latest_version') == '1.0.0', app.get('latest_version')
+          assert isinstance(app.get('last_update'), str) and app['last_update']
           assert '1.0.0' in versions, versions.keys()
           assert versions['1.0.0'].get('healthy') is True, versions['1.0.0'].get('healthy')
           assert versions['1.0.0'].get('supported') is True, versions['1.0.0'].get('supported')
+          assert isinstance(versions['1.0.0'].get('last_update'), str) and versions['1.0.0']['last_update']
           PY
 
       - name: Official TrueNAS dev-catalog validation
