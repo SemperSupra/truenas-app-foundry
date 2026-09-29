@@ -354,16 +354,28 @@ jobs:
         run: |
           set -euo pipefail
           docker pull "$VALIDATOR"
+
+          # The overlay qualification above intentionally publishes the new app
+          # into /tmp/apps/trains. The official dev validator compares ix-dev
+          # against the published train and would then interpret this brand-new
+          # 1.0.0 app as an unbumped modification. Validate the exact
+          # materialized dev source in a clean worktree from the same pinned
+          # TrueNAS commit instead.
+          git -C /tmp/apps worktree add --detach /tmp/apps-dev HEAD >/dev/null
+          mkdir -p /tmp/apps-dev/ix-dev/${{ steps.materialize.outputs.train }}
+          cp -a \
+            /tmp/apps/ix-dev/${{ steps.materialize.outputs.train }}/litellm \
+            /tmp/apps-dev/ix-dev/${{ steps.materialize.outputs.train }}/litellm
+
           mkdir -p /tmp/validator-home
           printf '[safe]\n\tdirectory = /workspace\n' > /tmp/validator-home/.gitconfig
           docker run --rm --platform linux/amd64 \
             -e FAKE_ENV=1 \
             -e HOME=/validator-home \
             -v /tmp/validator-home:/validator-home:ro \
-            -v /tmp/apps:/workspace \
+            -v /tmp/apps-dev:/workspace \
             "$VALIDATOR" \
             apps_dev_charts_validate validate --path /workspace --base_branch master
-
       - name: Official TrueNAS render path
         working-directory: /tmp/apps
         run: |
