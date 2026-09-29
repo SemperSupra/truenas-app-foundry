@@ -120,12 +120,27 @@ def resolve_library(
     )
 
 
+def determine_action(destination: Path, desired_fingerprint: str) -> tuple[str, str]:
+    observed = tree_fingerprint(destination)
+    if not destination.exists():
+        return "CREATE", observed
+    if observed == desired_fingerprint:
+        return "NOOP", observed
+    return "DRIFT_REFUSE", observed
+
+
 def build_desired(repo_root: Path, manifest_path: Path, checkout: Path, root: Path) -> dict[str, Any]:
     manifest = load_manifest(manifest_path)
     materializer = manifest["source_materializer"]
     source = (repo_root / str(manifest["source_path"])).resolve()
     if not source.is_dir():
         raise MaterializationError(f"candidate source does not exist: {source}")
+
+    source_library_root = source / "templates" / "library"
+    if source_library_root.exists():
+        raise MaterializationError(
+            f"source candidate must stay lean; materialized TrueNAS library present: {source_library_root}"
+        )
 
     app_yaml = source / "app.yaml"
     version = read_top_level_scalar(app_yaml, "lib_version")
@@ -207,14 +222,7 @@ def main() -> int:
             built = build_desired(repo_root, manifest_path, checkout, Path(tmp))
             desired = built["desired"]
             desired_fp = built["desired_fingerprint"]
-            observed_fp = tree_fingerprint(destination)
-
-            if not destination.exists():
-                action = "CREATE"
-            elif observed_fp == desired_fp:
-                action = "NOOP"
-            else:
-                action = "DRIFT_REFUSE"
+            action, observed_fp = determine_action(destination, desired_fp)
 
             receipt = {
                 "schema": "semper-supra.truenas-candidate-materialization/1",
