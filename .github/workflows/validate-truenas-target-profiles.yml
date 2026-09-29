@@ -6,6 +6,8 @@ on:
       - ".foundry/truenas-target-tracks.json"
       - "tools/truenas_target_profile.py"
       - "tools/test_truenas_target_profile.py"
+      - "tools/package_truenas_deployment_artifact.py"
+      - "tools/test_package_truenas_deployment_artifact.py"
       - "docs/truenas-target-reconciliation.md"
       - ".github/workflows/validate-truenas-target-profiles.yml"
   workflow_dispatch:
@@ -25,3 +27,5 @@ jobs:
         run: python3 -m json.tool .foundry/truenas-target-tracks.json >/dev/null
       - name: Exercise discovery, plan, and verify contracts
         run: python3 -m unittest -v tools/test_truenas_target_profile.py
+      - name: Exercise TrueNAS deployment artifact lowering
+        run: python3 -m unittest -v tools/test_package_truenas_deployment_artifact.py
