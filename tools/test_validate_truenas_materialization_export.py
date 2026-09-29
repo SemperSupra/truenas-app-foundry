@@ -1,11 +1,13 @@
 import importlib.util
 import json
 import pathlib
+import sys
 import tempfile
 import unittest
 
 
 MODULE_PATH = pathlib.Path(__file__).with_name("validate_truenas_materialization.py")
+sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("validate_truenas_materialization", MODULE_PATH)
 assert SPEC and SPEC.loader
 MOD = importlib.util.module_from_spec(SPEC)
