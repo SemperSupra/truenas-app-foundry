@@ -92,8 +92,8 @@ def validate() -> dict[str, Any]:
     if f'com.sempersupra.litellm.upstream.version="{upstream_version}"' not in dockerfile:
         raise ValidationError("Dockerfile upstream version label mismatch")
 
-    ix_repo = scalar(ix, "repository")
-    ix_tag = scalar(ix, "tag")
+    ix_repo = indented_scalar(ix, "repository")
+    ix_tag = indented_scalar(ix, "tag")
     if ix_repo != "ghcr.io/sempersupra/litellm-appliance@sha256":
         raise ValidationError("ix_values repository is not exact-digest form")
     if f"sha256:{ix_tag}" != appliance_digest:
