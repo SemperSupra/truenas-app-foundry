@@ -1,0 +1,263 @@
+name: Qualify LiteLLM MVP projection
+
+on:
+  pull_request:
+    paths:
+      - "images/litellm-appliance/**"
+      - "contracts/litellm/**"
+      - "candidates/litellm-app/**"
+      - "tools/materialize_truenas_candidate.py"
+      - "tests/test_materialize_truenas_candidate.py"
+      - "tests/fixtures/litellm/**"
+      - ".github/workflows/qualify-litellm-mvp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litellm-mvp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      APPLIANCE_CONTEXT: images/litellm-appliance
+      FIXTURE_CONFIG: tests/fixtures/litellm/proxy_server_config.yaml
+      VALIDATOR: ghcr.io/truenas/apps_validation@sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c
+      SOURCE_DATE_EPOCH: "1790132651"
+    steps:
+      - name: Checkout public Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Unit-test candidate materializer
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/test_materialize_truenas_candidate.py -v
+          python3 -m py_compile tools/materialize_truenas_candidate.py
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Validate appliance shell
+        run: |
+          set -euo pipefail
+          sh -n "$APPLIANCE_CONTEXT/semper-entrypoint.sh"
+
+      - name: Reproducibility challenge
+        id: repro
+        run: |
+          set -euo pipefail
+          for n in a b; do
+            docker buildx build \
+              --no-cache \
+              --provenance=false \
+              --sbom=false \
+              --output "type=oci,dest=/tmp/$n.tar,rewrite-timestamp=true" \
+              "$APPLIANCE_CONTEXT"
+            mkdir "/tmp/$n"
+            tar -xf "/tmp/$n.tar" -C "/tmp/$n"
+          done
+          d1="$(jq -r '.manifests[0].digest' /tmp/a/index.json)"
+          d2="$(jq -r '.manifests[0].digest' /tmp/b/index.json)"
+          [[ "$d1" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$d1" == "$d2" ]]
+          echo "oci_manifest_digest=$d1" >> "$GITHUB_OUTPUT"
+
+      - name: Build local appliance
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --load \
+            --provenance=false \
+            --sbom=false \
+            -t litellm-appliance:qualify \
+            "$APPLIANCE_CONTEXT"
+
+      - name: Negative secret-boundary tests
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/config" "$tmp/secrets"
+          cp "$FIXTURE_CONFIG" "$tmp/config/proxy_server_config.yaml"
+
+          printf '%s\n' fixture > "$tmp/secrets/bad-name"
+          set +e
+          docker run --rm \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify >/tmp/bad-name.out 2>&1
+          rc=$?
+          set -e
+          [[ "$rc" -eq 78 ]]
+          rm "$tmp/secrets/bad-name"
+
+          printf '%s\n' fixture-provider-token > "$tmp/secrets/TEST_PROVIDER_KEY"
+          set +e
+          docker run --rm \
+            -e TEST_PROVIDER_KEY=already-present \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify >/tmp/conflict.out 2>&1
+          rc=$?
+          set -e
+          [[ "$rc" -eq 78 ]]
+          ! grep -q 'fixture-provider-token' /tmp/bad-name.out /tmp/conflict.out
+
+      - name: Runtime health and secret projection
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cid=""
+          cleanup() {
+            [[ -z "$cid" ]] || docker rm -f "$cid" >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+          }
+          trap cleanup EXIT
+          mkdir -p "$tmp/config" "$tmp/secrets"
+          cp "$FIXTURE_CONFIG" "$tmp/config/proxy_server_config.yaml"
+          printf '%s\n' fixture-provider-token > "$tmp/secrets/TEST_PROVIDER_KEY"
+          chmod 0400 "$tmp/secrets/TEST_PROVIDER_KEY"
+
+          cid="$(docker run -d \
+            -p 127.0.0.1:14000:4000 \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify)"
+
+          live=false
+          ready=false
+          for _ in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:14000/health/liveliness >/dev/null 2>&1 && live=true || true
+            curl -fsS http://127.0.0.1:14000/health/readiness >/dev/null 2>&1 && ready=true || true
+            [[ "$live" == true && "$ready" == true ]] && break
+            docker inspect "$cid" --format '{{.State.Running}}' | grep -qx true || {
+              docker logs "$cid"
+              exit 1
+            }
+            sleep 2
+          done
+          [[ "$live" == true ]]
+          [[ "$ready" == true ]]
+          docker exec "$cid" python -c "data=open('/proc/1/environ','rb').read().split(b'\\0'); assert b'TEST_PROVIDER_KEY=fixture-provider-token' in data"
+          ! docker inspect "$cid" | grep -q 'fixture-provider-token'
+          ! docker history --no-trunc litellm-appliance:qualify | grep -q 'fixture-provider-token'
+
+      - name: Materialize pinned TrueNAS source
+        id: materialize
+        run: |
+          set -euo pipefail
+          manifest=candidates/litellm-app/candidate.json
+          repo="$(jq -r '.source_materializer.repository' "$manifest")"
+          commit="$(jq -r '.source_materializer.commit' "$manifest")"
+          train="$(jq -r '.source_materializer.train' "$manifest")"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+
+          git init -q /tmp/apps
+          git -C /tmp/apps remote add origin "$repo"
+          git -C /tmp/apps fetch --quiet --depth=1 origin "$commit"
+          git -C /tmp/apps checkout -q -b master FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$commit" ]]
+
+          destination="/tmp/apps/ix-dev/$train/litellm"
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode plan \
+            --evidence /tmp/plan.json
+          jq -e '.action == "CREATE" and .status == "PLANNED"' /tmp/plan.json >/dev/null
+
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode apply \
+            --evidence /tmp/apply.json
+          jq -e '.action == "CREATE" and .status == "APPLIED"' /tmp/apply.json >/dev/null
+
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode apply \
+            --evidence /tmp/noop.json
+          jq -e '.action == "NOOP" and .status == "NOOP"' /tmp/noop.json >/dev/null
+
+          git -C /tmp/apps add -N "ix-dev/$train/litellm"
+          git -C /tmp/apps diff --name-only master | grep -q "^ix-dev/$train/litellm/"
+          echo "train=$train" >> "$GITHUB_OUTPUT"
+
+      - name: Official TrueNAS dev-catalog validation
+        run: |
+          set -euo pipefail
+          docker pull "$VALIDATOR"
+          mkdir -p /tmp/validator-home
+          printf '[safe]\n\tdirectory = /workspace\n' > /tmp/validator-home/.gitconfig
+          docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
+            -e HOME=/validator-home \
+            -v /tmp/validator-home:/validator-home:ro \
+            -v /tmp/apps:/workspace \
+            "$VALIDATOR" \
+            apps_dev_charts_validate validate --path /workspace --base_branch master
+
+      - name: Official TrueNAS render path
+        working-directory: /tmp/apps
+        run: |
+          set -euo pipefail
+          python3 - "$VALIDATOR" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(".github/scripts/ci.py")
+          s = p.read_text(encoding="utf-8")
+          old = 'CONTAINER_IMAGE = "ghcr.io/truenas/apps_validation:latest"'
+          new = "CONTAINER_IMAGE = " + repr(sys.argv[1])
+          if old not in s:
+              raise SystemExit("official ci.py validator constant changed")
+          p.write_text(s.replace(old, new), encoding="utf-8")
+          PY
+          python3 ./.github/scripts/ci.py \
+            --train "${{ steps.materialize.outputs.train }}" \
+            --app litellm \
+            --test-file basic-values.yaml \
+            --render-only=true > /tmp/rendered.yaml
+          test -s /tmp/rendered.yaml
+          docker compose -f /tmp/rendered.yaml config --format json > /tmp/normalized.json
+
+      - name: Assert rendered candidate invariants
+        run: |
+          set -euo pipefail
+          expected="$(python3 - <<'PY'
+          import yaml
+          with open("candidates/litellm-app/ix-dev/community/litellm/ix_values.yaml", encoding="utf-8") as f:
+              image = yaml.safe_load(f)["images"]["image"]
+          print(f'{image["repository"]}:{image["tag"]}')
+          PY
+          )"
+          jq -e --arg expected "$expected" '
+            (.services | length) == 1 and
+            ([.services[] | select(.image == $expected)] | length) == 1 and
+            ([.services[]?.volumes[]? | select(.target == "/config" and .read_only == true)] | length) == 1 and
+            ([.services[]?.volumes[]? | select(.target == "/run/secrets/semper-env" and .read_only == true)] | length) == 1 and
+            ([.services[]? | .cap_drop[]? | select(. == "ALL")] | length) >= 1 and
+            ([.services[]? | select(.privileged == true)] | length) == 0
+          ' /tmp/normalized.json >/dev/null
+          ! grep -q 'OPENROUTER_MANAGEMENT_KEY' /tmp/rendered.yaml
+
+      - name: Emit sanitized qualification summary
+        if: always()
+        run: |
+          {
+            echo "### LiteLLM MVP public qualification"
+            echo
+            echo "- appliance reproducibility digest: `${{ steps.repro.outputs.oci_manifest_digest }}`"
+            if [[ -f /tmp/noop.json ]]; then
+              echo "- materializer second apply: `$(jq -r '.status' /tmp/noop.json)`"
+              echo "- TrueNAS library source: `$(jq -r '.upstream.library_source' /tmp/noop.json)`"
+              echo "- TrueNAS library hash: `$(jq -r '.upstream.library_hash' /tmp/noop.json)`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
