@@ -32,7 +32,9 @@ def sha256_file(path: Path) -> str:
 def truenas_directory_hash(path: Path) -> str:
     if not path.is_dir():
         raise MaterializationError(f"not a directory: {path}")
-    digests = sorted(sha256_file(p) for p in path.rglob("*") if p.is_file())
+    digests = sorted(
+        sha256_file(p) for p in path.rglob("*") if p.is_file() and not p.is_symlink()
+    )
     payload = "".join(f"{digest}\n" for digest in digests).encode()
     return hashlib.sha256(payload).hexdigest()
 
