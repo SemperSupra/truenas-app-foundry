@@ -9,6 +9,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
 from reconcile_truenas_catalog_overlay import OverlayError, tree_fingerprint
 
 
