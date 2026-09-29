@@ -359,9 +359,12 @@ jobs:
           # into /tmp/apps/trains. The official dev validator compares ix-dev
           # against the published train and would then interpret this brand-new
           # 1.0.0 app as an unbumped modification. Validate the exact
-          # materialized dev source in a clean worktree from the same pinned
-          # TrueNAS commit instead.
-          git -C /tmp/apps worktree add --detach /tmp/apps-dev HEAD >/dev/null
+          # materialized dev source in a standalone clone from the same pinned
+          # TrueNAS commit. A linked worktree is not sufficient because its
+          # .git file points outside the directory mounted into the validator.
+          git clone -q --no-local /tmp/apps /tmp/apps-dev
+          git -C /tmp/apps-dev checkout -q master
+          [[ "$(git -C /tmp/apps-dev rev-parse HEAD)" == "$(git -C /tmp/apps rev-parse HEAD)" ]]
           mkdir -p /tmp/apps-dev/ix-dev/${{ steps.materialize.outputs.train }}
           cp -a \
             /tmp/apps/ix-dev/${{ steps.materialize.outputs.train }}/litellm \
