@@ -76,8 +76,9 @@ def validate() -> dict[str, Any]:
 
     if upstream_version not in scalar(app, "app_version"):
         raise ValidationError("app_version does not carry upstream version")
-    if f"FROM ghcr.io/berriai/litellm@{upstream_digest}" not in dockerfile:
-        raise ValidationError("Dockerfile does not pin candidate upstream digest")
+    expected_base = f"ARG LITELLM_BASE=ghcr.io/berriai/litellm@{upstream_digest}"
+    if expected_base not in dockerfile or "FROM ${LITELLM_BASE}" not in dockerfile:
+        raise ValidationError("Dockerfile does not pin/use the candidate upstream digest")
     if f'com.sempersupra.litellm.upstream.version="{upstream_version}"' not in dockerfile:
         raise ValidationError("Dockerfile upstream version label mismatch")
 
