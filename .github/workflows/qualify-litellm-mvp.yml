@@ -7,7 +7,13 @@ on:
       - "contracts/litellm/**"
       - "candidates/litellm-app/**"
       - "tools/materialize_truenas_candidate.py"
+      - "tools/validate_litellm_candidate.py"
+      - "tools/package_truenas_catalog_overlay.py"
+      - "tools/reconcile_truenas_catalog_overlay.py"
       - "tests/test_materialize_truenas_candidate.py"
+      - "tests/test_litellm_candidate.py"
+      - "tests/test_package_truenas_catalog_overlay.py"
+      - "tests/test_reconcile_truenas_catalog_overlay.py"
       - "tests/fixtures/litellm/**"
       - ".github/workflows/qualify-litellm-mvp.yml"
   workflow_dispatch:
