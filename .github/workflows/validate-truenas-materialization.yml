@@ -13,6 +13,7 @@ on:
       - 'tools/validate_truenas_materialization.py'
       - '.github/workflows/validate-truenas-materialization.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -40,12 +41,28 @@ jobs:
           python3 --version
           git --version
 
+      - name: Validate export contract
+        shell: bash
+        run: python3 -m unittest -v tools/test_validate_truenas_materialization_export.py
+
       - name: Validate pinned TrueNAS materializer controls
         shell: bash
         run: |
           set -euo pipefail
           python3 tools/validate_truenas_materialization.py \
-            --evidence materialization-evidence.json
+            --evidence materialization-evidence.json \
+            --materialized-dir materialized-controls
+
+      - name: Upload reusable materialization controls
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: truenas-foundry-materialized-controls
+          path: |
+            materialization-evidence.json
+            materialized-controls/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Record public-safe materialization evidence
         if: always()

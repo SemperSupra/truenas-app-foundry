@@ -284,7 +284,54 @@ def fingerprint(compose: dict[str, Any], primary_name: str) -> dict[str, Any]:
     }
 
 
-def validate() -> dict[str, Any]:
+def _materialized_filename(app: str, test_file: str) -> str:
+    safe_test = test_file.removesuffix(".yaml").replace("/", "-")
+    return f"{app}--{safe_test}.compose.json"
+
+
+def write_materialized_controls(
+    directory: Path,
+    pin: dict[str, Any],
+    controls: list[dict[str, Any]],
+) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    index_entries: list[dict[str, Any]] = []
+    for item in controls:
+        app = str(item["app"])
+        test_file = str(item["test_file"])
+        compose = item["compose"]
+        fp = item["fingerprint"]
+        filename = _materialized_filename(app, test_file)
+        (directory / filename).write_text(
+            json.dumps(compose, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        index_entries.append({
+            "app": app,
+            "test_file": test_file,
+            "primary_service": item["primary_service"],
+            "compose_path": filename,
+            "compose_sha256": fp["compose_sha256"],
+        })
+
+    index = {
+        "schema": "truenas-foundry-materialized-controls/v1",
+        "upstream": {
+            "repository": pin["repository"],
+            "ref": pin["ref"],
+            "train": pin["train"],
+            "library_version": pin["library_version"],
+            "library_hash": pin["library_hash"],
+        },
+        "controls": index_entries,
+    }
+    (directory / "index.json").write_text(
+        json.dumps(index, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def validate(materialized_dir: Path | None = None) -> dict[str, Any]:
     for tool in ("git", "docker", "python3"):
         if not shutil.which(tool):
             raise ValidationError(f"required tool not found: {tool}")
@@ -294,15 +341,22 @@ def validate() -> dict[str, Any]:
     try:
         checkout = checkout_upstream(root, pin)
         evidence: dict[str, Any] = {}
+        materialized: list[dict[str, Any]] = []
         for control in pin["controls"]:
             app = str(control["app"])
             test_file = str(control["test_file"])
             primary_name = str(control["primary_service"])
             compose = normalize_rendered(checkout, pin, control)
             assert_control(app, test_file, compose, primary_name)
-            evidence[f"{pin['train']}/{app}:{test_file}"] = fingerprint(
-                compose, primary_name
-            )
+            fp = fingerprint(compose, primary_name)
+            evidence[f"{pin['train']}/{app}:{test_file}"] = fp
+            materialized.append({
+                "app": app,
+                "test_file": test_file,
+                "primary_service": primary_name,
+                "compose": compose,
+                "fingerprint": fp,
+            })
     finally:
         try:
             shutil.rmtree(root)
@@ -311,6 +365,9 @@ def validate() -> dict[str, Any]:
             # Hosted runners are ephemeral; cleanup inability must not convert an
             # otherwise-valid materialization result into a qualification failure.
             print(f"WARNING: best-effort temporary cleanup failed: {exc}", file=sys.stderr)
+
+    if materialized_dir is not None:
+        write_materialized_controls(materialized_dir, pin, materialized)
 
     return {
         "result": "PASS",
@@ -338,9 +395,14 @@ def main() -> int:
         type=Path,
         help="optional path for the sanitized JSON evidence record",
     )
+    parser.add_argument(
+        "--materialized-dir",
+        type=Path,
+        help="optional directory for normalized Compose controls and an identity index",
+    )
     args = parser.parse_args()
     try:
-        evidence = validate()
+        evidence = validate(args.materialized_dir)
         payload = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
         if args.evidence:
             args.evidence.write_text(payload)
