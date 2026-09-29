@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "candidate": "litellm-app",
-  "state": "DRAFT",
+  "state": "DISPOSABLE_RUNTIME_QUALIFIED",
   "source_path": "candidates/litellm-app/ix-dev/community/litellm",
   "runtime_target": "TrueNAS SCALE Apps",
   "source_materializer": {
     "repository": "https://github.com/truenas/apps.git",
     "commit": "4df7498747aad81b1049135539c65c383e42df95",
     "train": "community",
-    "lib_version": "2.3.4",
-    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+    "lib_version": "2.3.11",
+    "lib_hash": "874636814efb275e5276ea9d709b7cd665fed42bb1d50328e853d9253a2e1229"
   },
   "upstream": {
     "repository": "https://github.com/BerriAI/litellm",
@@ -19,10 +19,10 @@
     "signature_verified_run": 36496814619
   },
   "appliance": {
-    "reference": "ghcr.io/sempersupra/litellm-appliance@sha256:6209a4f4642a5e8b9bc1a4e7f9d853a9cb3a2a6c549aec5691f6370afefd0c26",
-    "digest": "sha256:6209a4f4642a5e8b9bc1a4e7f9d853a9cb3a2a6c549aec5691f6370afefd0c26",
+    "reference": "ghcr.io/sempersupra/litellm-appliance@sha256:225c899db85865929f6099d3e1fe27097cafaed5af823fa397e75e1eb6ec51ac",
+    "digest": "sha256:225c899db85865929f6099d3e1fe27097cafaed5af823fa397e75e1eb6ec51ac",
     "build_status": "PUBLIC_GHA_QUALIFIED",
-    "publication_run": 36498136255,
+    "publication_run": 36499380654,
     "anonymous_pull": true,
     "keyless_signed": true
   },
@@ -35,5 +35,38 @@
     "management_credentials_allowed": false,
     "moving_tags_allowed": false
   },
-  "claim_boundary": "Official-shaped TrueNAS catalog candidate for the SemperSupra LiteLLM gateway-minimal appliance. Real TrueNAS runtime acceptance and production cutover remain separate gates."
+  "claim_boundary": "Official-shaped TrueNAS catalog candidate for the SemperSupra LiteLLM gateway-minimal appliance. Real TrueNAS runtime acceptance and production cutover remain separate gates.",
+  "qualification": {
+    "product_source_revision": "8d326e74172eeaa3204b6c85f0c7690271711558",
+    "public_execution_projection_revision": "5bed3c1a21b9d50ae2f30571c47eb279abd548ec",
+    "public_execution_run": 36525319288,
+    "truenas_apps_commit": "4df7498747aad81b1049135539c65c383e42df95",
+    "truenas_validator_digest": "sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c",
+    "official_dev_catalog_validation": true,
+    "official_render_path": true,
+    "docker_compose_config": true,
+    "single_service": true,
+    "read_only_config_and_secret_mounts": true,
+    "management_secret_absent": true,
+    "secrets_captured": false,
+    "status": "PASS",
+    "score_compose": {
+      "version": "0.47.0",
+      "asset_sha256": "a1d0e62de419a93c0bb20d402390acc001657c870db6076d1138a2de7a24ed20",
+      "public_execution_run": 36525872900,
+      "status": "PASS",
+      "same_appliance_identity": true,
+      "read_only_config_volume": true,
+      "read_only_secret_volume": true,
+      "provider_secret_projected_inside_process": true,
+      "provider_secret_absent_from_compose_and_container_config": true,
+      "liveliness": true,
+      "restart_persistence": true,
+      "zero_residue_volumes": true,
+      "known_target_gaps": {
+        "http_probe_enforcement": "validated but intentionally ignored by score-compose",
+        "resource_limit_enforcement": "validated but intentionally ignored by score-compose"
+      }
+    }
+  }
 }
