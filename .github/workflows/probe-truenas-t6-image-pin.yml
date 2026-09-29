@@ -1,0 +1,55 @@
+name: Probe T6 image pin
+
+on:
+  push:
+    branches:
+      - prep/truenas-t6-image-pin
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Resolve exact T6 runtime image
+        shell: bash
+        env:
+          IMAGE: ghcr.io/element-hq/element-web:v1.12.26
+        run: |
+          set -euo pipefail
+          docker buildx version
+          inspect="$RUNNER_TEMP/imagetools.txt"
+          docker buildx imagetools inspect "$IMAGE" >"$inspect"
+          digest="$(awk '$1=="Digest:" {print $2; exit}' "$inspect")"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            cat "$inspect" >&2
+            echo "could not resolve immutable digest for $IMAGE" >&2
+            exit 1
+          }
+          resolved="${IMAGE%%:*}@$digest"
+          docker buildx imagetools inspect "$resolved" >"$RUNNER_TEMP/resolved.txt"
+          python3 - "$RUNNER_TEMP/t6-image-pin.json" "$IMAGE" "$digest" "$resolved" <<'PY'
+          import json, pathlib, sys
+          path,image,digest,resolved=sys.argv[1:]
+          pathlib.Path(path).write_text(json.dumps({
+              "schema":"truenas-foundry-t6-image-pin/v1",
+              "source_image":image,
+              "oci_index_digest":digest,
+              "resolved_image":resolved,
+              "platform_policy":"immutable OCI index; target runtime selects linux/amd64 child",
+          },indent=2,sort_keys=True)+"\n")
+          PY
+          cat "$RUNNER_TEMP/t6-image-pin.json" >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload image pin evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: truenas-t6-image-pin
+          path: ${{ runner.temp }}/t6-image-pin.json
+          if-no-files-found: error
+          retention-days: 7
