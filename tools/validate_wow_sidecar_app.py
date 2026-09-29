@@ -125,7 +125,9 @@ def extract_seed_script(seed: dict[str, Any]) -> str:
         raise ValidationError("seed: command is not a list")
     parts = [str(v) for v in command]
     if len(parts) == 2 and parts[0] == "-ec":
-        # TrueNAS' renderer escapes '
+        # Compose escapes shell-dollar characters as a doubled pair. Direct
+        # docker-run replay bypasses Compose, so restore the container-visible script.
+        return parts[1].replace(chr(36) * 2, chr(36))
     raise ValidationError(f"seed: unexpected command shape: {parts!r}")
 
 def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[str, str]:
