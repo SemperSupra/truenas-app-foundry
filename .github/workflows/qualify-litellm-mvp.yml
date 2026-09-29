@@ -229,7 +229,7 @@ jobs:
           # catalog_reader tolerates absent Git history for generated overlay
           # paths and returns null last_update values. Do not synthesize a
           # commit solely to manufacture timestamps.
-          docker run --rm --platform linux/amd64 \
+          docker run --rm -i --platform linux/amd64 \
             -e FAKE_ENV=1 \
             -v /tmp/apps:/workspace \
             --entrypoint python \
@@ -280,6 +280,7 @@ jobs:
 
           test -s /tmp/apps/catalog.json
           test -s /tmp/apps/trains/community/litellm/app_versions.json
+          test -s /tmp/apps/litellm-catalog-entry.json
 
           python3 - <<'PY'
           import json
