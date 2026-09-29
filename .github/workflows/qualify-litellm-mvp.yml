@@ -37,8 +37,14 @@ jobs:
           set -euo pipefail
           python3 -m unittest tests/test_materialize_truenas_candidate.py -v
           python3 -m unittest tests/test_litellm_candidate.py -v
+          python3 -m unittest tests/test_package_truenas_catalog_overlay.py -v
+          python3 -m unittest tests/test_reconcile_truenas_catalog_overlay.py -v
           python3 tools/validate_litellm_candidate.py
-          python3 -m py_compile tools/materialize_truenas_candidate.py tools/validate_litellm_candidate.py
+          python3 -m py_compile \
+            tools/materialize_truenas_candidate.py \
+            tools/validate_litellm_candidate.py \
+            tools/package_truenas_catalog_overlay.py \
+            tools/reconcile_truenas_catalog_overlay.py
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
@@ -260,6 +266,10 @@ jobs:
               json.dumps(versions, indent=4) + '\n',
               encoding='utf-8',
           )
+          (root / 'litellm-catalog-entry.json').write_text(
+              json.dumps(details, indent=4) + '\n',
+              encoding='utf-8',
+          )
           PY
 
           test -s /tmp/apps/catalog.json
@@ -281,6 +291,47 @@ jobs:
           assert versions['1.0.0'].get('supported') is True, versions['1.0.0'].get('supported')
           assert versions['1.0.0'].get('last_update') is None or isinstance(versions['1.0.0'].get('last_update'), str)
           PY
+
+          python3 tools/package_truenas_catalog_overlay.py \
+            --published-app /tmp/apps/trains/community/litellm \
+            --catalog-entry /tmp/apps/litellm-catalog-entry.json \
+            --app litellm \
+            --train community \
+            --version 1.0.0 \
+            --output /tmp/litellm-overlay \
+            --mode apply \
+            --evidence /tmp/overlay-package.json
+          jq -e '.status == "APPLIED" and .action == "CREATE"' /tmp/overlay-package.json >/dev/null
+
+          git -C /tmp/apps worktree add --detach /tmp/catalog-live HEAD >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode plan \
+            --evidence /tmp/overlay-plan.json
+          jq -e '.status == "ABSENT" and .action == "CREATE"' /tmp/overlay-plan.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode apply \
+            --evidence /tmp/overlay-apply.json
+          jq -e '.result == "APPLIED" and .status == "OWNED_MATCH"' /tmp/overlay-apply.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode apply \
+            --evidence /tmp/overlay-noop.json
+          jq -e '.result == "NOOP" and .status == "OWNED_MATCH"' /tmp/overlay-noop.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode revert \
+            --evidence /tmp/overlay-revert.json
+          jq -e '.result == "REVERTED" and .status == "ABSENT"' /tmp/overlay-revert.json >/dev/null
 
       - name: Official TrueNAS dev-catalog validation
         run: |
@@ -350,6 +401,13 @@ jobs:
               printf '%s\n' "- materializer second apply: $(jq -r '.status' /tmp/noop.json)"
               printf '%s\n' "- TrueNAS library source: $(jq -r '.upstream.library_source' /tmp/noop.json)"
               printf '%s\n' "- TrueNAS library hash: $(jq -r '.upstream.library_hash' /tmp/noop.json)"
+            fi
+            if [[ -f /tmp/overlay-package.json ]]; then
+              printf '%s\n' "- catalog overlay package: $(jq -r '.status' /tmp/overlay-package.json)"
+              printf '%s\n' "- catalog overlay fingerprint: $(jq -r '.desired_fingerprint' /tmp/overlay-package.json)"
+            fi
+            if [[ -f /tmp/overlay-revert.json ]]; then
+              printf '%s\n' "- catalog overlay reversible lifecycle: $(jq -r '.result' /tmp/overlay-revert.json)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
