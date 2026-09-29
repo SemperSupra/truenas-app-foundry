@@ -52,19 +52,35 @@ class TargetProfileTests(unittest.TestCase):
         self.assertTrue(got["exact_version_match"])
         self.assertFalse(got["apply_qualified"])
 
-    def test_current_stable_has_exact_anchor_but_profile_is_pending(self):
+    def test_current_stable_resolves_exact_profile_but_is_not_apply_qualified(self):
         got = mod.discover(observation("TrueNAS-25.10.7"), REGISTRY)
-        self.assertEqual(got["status"], "EXACT_TARGET_PROFILE_PENDING")
+        self.assertEqual(got["status"], "EXACT_PROFILE")
+        self.assertEqual(
+            got["profile"],
+            ".foundry/truenas-compatibility/25.10.7-materialization.json",
+        )
         self.assertEqual(
             got["middleware_commit"],
             "8ede398839710e56893d88ce85088139d8fab18e",
         )
         self.assertTrue(got["qualification_only"])
+        self.assertFalse(got["apply_qualified"])
 
-    def test_beta3_retains_t3_not_apply_claim(self):
+    def test_beta3_has_exact_profile_but_retains_t3_runtime_gate(self):
         got = mod.discover(observation("TrueNAS-26.0.0-BETA.3"), REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE")
+        self.assertEqual(
+            got["profile"],
+            ".foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json",
+        )
         self.assertEqual(got["accepted_runtime_rung"], "T3")
         self.assertFalse(got["apply_qualified"])
+
+    def test_registry_profile_paths_exist(self):
+        for target in REGISTRY["targets"]:
+            profile = target.get("profile")
+            if profile:
+                self.assertTrue((HERE.parent / profile).is_file(), profile)
 
     def test_exact_nightly_is_never_promoted_from_family_match(self):
         got = mod.discover(

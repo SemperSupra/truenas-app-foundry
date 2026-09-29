@@ -31,9 +31,19 @@ concurrency:
 
 jobs:
   source-contract:
-    name: Pinned TrueNAS middleware materialization contract
+    name: Pinned source / ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "25.04.2.6"
+            profile: ".foundry/truenas-compatibility/25.04.2.6-materialization.json"
+          - name: "25.10.7"
+            profile: ".foundry/truenas-compatibility/25.10.7-materialization.json"
+          - name: "26.0.0-BETA.3"
+            profile: ".foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json"
 
     steps:
       - name: Checkout Foundry
@@ -42,11 +52,13 @@ jobs:
       - name: Resolve pinned middleware identity
         id: profile
         shell: bash
+        env:
+          PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          p = json.load(open('.foundry/truenas-compatibility/25.04.2.6-materialization.json', encoding='utf-8'))
+          import json, os
+          p = json.load(open(os.environ["PROFILE"], encoding="utf-8"))
           print(f"repository={p['middleware']['repository']}")
           print(f"commit={p['middleware']['commit']}")
           PY
@@ -68,31 +80,35 @@ jobs:
 
       - name: Validate source-derived compatibility contract
         shell: bash
+        env:
+          PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
-          python3 tools/validate_truenas_source_contract.py \
-            --source-root .cache/truenas-middleware \
-            --evidence source-contract-evidence.json
-
-      - name: Install platform-resolver test dependency
-        shell: bash
-        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
-
-      - name: Test fail-closed platform value resolution
-        shell: bash
-        run: python3 tools/test_prepare_truenas_platform_values.py
+          python3 tools/validate_truenas_source_contract.py             --profile "$PROFILE"             --source-root .cache/truenas-middleware             --evidence source-contract-evidence.json
 
       - name: Record public-safe compatibility evidence
         if: always()
         shell: bash
         run: |
           {
-            echo '### TrueNAS middleware materialization-contract gate'
+            echo '### TrueNAS middleware materialization-contract gate — ${{ matrix.name }}'
             if [[ -f source-contract-evidence.json ]]; then
-              echo '```json'
+              echo '~~~json'
               cat source-contract-evidence.json
-              echo '```'
+              echo '~~~'
             else
               echo 'No PASS evidence file was produced; inspect the failed validation step.'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  platform-resolver:
+    name: Fail-closed platform value resolver
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install platform-resolver test dependency
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+      - name: Test fail-closed platform value resolution
+        run: python3 tools/test_prepare_truenas_platform_values.py

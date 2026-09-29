@@ -5,7 +5,6 @@ This intentionally does not emulate TrueNAS. It verifies that an exact upstream
 checkout still contains the source identities and semantics recorded by a
 Foundry compatibility profile. Live appliance behavior remains a HIL concern.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -135,9 +134,15 @@ def main() -> int:
         )
 
     assumptions = profile.get("provider_assumptions", {})
+    app_states = assumptions.get("app_states", [])
+    if not isinstance(app_states, list) or not all(isinstance(x, str) for x in app_states):
+        fail("provider_assumptions.app_states must be an array of strings")
+    if len(app_states) != len(set(app_states)):
+        fail("provider_assumptions.app_states must not contain duplicates")
     required_states = {"CRASHED", "DEPLOYING", "RUNNING", "STOPPED"}
-    if set(assumptions.get("app_states", [])) != required_states:
-        fail("Apps state contract must explicitly enumerate CRASHED/DEPLOYING/RUNNING/STOPPED")
+    missing_states = required_states - set(app_states)
+    if missing_states:
+        fail(f"Apps state contract is missing required core states: {sorted(missing_states)!r}")
 
     required_workload_fields = {
         "containers",
