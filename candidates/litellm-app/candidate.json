@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "candidate": "litellm-app",
+  "state": "DRAFT",
+  "source_path": "candidates/litellm-app/ix-dev/community/litellm",
+  "runtime_target": "TrueNAS SCALE Apps",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "4df7498747aad81b1049135539c65c383e42df95",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "upstream": {
+    "repository": "https://github.com/BerriAI/litellm",
+    "version": "v1.103.0",
+    "commit": "c991f4b01f5799eb0b0cab0fb63988e15c3a8a9d",
+    "image_digest": "sha256:bd089afdcd35b894b14a93f9743cdc8b591f82da1a38dd43a010a7b0c9de5fd7",
+    "signature_verified_run": 36496814619
+  },
+  "appliance": {
+    "reference": "ghcr.io/sempersupra/litellm-appliance@sha256:6209a4f4642a5e8b9bc1a4e7f9d853a9cb3a2a6c549aec5691f6370afefd0c26",
+    "digest": "sha256:6209a4f4642a5e8b9bc1a4e7f9d853a9cb3a2a6c549aec5691f6370afefd0c26",
+    "build_status": "PUBLIC_GHA_QUALIFIED",
+    "publication_run": 36498136255,
+    "anonymous_pull": true,
+    "keyless_signed": true
+  },
+  "invariants": {
+    "profile": "gateway-minimal",
+    "config_path": "/config/proxy_server_config.yaml",
+    "secret_directory": "/run/secrets/semper-env",
+    "internal_http_port": 4000,
+    "minimum_secret_tier": "S1",
+    "management_credentials_allowed": false,
+    "moving_tags_allowed": false
+  },
+  "claim_boundary": "Official-shaped TrueNAS catalog candidate for the SemperSupra LiteLLM gateway-minimal appliance. Real TrueNAS runtime acceptance and production cutover remain separate gates."
+}
