@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "candidate": "litellm-app",
-  "state": "STATIC_QUALIFIED",
+  "state": "DISPOSABLE_RUNTIME_QUALIFIED",
   "source_path": "candidates/litellm-app/ix-dev/community/litellm",
   "runtime_target": "TrueNAS SCALE Apps",
   "source_materializer": {
@@ -49,6 +49,24 @@
     "management_secret_absent": true,
     "secrets_captured": false,
     "status": "PASS",
+    "score_compose": {
+      "version": "0.47.0",
+      "asset_sha256": "a1d0e62de419a93c0bb20d402390acc001657c870db6076d1138a2de7a24ed20",
+      "public_execution_run": 36525872900,
+      "status": "PASS",
+      "same_appliance_identity": true,
+      "read_only_config_volume": true,
+      "read_only_secret_volume": true,
+      "provider_secret_projected_inside_process": true,
+      "provider_secret_absent_from_compose_and_container_config": true,
+      "liveliness": true,
+      "restart_persistence": true,
+      "zero_residue_volumes": true,
+      "known_target_gaps": {
+        "http_probe_enforcement": "validated but intentionally ignored by score-compose",
+        "resource_limit_enforcement": "validated but intentionally ignored by score-compose"
+      }
+    },
     "source_authority": "SemperSupra/truenas-app-foundry"
   }
 }
