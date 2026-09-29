@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -50,6 +51,16 @@ def build_desired(
         raise OverlayError(
             f"catalog entry latest_version {entry.get('latest_version')!r} != {version!r}"
         )
+    timestamp_re = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
+    if not isinstance(entry.get("last_update"), str) or not timestamp_re.fullmatch(entry["last_update"]):
+        raise OverlayError("catalog entry last_update must be a deterministic TrueNAS timestamp")
+
+    versions = load_object(published_app / "app_versions.json")
+    selected = versions.get(version)
+    if not isinstance(selected, dict):
+        raise OverlayError(f"app_versions.json missing version {version}")
+    if not isinstance(selected.get("last_update"), str) or not timestamp_re.fullmatch(selected["last_update"]):
+        raise OverlayError("published app version last_update must be a deterministic TrueNAS timestamp")
 
     desired = root / "desired"
     train_root = desired / "trains" / train
