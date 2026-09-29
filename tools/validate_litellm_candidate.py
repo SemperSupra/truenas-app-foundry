@@ -40,10 +40,19 @@ def scalar(text: str, key: str) -> str:
 
 
 def indented_scalar(text: str, key: str) -> str:
-    matches = re.findall(rf"(?m)^\\s+{re.escape(key)}:\\s*([^#\\n]+?)\\s*$", text)
+    matches = []
+    prefix = f"{key}:"
+    for raw in text.splitlines():
+        if not raw[:1].isspace():
+            continue
+        stripped = raw.strip()
+        if stripped.startswith(prefix):
+            value = stripped[len(prefix):].strip()
+            if value:
+                matches.append(value.strip("'\""))
     if len(matches) != 1:
         raise ValidationError(f"expected exactly one nested scalar {key}, found {len(matches)}")
-    return matches[0].strip().strip("'\\\"")
+    return matches[0]
 
 
 def load_json(path: Path) -> dict[str, Any]:
