@@ -191,6 +191,50 @@ jobs:
           git -C /tmp/apps diff --name-only master | grep -q "^ix-dev/$train/litellm/"
           echo "train=$train" >> "$GITHUB_OUTPUT"
 
+      - name: Qualify pre-upstream local catalog overlay
+        run: |
+          set -euo pipefail
+
+          # Exercise TrueNAS's own dev->published-catalog transformation against
+          # the exact materialized candidate. This is the temporary pre-upstream
+          # seam used to make the official-shaped app visible to app.create.
+          docker run --rm --platform linux/amd64 \
+            -v /tmp/apps:/workspace \
+            --entrypoint python \
+            "$VALIDATOR" \
+            -m apps_ci.scripts.catalog_update publish --path /workspace
+
+          test -d /tmp/apps/trains/community/litellm/1.0.0
+          test -f /tmp/apps/trains/community/litellm/item.yaml
+
+          # The official updater currently carries a FIXME in source; run it as
+          # an oracle rather than assuming it works. A failure here is a product
+          # blocker for native catalog-app installation, not permission to hand
+          # edit catalog metadata.
+          docker run --rm --platform linux/amd64 \
+            -v /tmp/apps:/workspace \
+            --entrypoint python \
+            "$VALIDATOR" \
+            -m apps_ci.scripts.catalog_update update --path /workspace
+
+          test -s /tmp/apps/catalog.json
+          test -s /tmp/apps/trains/community/litellm/app_versions.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          catalog = json.loads(Path('/tmp/apps/catalog.json').read_text(encoding='utf-8'))
+          versions = json.loads(Path('/tmp/apps/trains/community/litellm/app_versions.json').read_text(encoding='utf-8'))
+
+          app = catalog.get('community', {}).get('litellm')
+          assert isinstance(app, dict), 'litellm absent from generated catalog.json'
+          assert app.get('latest_version') == '1.0.0', app.get('latest_version')
+          assert '1.0.0' in versions, versions.keys()
+          assert versions['1.0.0'].get('healthy') is True, versions['1.0.0'].get('healthy')
+          assert versions['1.0.0'].get('supported') is True, versions['1.0.0'].get('supported')
+          PY
+
       - name: Official TrueNAS dev-catalog validation
         run: |
           set -euo pipefail
