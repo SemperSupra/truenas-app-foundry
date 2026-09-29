@@ -12,7 +12,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 IMAGE_RE = re.compile(r"^ghcr\.io/sempersupra/wow-sidecar@sha256:[0-9a-f]{64}$")
 HELPER_RE = re.compile(r"^ixsystems/container-utils@sha256:[0-9a-f]{64}$")
-PRIVATE_REPO_RE = re.compile(r"(?:https://github\\.com/)?(?:SemperSupra/)?[A-Za-z0-9_.-]+-private(?![A-Za-z0-9_.-])", re.IGNORECASE)
+PRIVATE_REPO_RE = re.compile(r"(?:https://github[.]com/)?(?:SemperSupra/)?[A-Za-z0-9_.-]+-private(?![A-Za-z0-9_.-])", re.IGNORECASE)
 
 class ValidationError(RuntimeError):
     pass
