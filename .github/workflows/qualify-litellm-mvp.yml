@@ -226,16 +226,22 @@ jobs:
           # historical/test-train metadata in the pinned checkout. Derive only
           # our app through the official catalog_reader and merge that validated
           # fragment into the already-valid catalog cache.
-          # catalog_reader tolerates absent Git history for generated overlay
-          # paths and returns null last_update values. Do not synthesize a
-          # commit solely to manufacture timestamps.
+          # The generated published path has no Git history, while TrueNAS
+          # catalog_reader derives last_update from Git. Preserve that semantic
+          # deterministically by binding the generated catalog metadata to the
+          # last Foundry source commit that changed this candidate.
+          source_last_update="$(TZ=UTC git log -1 --format='%ad' --date=format-local:'%Y-%m-%d %H:%M:%S' -- candidates/litellm-app)"
+          [[ "$source_last_update" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]
+
           docker run --rm -i --platform linux/amd64 \
             -e FAKE_ENV=1 \
+            -e SOURCE_LAST_UPDATE="$source_last_update" \
             -v /tmp/apps:/workspace \
             --entrypoint python \
             "$VALIDATOR" \
             - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           from jsonschema import validate
@@ -250,6 +256,10 @@ jobs:
               {'retrieve_versions': True, 'normalize_questions': False},
           )
           versions = details.pop('versions')
+          last_update = os.environ['SOURCE_LAST_UPDATE']
+          details['last_update'] = details.get('last_update') or last_update
+          for version in versions.values():
+              version['last_update'] = version.get('last_update') or last_update
           latest = details.get('latest_version')
           metadata = {'capabilities': [], 'run_as_context': []}
           if latest in versions:
