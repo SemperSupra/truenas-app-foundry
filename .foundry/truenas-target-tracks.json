@@ -46,14 +46,34 @@
       "middleware_ref": "TS-26.0.0-BETA.3",
       "middleware_commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3",
       "source_qualification": "source-contract-qualified",
-      "runtime_qualification": "public-gha-rdte-t4-accepted",
-      "accepted_runtime_rung": "T4",
+      "runtime_qualification": "public-gha-rdte-t5-accepted",
+      "accepted_runtime_rung": "T5",
       "apply_qualified": false,
       "runtime_evidence": {
-        "run_id": 36538950860,
-        "head_sha": "8968f0426e9aaa8f5ddea9c8cb1b49b23f57855f",
-        "artifact_id": 11021107386,
-        "artifact_digest": "sha256:9449c202b6146812cd1ceb02af02821cc5069ca8b2c67536cc8cd69ee553c2ad"
+        "run_id": 36543274366,
+        "head_sha": "c88013f0c46ce172ec9cd6ade7638925df2a0da8",
+        "artifact_id": 11021279285,
+        "artifact_digest": "sha256:b426c5f22cb3573ad3eaf2b5f11c0481a0956eef1b08580cc58735e07347a376",
+        "lifecycle": {
+          "states": [
+            "RUNNING",
+            "STOPPED",
+            "RUNNING",
+            "RUNNING",
+            "RUNNING",
+            "STOPPED"
+          ],
+          "jobs": [
+            "stop",
+            "start",
+            "update",
+            "redeploy",
+            "stop",
+            "delete"
+          ],
+          "config_readback": "RDTE_GENERATION=2 + immutable nginx digest",
+          "final_state": "absent"
+        }
       }
     }
   ],
