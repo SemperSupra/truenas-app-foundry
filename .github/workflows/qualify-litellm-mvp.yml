@@ -201,6 +201,7 @@ jobs:
           # the exact materialized candidate. This is the temporary pre-upstream
           # seam used to make the official-shaped app visible to app.create.
           docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
             -v /tmp/apps:/workspace \
             --entrypoint python \
             "$VALIDATOR" \
@@ -214,6 +215,7 @@ jobs:
           # blocker for native catalog-app installation, not permission to hand
           # edit catalog metadata.
           docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
             -v /tmp/apps:/workspace \
             --entrypoint python \
             "$VALIDATOR" \
