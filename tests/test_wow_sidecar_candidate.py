@@ -18,17 +18,20 @@ class WowSidecarCandidateTests(unittest.TestCase):
     def setUp(self):
         self.value = json.loads(CANDIDATE.read_text(encoding="utf-8"))
 
-    def test_image_published_helper_pinned_render_unqualified_candidate_passes_but_is_not_hil_eligible(self):
+    def test_render_qualified_candidate_is_hil_eligible_but_not_hil_or_cutover_qualified(self):
         result = MODULE.validate(copy.deepcopy(self.value))
         self.assertEqual(result["result"], "PASS")
         self.assertIsNotNone(result["registry_reference"])
         self.assertTrue(result["permissions_helper_pinned"])
-        self.assertFalse(result["hil_eligible"])
+        self.assertTrue(result["hil_eligible"])
         self.assertFalse(result["private_hil_claimed"])
         self.assertFalse(result["cutover_claimed"])
 
     def test_hil_cannot_be_claimed_without_render_qualification(self):
         value = copy.deepcopy(self.value)
+        value["phase"] = "image-published-render-unqualified"
+        value["gates"]["public_app_render_qualified"] = False
+        value["gates"]["hil_eligible"] = False
         value["gates"]["private_truenas_hil_qualified"] = True
         with self.assertRaisesRegex(MODULE.ValidationError, "private HIL cannot precede"):
             MODULE.validate(value)
@@ -41,11 +44,14 @@ class WowSidecarCandidateTests(unittest.TestCase):
 
     def test_render_gate_requires_immutable_permissions_helper(self):
         value = copy.deepcopy(self.value)
-        value["phase"] = "render-qualified-private-hil-pending"
         value["permissions_helper"]["reference"] = None
-        value["gates"]["public_app_render_qualified"] = True
-        value["gates"]["hil_eligible"] = True
         with self.assertRaisesRegex(MODULE.ValidationError, "immutable permissions helper"):
+            MODULE.validate(value)
+
+    def test_render_gate_requires_exact_durable_evidence(self):
+        value = copy.deepcopy(self.value)
+        value["public_render_evidence"]["compose_sha256"] = "0" * 64
+        with self.assertRaisesRegex(MODULE.ValidationError, "rendered Compose digest drift"):
             MODULE.validate(value)
 
     def test_runtime_identity_is_fixed_numeric_nonroot(self):
@@ -56,6 +62,8 @@ class WowSidecarCandidateTests(unittest.TestCase):
 
     def test_hil_eligibility_is_derived_not_self_asserted(self):
         value = copy.deepcopy(self.value)
+        value["phase"] = "image-published-render-unqualified"
+        value["gates"]["public_app_render_qualified"] = False
         value["gates"]["hil_eligible"] = True
         with self.assertRaisesRegex(MODULE.ValidationError, "does not match"):
             MODULE.validate(value)
