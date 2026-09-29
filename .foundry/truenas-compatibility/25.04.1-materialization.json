@@ -10,6 +10,19 @@
   },
   "source_contract": [
     {
+      "path": "src/middlewared/middlewared/api/v25_04_0/app.py",
+      "blob_sha": "952c43db525d5739731fa98bb359ca3c80f1b4e4",
+      "contains": [
+        "@single_argument_args('app_create')",
+        "class AppCreateArgs(BaseModel):",
+        "custom_compose_config: Secret[dict]",
+        "class AppUpdateArgs(BaseModel):",
+        "app_name: NonEmptyString",
+        "update: AppUpdate = AppUpdate()",
+        "state: Literal['CRASHED', 'DEPLOYING', 'RUNNING', 'STOPPED', 'STOPPING']"
+      ]
+    },
+    {
       "path": "src/middlewared/middlewared/plugins/apps/crud.py",
       "blob_sha": "f3c4f79201c0d2340a8bc2cfbe4757448a6851ba",
       "contains": [
@@ -250,5 +263,68 @@
       "hardware-in-loop behavior",
       "generic compatibility with other TrueNAS releases"
     ]
+  },
+  "runtime_api": {
+    "transport": "middleware-json-rpc",
+    "version_probe": "system.version",
+    "capability_probe": "core.get_methods",
+    "app_query": {
+      "method": "app.query",
+      "arguments": "filters-plus-options",
+      "ownership_use": "presence/read-back only; ownership requires separate provenance"
+    },
+    "app_config": {
+      "method": "app.config",
+      "arguments": "app_name",
+      "role": "independent desired-config read-back"
+    },
+    "app_create": {
+      "method": "app.create",
+      "arguments": "single-dictionary",
+      "payload_fields": [
+        "custom_app",
+        "values",
+        "custom_compose_config",
+        "custom_compose_config_string",
+        "catalog_app",
+        "app_name",
+        "train",
+        "version"
+      ],
+      "job_backed": true
+    },
+    "app_update": {
+      "method": "app.update",
+      "arguments": "app_name-plus-update-dictionary",
+      "payload_fields": [
+        "values",
+        "custom_compose_config",
+        "custom_compose_config_string"
+      ],
+      "job_backed": true
+    },
+    "app_redeploy": {
+      "method": "app.redeploy",
+      "arguments": "app_name",
+      "job_backed": true
+    },
+    "app_delete": {
+      "method": "app.delete",
+      "arguments": "app_name-plus-options",
+      "job_backed": true
+    },
+    "apply_preconditions": [
+      "reobserve exact system.version",
+      "reobserve required methods",
+      "reobserve ownership/provenance",
+      "require plan target/profile identity unchanged"
+    ],
+    "verify_postconditions": [
+      "app.query exact id",
+      "app.config desired config",
+      "RUNNING state when desired",
+      "active workload/container evidence when desired"
+    ],
+    "source_api_family": "v25_04_0"
   }
 }

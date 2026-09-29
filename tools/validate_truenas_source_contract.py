@@ -164,6 +164,33 @@ def main() -> int:
     if delete_semantics.get("ix_volumes_removed_only_when_requested") is not True:
         fail("profile must record conditional ixVolume dataset deletion")
 
+    runtime_api = profile.get("runtime_api")
+    if not isinstance(runtime_api, dict):
+        fail("materialization profile must define runtime_api")
+    if runtime_api.get("transport") != "middleware-json-rpc":
+        fail("runtime_api.transport must be middleware-json-rpc")
+    if runtime_api.get("version_probe") != "system.version":
+        fail("runtime_api.version_probe must be system.version")
+    if runtime_api.get("capability_probe") != "core.get_methods":
+        fail("runtime_api.capability_probe must be core.get_methods")
+    for key, method, job_backed in (
+        ("app_query", "app.query", None),
+        ("app_config", "app.config", None),
+        ("app_create", "app.create", True),
+        ("app_update", "app.update", True),
+        ("app_redeploy", "app.redeploy", True),
+        ("app_delete", "app.delete", True),
+    ):
+        contract = runtime_api.get(key)
+        if not isinstance(contract, dict) or contract.get("method") != method:
+            fail(f"runtime_api.{key} must bind {method}")
+        if job_backed is not None and contract.get("job_backed") is not job_backed:
+            fail(f"runtime_api.{key}.job_backed must be {job_backed}")
+    if runtime_api["app_create"].get("arguments") != "single-dictionary":
+        fail("current qualified releases require app.create single-dictionary payload")
+    if runtime_api["app_update"].get("arguments") != "app_name-plus-update-dictionary":
+        fail("current qualified releases require app.update app_name + update dictionary")
+
     feature_summary = validate_materialization_profile(profile) if schema_version >= 2 else None
 
     evidence = {
@@ -176,6 +203,7 @@ def main() -> int:
         "middleware_commit": actual_commit,
         "checked_files": checked_files,
         "provider_assumptions": assumptions,
+        "runtime_api": runtime_api,
         "platform_features": feature_summary,
         "scope": profile.get("scope", {}),
     }
