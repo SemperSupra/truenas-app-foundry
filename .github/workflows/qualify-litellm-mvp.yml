@@ -354,11 +354,11 @@ jobs:
           {
             echo "### LiteLLM MVP public qualification"
             echo
-            echo "- appliance reproducibility digest: `${{ steps.repro.outputs.oci_manifest_digest }}`"
+            printf '%s\n' "- appliance reproducibility digest: ${{ steps.repro.outputs.oci_manifest_digest }}"
             if [[ -f /tmp/noop.json ]]; then
-              echo "- materializer second apply: `$(jq -r '.status' /tmp/noop.json)`"
-              echo "- TrueNAS library source: `$(jq -r '.upstream.library_source' /tmp/noop.json)`"
-              echo "- TrueNAS library hash: `$(jq -r '.upstream.library_hash' /tmp/noop.json)`"
+              printf '%s\n' "- materializer second apply: $(jq -r '.status' /tmp/noop.json)"
+              printf '%s\n' "- TrueNAS library source: $(jq -r '.upstream.library_source' /tmp/noop.json)"
+              printf '%s\n' "- TrueNAS library hash: $(jq -r '.upstream.library_hash' /tmp/noop.json)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
