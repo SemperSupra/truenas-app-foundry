@@ -38,6 +38,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: "25.04.1"
+            profile: ".foundry/truenas-compatibility/25.04.1-materialization.json"
           - name: "25.04.2.6"
             profile: ".foundry/truenas-compatibility/25.04.2.6-materialization.json"
           - name: "25.10.7"
