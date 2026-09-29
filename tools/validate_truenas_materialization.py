@@ -243,6 +243,18 @@ def assert_control(app: str, test_file: str, compose: dict[str, Any], primary_na
             raise ValidationError("forgejo-runner: expected upstream Docker socket missing")
         return
 
+    if app == "element-web":
+        if not primary.get("ports"):
+            raise ValidationError("element-web: expected published web port missing")
+        if has_docker_socket(primary):
+            raise ValidationError("element-web: unexpected Docker socket materialized")
+        for mount in mounts(primary):
+            if mount["type"] == "bind" or str(mount["source"]).startswith("/"):
+                raise ValidationError(
+                    "element-web: live T6 control must not materialize host/bind storage"
+                )
+        return
+
     if app == "ntfy":
         service(compose, "permissions")
         if not primary.get("ports"):
@@ -312,6 +324,8 @@ def write_materialized_controls(
             "primary_service": item["primary_service"],
             "compose_path": filename,
             "compose_sha256": fp["compose_sha256"],
+            "runtime_safe": bool(item.get("runtime_safe", False)),
+            "qualification_role": item.get("qualification_role"),
         })
 
     index = {
@@ -356,6 +370,8 @@ def validate(materialized_dir: Path | None = None) -> dict[str, Any]:
                 "primary_service": primary_name,
                 "compose": compose,
                 "fingerprint": fp,
+                "runtime_safe": bool(control.get("runtime_safe", False)),
+                "qualification_role": control.get("qualification_role"),
             })
     finally:
         try:
