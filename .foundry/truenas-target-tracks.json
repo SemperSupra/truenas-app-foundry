@@ -34,7 +34,7 @@
       "profile": ".foundry/truenas-compatibility/25.10.7-materialization.json",
       "middleware_ref": "TS-25.10.7",
       "middleware_commit": "8ede398839710e56893d88ce85088139d8fab18e",
-      "source_qualification": "profile-added-source-ci-pending",
+      "source_qualification": "source-contract-qualified",
       "runtime_qualification": "pending-real-system-rdte",
       "accepted_runtime_rung": null,
       "apply_qualified": false
@@ -45,7 +45,7 @@
       "profile": ".foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json",
       "middleware_ref": "TS-26.0.0-BETA.3",
       "middleware_commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3",
-      "source_qualification": "profile-added-source-ci-pending",
+      "source_qualification": "source-contract-qualified",
       "runtime_qualification": "public-gha-rdte-in-progress",
       "accepted_runtime_rung": "T3",
       "apply_qualified": false
