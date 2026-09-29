@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "candidate": "wow-sidecar-truenas-app",
+  "result": "PASS",
+  "run": 36550143870,
+  "qualified_head": "c5aa14ac85482cc093c1e1283b7c8e969d805f0e",
+  "compose_sha256": "46ed8d0a3fdd543b5ad359cd73e2b5bf06b69a65ab4f6312fd5c523d2445ab1a",
+  "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376",
+  "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992",
+  "truenas_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "ghcr_anonymous_pull": true,
+  "seed_behavior": "PASS:create-once/preserve/fail-partial",
+  "services": [
+    "permissions",
+    "wow-sidecar",
+    "wow-sidecar-config-seed"
+  ],
+  "security": {
+    "wow_runtime_uid_gid": "10001:10001",
+    "wow_cap_drop_all": true,
+    "wow_no_new_privileges": true,
+    "wow_rootfs_read_only": true,
+    "wow_config_read_only": true,
+    "host_paths_allowed_by_source_schema": false,
+    "runtime_socket_allowed": false,
+    "host_network": false,
+    "privileged": false,
+    "permissions_helper_scope": "ixVolume ownership only"
+  },
+  "non_claims": [
+    "no TrueNAS runtime realization",
+    "no site credential use",
+    "no execution-control request/claim/receipt mutation",
+    "no GARM/root integration migration",
+    "no live cutover or rollback claim"
+  ]
+}
