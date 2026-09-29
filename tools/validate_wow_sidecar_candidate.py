@@ -113,6 +113,17 @@ def validate(value: dict[str, Any]) -> dict[str, Any]:
     if render_qualified:
         require(helper_ref is not None, "render qualification requires immutable permissions helper")
         require(value.get("phase") != "image-published-render-unqualified", "render-qualified gate/phase mismatch")
+        evidence = value.get("public_render_evidence")
+        require(isinstance(evidence, dict), "render qualification requires durable evidence")
+        require(evidence.get("result") == "PASS", "render qualification evidence is not PASS")
+        require(evidence.get("run") == 36550143870, "render qualification run drift")
+        require(evidence.get("qualified_head") == "c5aa14ac85482cc093c1e1283b7c8e969d805f0e", "render qualification head drift")
+        require(evidence.get("compose_sha256") == "46ed8d0a3fdd543b5ad359cd73e2b5bf06b69a65ab4f6312fd5c523d2445ab1a", "rendered Compose digest drift")
+        require(evidence.get("ghcr_anonymous_pull") is True, "render qualification did not prove anonymous GHCR pull")
+        require(evidence.get("seed_behavior") == "PASS:create-once/preserve/fail-partial", "seed qualification drift")
+        require(evidence.get("materializer_commit") == tn.get("commit"), "render materializer drift")
+        require(evidence.get("wow_image") == container.get("registry_reference"), "render WOW image drift")
+        require(evidence.get("permissions_helper") == helper_ref, "render permissions-helper drift")
 
     computed_hil_eligible = bool(gates.get("public_source_qualified") is True and gates.get("registry_image_published") is True and render_qualified)
     require(gates.get("hil_eligible") is computed_hil_eligible, "hil_eligible does not match pre-HIL gates")
