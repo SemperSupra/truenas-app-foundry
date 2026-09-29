@@ -1,0 +1,21 @@
+images:
+  image:
+    repository: ghcr.io/sempersupra/wow-sidecar@sha256
+    tag: 6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376
+  container_utils_image:
+    repository: ixsystems/container-utils@sha256
+    tag: 46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992
+
+consts:
+  worker_container_name: wow-sidecar
+  seed_container_name: wow-sidecar-config-seed
+  perms_container_name: permissions
+  runtime_uid: 10001
+  runtime_gid: 10001
+  config_path: /etc/wow-sidecar
+  state_path: /var/lib/wow-sidecar
+  private_key_path: /etc/wow-sidecar/github-app.pem
+  profile_path: /etc/wow-sidecar/profiles/operator.json
+  seed_private_key_path: /seed/github-app.pem
+  seed_profile_path: /seed/operator-profile.json
+  revision_file: /usr/share/wow-sidecar/source-revision

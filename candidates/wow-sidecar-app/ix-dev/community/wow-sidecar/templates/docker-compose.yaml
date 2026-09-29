@@ -1,0 +1,60 @@
+{% set tpl = ix_lib.base.render.Render(values) %}
+{% set perms = tpl.deps.perms(values.consts.perms_container_name) %}
+{% set seed = tpl.add_container(values.consts.seed_container_name, "image") %}
+{% set worker = tpl.add_container(values.consts.worker_container_name, "image") %}
+
+{% set perms_config = {
+  "uid": values.consts.runtime_uid,
+  "gid": values.consts.runtime_gid,
+  "mode": "check",
+  "chmod": "0750"
+} %}
+{% do perms.add_or_skip_action("config", values.storage.config, perms_config) %}
+{% do perms.add_or_skip_action("state", values.storage.state, perms_config) %}
+{% if perms.has_actions() %}
+  {% do perms.activate() %}
+{% endif %}
+
+{% set seed_script = "set -eu; marker=/etc/wow-sidecar/.initialized-v1; key=/etc/wow-sidecar/github-app.pem; profile=/etc/wow-sidecar/profiles/operator.json; if [ -e \"$marker\" ]; then test -s \"$key\" && test -s \"$profile\" || { echo 'initialized marker exists but managed config is incomplete' >&2; exit 42; }; exit 0; fi; if [ -e \"$key\" ] || [ -e \"$profile\" ] || [ -e /etc/wow-sidecar/profiles ]; then echo 'partial or unexpected WOW configuration exists; refusing to overwrite' >&2; exit 42; fi; umask 077; mkdir /etc/wow-sidecar/profiles; cp /seed/github-app.pem \"$key\"; cp /seed/operator-profile.json \"$profile\"; test -s \"$key\"; test -s \"$profile\"; printf '%s\\n' 'wow-sidecar-config-v1' > /etc/wow-sidecar/.initialized-v1.tmp; mv /etc/wow-sidecar/.initialized-v1.tmp \"$marker\"; chmod 0400 \"$key\" \"$profile\"; chmod 0444 \"$marker\"" %}
+
+{% do seed.set_user(values.consts.runtime_uid, values.consts.runtime_gid) %}
+{% do seed.set_entrypoint(["/bin/sh"]) %}
+{% do seed.set_command(["-ec", seed_script]) %}
+{% do seed.setup_as_helper("low", true) %}
+{% do seed.set_read_only(true) %}
+{% do seed.add_storage(values.consts.config_path, values.storage.config) %}
+{% do seed.add_storage("/tmp", {"type": "tmpfs", "tmpfs_config": {"size": 16, "mode": "0700", "uid": values.consts.runtime_uid, "gid": values.consts.runtime_gid}}) %}
+{% do seed.configs.add("wow-github-app-private-key", values.wow.github_app_private_key, values.consts.seed_private_key_path, "0400") %}
+{% do seed.configs.add("wow-operator-profile", values.wow.operator_profile_json, values.consts.seed_profile_path, "0400") %}
+{% if perms.has_actions() %}
+  {% do seed.depends.add_dependency(values.consts.perms_container_name, "service_completed_successfully") %}
+{% endif %}
+
+{% set config_ro = {
+  "type": values.storage.config.type,
+  "read_only": true,
+  "ix_volume_config": values.storage.config.ix_volume_config
+} %}
+{% do worker.set_user(values.consts.runtime_uid, values.consts.runtime_gid) %}
+{% do worker.set_read_only(true) %}
+{% do worker.set_init(true) %}
+{% do worker.set_grace_period(30) %}
+{% do worker.healthcheck.disable() %}
+{% do worker.add_storage(values.consts.config_path, config_ro) %}
+{% do worker.add_storage(values.consts.state_path, values.storage.state) %}
+{% do worker.add_storage("/tmp", {"type": "tmpfs", "tmpfs_config": {"size": 64, "mode": "0700", "uid": values.consts.runtime_uid, "gid": values.consts.runtime_gid}}) %}
+{% do worker.environment.add_env("GITHUB_APP_ID", values.wow.github_app_id) %}
+{% do worker.environment.add_env("GITHUB_APP_PRIVATE_KEY_FILE", values.consts.private_key_path) %}
+{% do worker.set_command([
+  "--control-repository", values.wow.control_repository,
+  "--profile", values.consts.profile_path,
+  "--revision-file", values.consts.revision_file,
+  "--serve",
+  "--poll-seconds", values.wow.poll_seconds
+]) %}
+{% do worker.depends.add_dependency(values.consts.seed_container_name, "service_completed_successfully") %}
+{% if perms.has_actions() %}
+  {% do worker.depends.add_dependency(values.consts.perms_container_name, "service_completed_successfully") %}
+{% endif %}
+
+{{ tpl.render() | tojson }}
