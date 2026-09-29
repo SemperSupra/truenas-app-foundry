@@ -5,7 +5,8 @@ usage() {
   cat >&2 <<'EOF'
 usage: materialize_truenas_catalog_app.sh \
   --source <ix-dev app dir> --train <train> --app <name> \
-  --apps-commit <40-hex> --validator <image@sha256:digest> --output <dir>
+  --apps-commit <40-hex> --validator <image@sha256:digest> \
+  --source-date-epoch <unix-seconds> --output <dir>
 EOF
   exit 64
 }
@@ -16,6 +17,7 @@ APP=""
 APPS_COMMIT=""
 VALIDATOR=""
 OUTPUT=""
+SOURCE_DATE_EPOCH_VALUE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,11 +27,13 @@ while [[ $# -gt 0 ]]; do
     --apps-commit) APPS_COMMIT="$2"; shift 2 ;;
     --validator) VALIDATOR="$2"; shift 2 ;;
     --output) OUTPUT="$2"; shift 2 ;;
+    --source-date-epoch) SOURCE_DATE_EPOCH_VALUE="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
 
-[[ -n "$SOURCE" && -n "$TRAIN" && -n "$APP" && -n "$APPS_COMMIT" && -n "$VALIDATOR" && -n "$OUTPUT" ]] || usage
+[[ -n "$SOURCE" && -n "$TRAIN" && -n "$APP" && -n "$APPS_COMMIT" && -n "$VALIDATOR" && -n "$OUTPUT" && -n "$SOURCE_DATE_EPOCH_VALUE" ]] || usage
+[[ "$SOURCE_DATE_EPOCH_VALUE" =~ ^[0-9]{9,}$ ]] || { echo "invalid source date epoch" >&2; exit 78; }
 [[ "$APPS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid apps commit" >&2; exit 78; }
 [[ "$VALIDATOR" =~ @sha256:[0-9a-f]{64}$ ]] || { echo "validator must be digest-pinned" >&2; exit 78; }
 [[ "$TRAIN" =~ ^[a-z][a-z0-9_-]*$ ]] || { echo "invalid train" >&2; exit 78; }
@@ -105,6 +109,12 @@ docker run --rm --platform linux/amd64 \
   "$VALIDATOR" \
   apps_catalog_update publish --path /workspace
 
+git -C "$REPO" config user.name "SemperSupra Foundry"
+git -C "$REPO" config user.email "foundry@invalid.local"
+git -C "$REPO" add -A
+GIT_AUTHOR_DATE="@$SOURCE_DATE_EPOCH_VALUE" GIT_COMMITTER_DATE="@$SOURCE_DATE_EPOCH_VALUE" \
+  git -C "$REPO" commit -q -m "Foundry materialization publish"
+
 docker run --rm --platform linux/amd64 \
   -e FAKE_ENV=1 \
   -v "$REPO:/workspace" \
@@ -144,15 +154,16 @@ tree_hash="$(
 )"
 entry_hash="$(sha256sum "$OUTPUT/catalog-entry.json" | awk '{print $1}')"
 
-python3 - "$OUTPUT/materialization.json" "$APPS_COMMIT" "$VALIDATOR" "$TRAIN" "$APP" "$version" "$lib_version" "$lib_hash" "$tree_hash" "$entry_hash" <<'PY'
+python3 - "$OUTPUT/materialization.json" "$APPS_COMMIT" "$VALIDATOR" "$TRAIN" "$APP" "$version" "$lib_version" "$lib_hash" "$tree_hash" "$entry_hash" "$SOURCE_DATE_EPOCH_VALUE" <<'PY'
 import json, pathlib, sys
-(out, apps_commit, validator, train, app, version, lib_version, lib_hash, tree_hash, entry_hash) = sys.argv[1:]
+(out, apps_commit, validator, train, app, version, lib_version, lib_hash, tree_hash, entry_hash, source_date_epoch) = sys.argv[1:]
 value = {
     "schema_version": 1,
     "record_type": "truenas-runtime-catalog-materialization",
     "status": "PASS",
     "truenas_apps_commit": apps_commit,
     "validator": validator,
+    "source_date_epoch": int(source_date_epoch),
     "train": train,
     "app": app,
     "version": version,
