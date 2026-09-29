@@ -1,0 +1,36 @@
+annotations:
+  min_scale_version: 24.10.2.2
+app_version: 4.0.1
+capabilities: []
+categories:
+  - games
+changelog_url: https://github.com/unmojang/drasl/blob/v4.0.1/doc/release-notes.md
+date_added: '2026-09-26'
+description: Alternative Minecraft authentication, profile, skin, and cape API server compatible with Yggdrasil and authlib-injector.
+home: https://github.com/unmojang/drasl
+host_mounts: []
+icon: https://raw.githubusercontent.com/unmojang/drasl/v4.0.1/doc/icon.png
+keywords:
+  - minecraft
+  - yggdrasil
+  - authentication
+  - authlib-injector
+lib_version: 2.3.14
+lib_version_hash: 6038f48d2190e05399cd824410204c3eba22568c1150470f3d9f8815a6dd241a
+maintainers:
+  - name: SemperSupra
+    url: https://github.com/SemperSupra
+name: drasl
+run_as_context:
+  - description: Drasl is qualified by this candidate to run as the TrueNAS apps user with a writable persistent state volume.
+    gid: 568
+    group_name: apps
+    uid: 568
+    user_name: apps
+screenshots: []
+sources:
+  - https://github.com/unmojang/drasl
+  - https://github.com/SemperSupra/truenas-app-foundry
+title: Drasl
+train: community
+version: 1.0.0

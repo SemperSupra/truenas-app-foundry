@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "candidate": "drasl-app",
+  "source_path": "candidates/drasl-app/ix-dev/community/drasl",
+  "runtime_target": "TrueNAS SCALE Apps",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "c988f4a626e1540c9849b6278780a7c1df00f3d3",
+    "train": "community",
+    "lib_version": "2.3.14",
+    "lib_hash": "6038f48d2190e05399cd824410204c3eba22568c1150470f3d9f8815a6dd241a"
+  },
+  "upstream": {
+    "repository": "https://github.com/unmojang/drasl",
+    "tag": "v4.0.1",
+    "commit": "823d8a21780d6b15f44aec3de68411a5c40e3fe2",
+    "image": "unmojang/drasl:4.0.1"
+  },
+  "invariants": {
+    "persistent_path": "/var/lib/drasl",
+    "config_path": "/etc/drasl/config.toml",
+    "internal_http_port": 25585,
+    "runtime_uid": 568,
+    "runtime_gid": 568,
+    "host_paths_allowed": false,
+    "container_runtime_socket_allowed": false,
+    "privileged_allowed": false,
+    "cap_drop_all": true,
+    "no_new_privileges": true,
+    "registration_requires_invite_by_default": true,
+    "in_container_healthcheck": "disabled because the exact upstream minimal image has no qualified probe utility; public qualification probes the real HTTP service externally"
+  },
+  "claim_boundary": "Public source/render and exact-image container qualification only. Live TrueNAS realization, site bindings, persistence/upgrade/rollback HIL, and promotion remain separate private concerns."
+}
