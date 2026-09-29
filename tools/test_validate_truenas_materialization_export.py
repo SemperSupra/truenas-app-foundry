@@ -36,6 +36,8 @@ class MaterializationExportTests(unittest.TestCase):
             "primary_service": "probe",
             "compose": compose,
             "fingerprint": fp,
+            "runtime_safe": True,
+            "qualification_role": "t6-live-stateless-control",
         }]
         with tempfile.TemporaryDirectory() as td:
             out = pathlib.Path(td)
@@ -58,6 +60,11 @@ class MaterializationExportTests(unittest.TestCase):
         self.assertEqual(
             index["controls"][0]["compose_path"],
             "probe--basic-values.compose.json",
+        )
+        self.assertTrue(index["controls"][0]["runtime_safe"])
+        self.assertEqual(
+            index["controls"][0]["qualification_role"],
+            "t6-live-stateless-control",
         )
 
 
