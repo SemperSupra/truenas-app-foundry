@@ -26,6 +26,7 @@ from validate_garm_controller_app import (
 APP_NAME = "rdte-t6-garm"
 RUNTIME_CONFIG_ROOT = "/mnt/rdtepool/garm-t6/config"
 TLS_CONFIGS = {"garm-tls-certificate", "garm-tls-private-key"}
+BOOTSTRAP_CONFIG = "garm-initial-config"
 
 
 def canonical_sha256(value: Any) -> str:
@@ -43,7 +44,8 @@ def lower_for_nested(compose: dict[str, Any]) -> dict[str, Any]:
     for name in ("garm", "garm-config-seed"):
         volumes = services[name].get("volumes") or []
         matches = [
-            item for item in volumes
+            item
+            for item in volumes
             if isinstance(item, dict) and item.get("target") == "/etc/garm"
         ]
         if len(matches) != 1:
@@ -54,12 +56,24 @@ def lower_for_nested(compose: dict[str, Any]) -> dict[str, Any]:
     configs = lowered.get("configs") or {}
     if not TLS_CONFIGS.issubset(configs):
         raise ValidationError("rendered GARM TLS configs missing")
+    if BOOTSTRAP_CONFIG not in configs:
+        raise ValidationError("rendered GARM bootstrap config missing")
+
     for config_name in TLS_CONFIGS:
         configs[config_name]["content"] = f"__EPHEMERAL_NESTED_TLS__:{config_name}"
+    configs[BOOTSTRAP_CONFIG]["content"] = "__EPHEMERAL_NESTED_GARM_CONFIG__"
 
     rendered = json.dumps(lowered, sort_keys=True)
     if "docker.sock" in rendered or '"privileged": true' in rendered:
         raise ValidationError("unsafe runtime boundary materialized")
+    for forbidden in (
+        "PUBLIC-QUALIFICATION-FIXTURE",
+        "PRIVATE-QUALIFICATION-FIXTURE",
+        "N4vR8xK2mQ7pL5sD9wF3cH6yT1jB0zUa",
+        "Y7cD2mQ9vK4sR8pL1xF6nH3wT5jB0zUa",
+    ):
+        if forbidden in rendered:
+            raise ValidationError(f"retained control contains fixture secret material: {forbidden}")
     return lowered
 
 
@@ -78,6 +92,11 @@ def export(foundry_ref: str, output: Path) -> dict[str, Any]:
 
         source_sha = canonical_sha256(source_compose)
         runtime_sha = canonical_sha256(runtime_compose)
+        target_lowering = {
+            "persistent_config_root": RUNTIME_CONFIG_ROOT,
+            "tls": "replace two placeholders with run-local ephemeral PEM; never retain key material",
+            "bootstrap_config": "replace placeholder with run-local disposable JWT/database values",
+        }
         artifact = build_artifact(
             APP_NAME,
             runtime_compose,
@@ -88,10 +107,7 @@ def export(foundry_ref: str, output: Path) -> dict[str, Any]:
                     CANDIDATE.read_bytes()
                 ).hexdigest(),
                 "source_compose_sha256": source_sha,
-                "target_lowering": {
-                    "persistent_config_root": RUNTIME_CONFIG_ROOT,
-                    "tls": "replace two public placeholder configs with run-local ephemeral PEM; never retain key material",
-                },
+                "target_lowering": target_lowering,
                 "source_materializer": manifest["source_materializer"],
                 "appliance": manifest["appliance"],
             },
@@ -117,19 +133,21 @@ def export(foundry_ref: str, output: Path) -> dict[str, Any]:
             "runtime_compose_sha256": runtime_sha,
             "deployment_artifact_sha256": artifact["artifact_sha256"],
             "materialization_identity": artifact["materialization_identity"],
+            "target_lowering": target_lowering,
             "runtime": {
                 "app_name": APP_NAME,
                 "config_root": RUNTIME_CONFIG_ROOT,
                 "host_port": 30880,
                 "tls_replacement": sorted(TLS_CONFIGS),
+                "bootstrap_replacement": BOOTSTRAP_CONFIG,
             },
             "private_secrets_captured": False,
-            "fixture_bootstrap_values_only": True,
+            "fixture_secret_values_retained": False,
             "github_credentials_present": False,
             "claims": [
                 "public Foundry source rendered through the existing qualified GARM controller path",
                 "runtime Compose binds only disposable nested config storage",
-                "TLS private key is deliberately absent from the exported bundle",
+                "all retained secret-bearing configs are placeholders",
             ],
             "non_claims": [
                 "no GitHub credential/JIT runner registration",
