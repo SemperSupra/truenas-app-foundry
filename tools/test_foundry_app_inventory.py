@@ -134,15 +134,15 @@ class InventoryTests(unittest.TestCase):
             app = root / "candidate"
             (app / "templates").mkdir(parents=True)
             (app / "app.yaml").write_text(
-                "name: probe-app\\n"
-                "version: 1.0.0\\n"
-                "app_version: v1.0.0-test\\n"
-                "train: test\\n",
+                "name: probe-app\n"
+                "version: 1.0.0\n"
+                "app_version: v1.0.0-test\n"
+                "train: test\n",
                 encoding="utf-8",
             )
-            (app / "questions.yaml").write_text("groups: []\\n", encoding="utf-8")
+            (app / "questions.yaml").write_text("groups: []\n", encoding="utf-8")
             (app / "templates" / "docker-compose.yaml").write_text(
-                "services:\\n  probe:\\n    image: example.invalid/probe@sha256:" + "a" * 64 + "\\n",
+                "services:\n  probe:\n    image: example.invalid/probe@sha256:" + "a" * 64 + "\n",
                 encoding="utf-8",
             )
             entry = sample_entry("probe-app", "1.0.0")
