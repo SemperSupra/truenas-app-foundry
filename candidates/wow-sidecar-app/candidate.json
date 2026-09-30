@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "candidate": "wow-sidecar-truenas-app",
-  "phase": "render-qualified-private-hil-pending",
+  "phase": "image-published-render-unqualified",
   "wow_source": {
     "repository": "https://github.com/SemperSupra/wow-sidecar.git",
     "published_revision": "8826acc6ee5d739ba302144dd912798fda7ed424",
@@ -45,7 +45,6 @@
     "config_mount_read_only_for_worker": true,
     "state_storage": "ix_volume",
     "state_mount": "/var/lib/wow-sidecar",
-    "root_filesystem_read_only": true,
     "temporary_filesystem": "/tmp",
     "runtime_uid": 10001,
     "runtime_gid": 10001,
@@ -59,18 +58,21 @@
     "host_paths_allowed": false,
     "container_runtime_socket_allowed": false,
     "config_seed": "create-once; preserve initialized config; fail on partial state",
-    "permissions_helper_scope": "ixVolume ownership only"
+    "permissions_helper_scope": "ixVolume ownership only",
+    "worker_root_filesystem_read_only": true,
+    "seed_root_filesystem_writable_for_inline_configs": true,
+    "seed_rootfs_exception_scope": "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only"
   },
   "gates": {
     "public_source_qualified": true,
     "registry_image_published": true,
-    "public_app_render_qualified": true,
+    "public_app_render_qualified": false,
     "private_truenas_hil_qualified": false,
     "state_preserving_cutover_qualified": false,
-    "hil_eligible": true
+    "hil_eligible": false
   },
-  "claim_boundary": "Published image plus public TrueNAS App render/runtime qualification are accepted. Private TrueNAS HIL, state-preserving migration/cutover, rollback, and the separately privileged GARM integration remain outside this claim.",
-  "public_render_evidence": {
+  "claim_boundary": "Published WOW image remains accepted. Prior public App render claim is superseded by full-Compose falsification; corrected App render/runtime qualification is pending. Private TrueNAS HIL, state-preserving migration/cutover, rollback, and privileged GARM integration remain outside this claim.",
+  "superseded_public_render_evidence": {
     "result": "PASS",
     "run": 36550143870,
     "qualified_head": "c5aa14ac85482cc093c1e1283b7c8e969d805f0e",
@@ -80,5 +82,11 @@
     "materializer_commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
     "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376",
     "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
+  },
+  "render_falsification": {
+    "result": "FAIL",
+    "run": 36791533322,
+    "boundary": "full-compose-orchestration",
+    "detail": "Docker Compose rejects inline-content configs on read_only seed service; previous seed-script replay did not exercise this full-graph constraint."
   }
 }
