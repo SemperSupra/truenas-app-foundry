@@ -89,17 +89,18 @@ jobs:
           test "$original_ci_sha" != "$patched_ci_sha"
           ! grep -q 'ghcr.io/truenas/apps_validation:latest' "$root/apps/.github/scripts/ci.py"
 
-          uv_version="$(uv --version)"
+          python_version="$(python3 --version 2>&1)"
+          pyyaml_version="$(python3 -c 'import yaml; print(yaml.__version__)')"
           (
             cd "$root/apps"
-            uv run --no-progress .github/scripts/ci.py \
+            python3 .github/scripts/ci.py \
               --train community \
               --app element-web \
               --test-file basic-values.yaml
           )
 
           receipt="$RUNNER_TEMP/truenas-catalog-render-install-v2-receipt.json"
-          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" "$original_ci_sha" "$patched_ci_sha" "$uv_version" "$receipt" <<'PY'
+          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" "$original_ci_sha" "$patched_ci_sha" "$python_version" "$pyyaml_version" "$receipt" <<'PY'
           import json, pathlib, sys
           payload = {
               "schema": "truenas-foundry-catalog-render-install-receipt/v2",
@@ -112,7 +113,8 @@ jobs:
               "built_validator_image_id": sys.argv[4],
               "upstream_ci_sha256": "sha256:" + sys.argv[5],
               "patched_ci_sha256": "sha256:" + sys.argv[6],
-              "uv_version": sys.argv[7],
+              "python_version": sys.argv[7],
+              "pyyaml_version": sys.argv[8],
               "control": {
                   "train": "community",
                   "app": "element-web",
@@ -134,7 +136,7 @@ jobs:
               ],
           }
           text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-          pathlib.Path(sys.argv[8]).write_text(text, encoding="utf-8")
+          pathlib.Path(sys.argv[9]).write_text(text, encoding="utf-8")
           print(text, end="")
           PY
 
