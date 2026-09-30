@@ -64,6 +64,7 @@ class TargetProfileTests(unittest.TestCase):
             "8ede398839710e56893d88ce85088139d8fab18e",
         )
         self.assertTrue(got["qualification_only"])
+        self.assertEqual(got["accepted_runtime_rung"], "T5")
         self.assertFalse(got["apply_qualified"])
 
     def test_beta3_has_exact_profile_and_retains_t6_runtime_gate(self):

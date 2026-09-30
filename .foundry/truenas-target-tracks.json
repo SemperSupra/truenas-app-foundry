@@ -35,9 +35,17 @@
       "middleware_ref": "TS-25.10.7",
       "middleware_commit": "8ede398839710e56893d88ce85088139d8fab18e",
       "source_qualification": "source-contract-qualified",
-      "runtime_qualification": "pending-real-system-rdte",
-      "accepted_runtime_rung": null,
-      "apply_qualified": false
+      "runtime_qualification": "public-gha-rdte-t5-accepted",
+      "accepted_runtime_rung": "T5",
+      "apply_qualified": false,
+      "runtime_evidence": {
+        "run_id": 36764364927,
+        "head_sha": "aa69b1b23ca2239bf882c3a5e6047b77581c4e16",
+        "artifact_id": 11121716314,
+        "artifact_digest": "sha256:d4727f24efee6e41a385a4b135c60b0462beff5cb9fc10dcf90aa356a0c53a22",
+        "classification": "SUPPORTED",
+        "oracle_satisfied": true
+      }
     },
     {
       "version": "26.0.0-BETA.3",
