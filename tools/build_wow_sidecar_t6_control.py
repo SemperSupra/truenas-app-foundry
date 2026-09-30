@@ -81,11 +81,13 @@ def validate(candidate: dict, compose: dict) -> dict:
             raise ControlError(f"{name} user drifted")
         if service.get("privileged"):
             raise ControlError(f"{name} became privileged")
-        if service.get("read_only") is not True:
-            raise ControlError(f"{name} rootfs is not read-only")
         caps = {str(x).upper() for x in service.get("cap_drop") or []}
         if "ALL" not in caps:
             raise ControlError(f"{name} cap_drop ALL missing")
+    if worker.get("read_only") is not True:
+        raise ControlError("worker rootfs is not read-only")
+    if seed.get("read_only") is not False:
+        raise ControlError("seed bounded writable-rootfs exception drifted")
 
     if seed.get("network_mode") != "none":
         raise ControlError("seed helper network is not disabled")
