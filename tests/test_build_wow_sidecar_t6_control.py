@@ -43,6 +43,7 @@ def compose():
             },
             "wow-sidecar-config-seed": {
                 **common,
+                "read_only": False,
                 "image": MODULE.EXPECTED_IMAGE,
                 "network_mode":"none",
                 "volumes": [
