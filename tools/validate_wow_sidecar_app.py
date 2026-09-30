@@ -206,13 +206,13 @@ def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[s
         raise ValidationError("seed config mount unexpectedly read-only")
 
     seed_inputs = {
-        str(item.get("target") or ""): int(item.get("mode", 0))
+        str(item.get("target") or ""): str(item.get("mode") or "")
         for item in (seed.get("configs") or [])
         if isinstance(item, dict)
     }
     expected_seed_inputs = {
-        "/seed/github-app.pem": 0o444,
-        "/seed/operator-profile.json": 0o444,
+        "/seed/github-app.pem": "444",
+        "/seed/operator-profile.json": "444",
     }
     if seed_inputs != expected_seed_inputs:
         raise ValidationError(f"seed inline config mode/target drift: {seed_inputs!r}")
