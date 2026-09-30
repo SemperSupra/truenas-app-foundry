@@ -61,7 +61,10 @@
     "permissions_helper_scope": "ixVolume ownership only",
     "worker_root_filesystem_read_only": true,
     "seed_root_filesystem_writable_for_inline_configs": true,
-    "seed_rootfs_exception_scope": "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only"
+    "seed_rootfs_exception_scope": "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only",
+    "seed_inline_config_mode": "0444",
+    "persisted_managed_config_mode": "0400",
+    "seed_inline_config_scope": "ephemeral one-shot network-disabled seed inputs only"
   },
   "gates": {
     "public_source_qualified": true,
@@ -88,5 +91,11 @@
     "run": 36791533322,
     "boundary": "full-compose-orchestration",
     "detail": "Docker Compose rejects inline-content configs on read_only seed service; previous seed-script replay did not exercise this full-graph constraint."
+  },
+  "render_falsification_followup": {
+    "result": "FAIL",
+    "run": 36792356264,
+    "boundary": "full-compose-seed-input-permissions",
+    "detail": "After correcting the read-only seed rootfs, Docker Compose materialized inline configs root-owned mode 0400; non-root UID 10001 seed could not read /seed/github-app.pem. Ephemeral seed input configs require 0444; persisted managed copies remain 0400."
   }
 }
