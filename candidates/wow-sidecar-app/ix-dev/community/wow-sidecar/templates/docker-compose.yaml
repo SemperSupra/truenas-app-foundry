@@ -24,8 +24,8 @@
 {% do seed.set_read_only(false) %}
 {% do seed.add_storage(values.consts.config_path, values.storage.config) %}
 {% do seed.add_storage("/tmp", {"type": "tmpfs", "tmpfs_config": {"size": 16, "mode": "0700", "uid": values.consts.runtime_uid, "gid": values.consts.runtime_gid}}) %}
-{% do seed.configs.add("wow-github-app-private-key", values.wow.github_app_private_key, values.consts.seed_private_key_path, "0400") %}
-{% do seed.configs.add("wow-operator-profile", values.wow.operator_profile_json, values.consts.seed_profile_path, "0400") %}
+{% do seed.configs.add("wow-github-app-private-key", values.wow.github_app_private_key, values.consts.seed_private_key_path, "0444") %}
+{% do seed.configs.add("wow-operator-profile", values.wow.operator_profile_json, values.consts.seed_profile_path, "0444") %}
 {% if perms.has_actions() %}
   {% do seed.depends.add_dependency(values.consts.perms_container_name, "service_completed_successfully") %}
 {% endif %}
