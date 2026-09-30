@@ -76,6 +76,7 @@ jobs:
           destination="/tmp/apps/ix-dev/$train/wow-sidecar"
           cp -a candidates/wow-sidecar-app/ix-dev/community/wow-sidecar "$destination"
           lib_name="base_v${lib_version//./_}"
+          mkdir -p "$destination/templates/library"
           cp -a "/tmp/apps/ix-dev/community/ntfy/templates/library/$lib_name" "$destination/templates/library/$lib_name"
           echo "train=$train" >> "$GITHUB_OUTPUT"
 
