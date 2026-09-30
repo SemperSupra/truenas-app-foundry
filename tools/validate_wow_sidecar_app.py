@@ -204,6 +204,19 @@ def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[s
     seed_config = mount_by_target(seed, "/etc/wow-sidecar")
     if seed_config.get("read_only") is True:
         raise ValidationError("seed config mount unexpectedly read-only")
+
+    seed_inputs = {
+        str(item.get("target") or ""): int(item.get("mode", 0))
+        for item in (seed.get("configs") or [])
+        if isinstance(item, dict)
+    }
+    expected_seed_inputs = {
+        "/seed/github-app.pem": 0o444,
+        "/seed/operator-profile.json": 0o444,
+    }
+    if seed_inputs != expected_seed_inputs:
+        raise ValidationError(f"seed inline config mode/target drift: {seed_inputs!r}")
+
     script = extract_seed_script(seed)
     for required in (
         ".initialized-v1", "github-app.pem", "profiles/operator.json",
@@ -386,6 +399,8 @@ def validate(public_pull: bool) -> dict[str, Any]:
                 "worker_rootfs_read_only": True,
                 "seed_rootfs_read_only": False,
                 "seed_rootfs_exception": "inline-content configs require writable one-shot service rootfs",
+                "seed_inline_config_mode": "0444",
+                "persisted_managed_config_mode": "0400",
                 "wow_config_read_only": True,
                 "host_paths_allowed_by_source_schema": False,
                 "runtime_socket_allowed": False,
