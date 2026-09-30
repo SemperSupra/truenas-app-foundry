@@ -34,6 +34,10 @@ def compose():
                 "image": MODULE.EXPECTED_IMAGE,
                 "environment": {"GITHUB_APP_ID":"12345"},
                 "configs": [],
+                "volumes": [
+                    {"source": MODULE.CONFIG_DIR, "target": "/etc/wow-sidecar", "read_only": True},
+                    {"source": MODULE.STATE_DIR, "target": "/var/lib/wow-sidecar", "read_only": False},
+                ],
                 "command": ["--control-repository","ExampleOrg/control"],
                 "labels": {"fixture":"ExampleOrg/operator"},
             },
@@ -41,6 +45,9 @@ def compose():
                 **common,
                 "image": MODULE.EXPECTED_IMAGE,
                 "network_mode":"none",
+                "volumes": [
+                    {"source": MODULE.CONFIG_DIR, "target": "/etc/wow-sidecar", "read_only": False},
+                ],
                 "environment": {"FIXTURE": MODULE.FIXTURE_MARKER},
             },
             "permissions": {
