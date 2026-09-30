@@ -89,6 +89,17 @@ def validate(candidate: dict, compose: dict) -> dict:
     if seed.get("read_only") is True:
         raise ControlError("seed bounded writable-rootfs exception drifted")
 
+    seed_inputs = {
+        str(item.get("target") or ""): str(item.get("mode") or "")
+        for item in seed.get("configs") or []
+        if isinstance(item, dict)
+    }
+    if seed_inputs != {
+        "/seed/github-app.pem": "444",
+        "/seed/operator-profile.json": "444",
+    }:
+        raise ControlError("seed inline config mode/target drifted")
+
     if seed.get("network_mode") != "none":
         raise ControlError("seed helper network is not disabled")
 
