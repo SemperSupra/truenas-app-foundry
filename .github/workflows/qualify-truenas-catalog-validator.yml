@@ -53,6 +53,16 @@ jobs:
           fetch_exact "$apps_repo" "$apps_ref" "$root/apps"
           fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
 
+          # Match the upstream validator's PR topology without introducing a
+          # floating branch: local master is pinned to the exact admitted apps
+          # commit, then one harmless README-only working-tree delta forces the
+          # native validator to exercise a real changed app.
+          git -C "$root/apps" branch -f master "$apps_ref"
+          printf '\n<!-- Foundry V1 native-validator positive control; ephemeral only -->\n' \
+            >> "$root/apps/ix-dev/community/element-web/README.md"
+          test "$(git -C "$root/apps" diff --name-only master)" = \
+            "ix-dev/community/element-web/README.md"
+
           grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
 
           docker pull --quiet "$declared_base" >/dev/null
@@ -85,7 +95,8 @@ jobs:
             -v "$root/apps:/work" \
             -w /work \
             "$image" \
-            /usr/local/bin/apps_dev_charts_validate validate --path /work
+            /bin/bash -lc \
+            'git config --global --add safe.directory /work && exec /usr/local/bin/apps_dev_charts_validate validate --path /work'
 
           python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" <<'PY'
           import json, sys
@@ -99,6 +110,8 @@ jobs:
               "resolved_middleware_base": sys.argv[3],
               "built_validator_image_id": sys.argv[4],
               "validator_command": "/usr/local/bin/apps_dev_charts_validate validate --path /work",
+              "base_ref": sys.argv[1],
+              "positive_control": "community/element-web README-only ephemeral diff",
               "non_claims": [
                   "render/install test suite not yet qualified by this rung",
                   "no Foundry candidate app admitted",
