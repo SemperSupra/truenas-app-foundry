@@ -95,8 +95,8 @@ def validate(candidate: dict, compose: dict) -> dict:
         if isinstance(item, dict)
     }
     if seed_inputs != {
-        "/seed/github-app.pem": "444",
-        "/seed/operator-profile.json": "444",
+        "/seed/github-app.pem": "0444",
+        "/seed/operator-profile.json": "0444",
     }:
         raise ControlError("seed inline config mode/target drifted")
 
