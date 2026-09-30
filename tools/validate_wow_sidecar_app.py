@@ -211,8 +211,8 @@ def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[s
         if isinstance(item, dict)
     }
     expected_seed_inputs = {
-        "/seed/github-app.pem": "444",
-        "/seed/operator-profile.json": "444",
+        "/seed/github-app.pem": "0444",
+        "/seed/operator-profile.json": "0444",
     }
     if seed_inputs != expected_seed_inputs:
         raise ValidationError(f"seed inline config mode/target drift: {seed_inputs!r}")
