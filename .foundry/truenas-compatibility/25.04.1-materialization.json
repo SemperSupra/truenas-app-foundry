@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "profile_id": "truenas-scale-25.04.2.6-materialization",
+  "profile_id": "truenas-scale-25.04.1-materialization",
   "runtime_target": "truenas-scale-apps",
-  "truenas_version": "25.04.2.6",
+  "truenas_version": "25.04.1",
   "middleware": {
     "repository": "https://github.com/truenas/middleware.git",
-    "release_ref": "release/25.04.2.6",
-    "commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6"
+    "release_ref": "release/25.04.1",
+    "commit": "74ab5a2d373be4097dece257d00e1086376333ba"
   },
   "source_contract": [
     {
@@ -163,7 +163,7 @@
     },
     {
       "path": "tests/api2/test_apps.py",
-      "blob_sha": "654a8f47727e0288313dc8aad91401d486f5b1c1",
+      "blob_sha": "725abe70d0eef0f819f9565b7b0472418850214f",
       "contains": [
         "call('app.stop', 'actual-budget', job=True)",
         "call('app.start', 'actual-budget', job=True)",
@@ -260,17 +260,17 @@
   },
   "scope": {
     "qualifies": [
-      "source-level catalog versus Custom App pipeline boundary",
-      "release-pinned middleware normalization/action identities",
-      "MVP feature classification contract",
-      "source-level Custom App lifecycle/read-back assumptions"
+      "exact 25.04.1 source-level catalog versus Custom App pipeline boundary",
+      "exact 25.04.1 middleware normalization/action identities",
+      "exact 25.04.1 MVP feature classification contract",
+      "exact 25.04.1 Custom App lifecycle/read-back assumptions"
     ],
     "does_not_qualify": [
       "live TrueNAS API transport or RBAC",
       "site certificate/volume resolution",
       "runtime certificate renewal behavior",
-      "hardware-in-loop parity",
-      "unsupported/deferred platform features"
+      "hardware-in-loop behavior",
+      "generic compatibility with other TrueNAS releases"
     ]
   },
   "runtime_api": {
