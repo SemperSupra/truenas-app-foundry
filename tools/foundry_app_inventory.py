@@ -201,7 +201,7 @@ def _yaml_scalar(path: Path, key: str) -> str:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise InventoryError(f"cannot read bootstrap app metadata {path}: {exc}") from exc
-    match = re.search(rf"(?m)^{re.escape(key)}:\\s*(.+?)\\s*$", text)
+    match = re.search(rf"(?m)^{re.escape(key)}:\s*(.+?)\s*$", text)
     if not match:
         raise InventoryError(f"bootstrap app.yaml is missing top-level {key}")
     value = match.group(1).strip()
