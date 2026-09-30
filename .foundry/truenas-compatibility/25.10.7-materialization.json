@@ -101,6 +101,15 @@
         "async def do_update(self, job, data):",
         "async def status(self):"
       ]
+    },
+    {
+      "path": "tests/api2/test_apps.py",
+      "blob_sha": "654a8f47727e0288313dc8aad91401d486f5b1c1",
+      "contains": [
+        "call('app.stop', 'actual-budget', job=True)",
+        "call('app.start', 'actual-budget', job=True)",
+        "call('app.delete', 'actual-budget', {'remove_ix_volumes': True, 'remove_images': True}, job=True)"
+      ]
     }
   ],
   "platform_features": {
@@ -274,6 +283,16 @@
       "RUNNING state when desired",
       "active workload/container evidence when desired"
     ],
-    "source_api_family": "v25_10_0"
+    "source_api_family": "v25_10_0",
+    "app_stop": {
+      "method": "app.stop",
+      "arguments": "app_name",
+      "job_backed": true
+    },
+    "app_start": {
+      "method": "app.start",
+      "arguments": "app_name",
+      "job_backed": true
+    }
   }
 }

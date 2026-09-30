@@ -178,6 +178,8 @@ def main() -> int:
         ("app_config", "app.config", None),
         ("app_create", "app.create", True),
         ("app_update", "app.update", True),
+        ("app_stop", "app.stop", True),
+        ("app_start", "app.start", True),
         ("app_redeploy", "app.redeploy", True),
         ("app_delete", "app.delete", True),
     ):
@@ -190,6 +192,11 @@ def main() -> int:
         fail("current qualified releases require app.create single-dictionary payload")
     if runtime_api["app_update"].get("arguments") != "app_name-plus-update-dictionary":
         fail("current qualified releases require app.update app_name + update dictionary")
+    for key in ("app_stop", "app_start", "app_redeploy"):
+        if runtime_api[key].get("arguments") != "app_name":
+            fail(f"current qualified releases require runtime_api.{key} app_name argument")
+    if runtime_api["app_delete"].get("arguments") != "app_name-plus-options":
+        fail("current qualified releases require app.delete app_name + options")
 
     feature_summary = validate_materialization_profile(profile) if schema_version >= 2 else None
 
