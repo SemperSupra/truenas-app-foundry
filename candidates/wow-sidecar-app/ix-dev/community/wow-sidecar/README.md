@@ -15,3 +15,5 @@ It consumes only the immutable public WOW image recorded in `candidate.json`. Th
 The GitHub App private key and operator-profile JSON are seed inputs. They are persisted only on first initialization; an initialized or partially initialized configuration is never silently overwritten. TrueNAS private fields reduce UI exposure but are not treated as a zero-residue secret store.
 
 The root-required GARM capacity-two integration remains outside this App and continues through its separately governed compatibility path until a dedicated integration boundary is qualified.
+
+The seed's inline Compose config inputs are mounted mode `0444` because Docker owns inline configs as root and the helper runs as UID 10001. Those inputs exist only inside the network-disabled one-shot seed service; the helper copies them into managed config storage and immediately constrains the persistent private key and operator profile to mode `0400`.
