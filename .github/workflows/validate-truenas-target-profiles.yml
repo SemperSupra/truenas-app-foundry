@@ -5,6 +5,7 @@ on:
     paths:
       - ".foundry/truenas-target-tracks.json"
       - ".foundry/app-inventory.json"
+      - ".foundry/bootstrap/**"
       - "tools/truenas_target_profile.py"
       - "tools/test_truenas_target_profile.py"
       - "tools/package_truenas_deployment_artifact.py"
@@ -33,6 +34,17 @@ jobs:
         run: python3 tools/foundry_app_inventory.py validate
       - name: Exercise Foundry app inventory contract
         run: python3 -m unittest -v tools/test_foundry_app_inventory.py
+      - name: Check out exact LiteLLM bootstrap source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: bac15635daf231331aef1305d3bbca0e5fbbd5c5
+          path: _bootstrap/litellm-source
+          persist-credentials: false
+      - name: Validate LiteLLM source before inventory admission
+        run: >-
+          python3 tools/foundry_app_inventory.py bootstrap
+          --entry-file .foundry/bootstrap/litellm-1.0.0.json
+          --source-root _bootstrap/litellm-source
       - name: Exercise discovery, plan, and verify contracts
         run: python3 -m unittest -v tools/test_truenas_target_profile.py
       - name: Exercise TrueNAS deployment artifact lowering

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -14,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INVENTORY = REPO_ROOT / ".foundry" / "app-inventory.json"
 DEFAULT_TARGETS = REPO_ROOT / ".foundry" / "truenas-target-tracks.json"
 APP_ID_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+EXACT_REF_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_TRAINS = {"test", "community", "stable", "enterprise", "none"}
 
 
@@ -41,8 +43,12 @@ def validate_source(source: Any, prefix: str) -> None:
     if kind not in {"foundry-repository", "truenas-apps-upstream"}:
         raise InventoryError(f"{prefix}.source.kind is unsupported: {kind!r}")
     require_text(source.get("repository"), f"{prefix}.source.repository")
-    require_text(source.get("ref"), f"{prefix}.source.ref")
-    require_text(source.get("path"), f"{prefix}.source.path")
+    ref = require_text(source.get("ref"), f"{prefix}.source.ref")
+    if not EXACT_REF_RE.fullmatch(ref):
+        raise InventoryError(f"{prefix}.source.ref must be an exact 40-hex commit")
+    path = require_text(source.get("path"), f"{prefix}.source.path")
+    if Path(path).is_absolute() or ".." in Path(path).parts:
+        raise InventoryError(f"{prefix}.source.path must be repository-relative and non-escaping")
 
 
 def validate_entry(entry: Any, index: int) -> tuple[str, str]:
@@ -189,6 +195,93 @@ def resolve_entry(
     }
 
 
+
+def _yaml_scalar(path: Path, key: str) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise InventoryError(f"cannot read bootstrap app metadata {path}: {exc}") from exc
+    match = re.search(rf"(?m)^{re.escape(key)}:\s*(.+?)\s*$", text)
+    if not match:
+        raise InventoryError(f"bootstrap app.yaml is missing top-level {key}")
+    value = match.group(1).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    return value
+
+
+def _tree_sha256(root: Path) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    count = 0
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\\0")
+        count += 1
+    return digest.hexdigest(), count
+
+
+def bootstrap_entry(entry: Any, source_root: Path) -> dict[str, Any]:
+    validate_entry(entry, 0)
+    source = entry["source"]
+    source_root = source_root.resolve()
+    app_root = (source_root / source["path"]).resolve()
+    try:
+        app_root.relative_to(source_root)
+    except ValueError as exc:
+        raise InventoryError("bootstrap source path escapes the supplied source root") from exc
+    if not app_root.is_dir():
+        raise InventoryError(f"bootstrap app source path does not exist: {source['path']}")
+
+    required = [
+        app_root / "app.yaml",
+        app_root / "questions.yaml",
+        app_root / "templates" / "docker-compose.yaml",
+    ]
+    missing = [p.relative_to(source_root).as_posix() for p in required if not p.is_file()]
+    if missing:
+        raise InventoryError(f"bootstrap app source is incomplete; missing: {missing}")
+
+    observed = {
+        "name": _yaml_scalar(app_root / "app.yaml", "name"),
+        "version": _yaml_scalar(app_root / "app.yaml", "version"),
+        "app_version": _yaml_scalar(app_root / "app.yaml", "app_version"),
+        "train": _yaml_scalar(app_root / "app.yaml", "train"),
+    }
+    if observed["name"] != entry["id"]:
+        raise InventoryError(
+            f"bootstrap app id mismatch: inventory {entry['id']!r}, source {observed['name']!r}"
+        )
+    if observed["version"] != entry["version"]:
+        raise InventoryError(
+            f"bootstrap app version mismatch: inventory {entry['version']!r}, source {observed['version']!r}"
+        )
+    if observed["train"] != entry.get("catalog_train", "none"):
+        raise InventoryError(
+            f"bootstrap train mismatch: inventory {entry.get('catalog_train')!r}, source {observed['train']!r}"
+        )
+
+    tree_sha256, file_count = _tree_sha256(app_root)
+    return {
+        "schema": "truenas-foundry-app-bootstrap/v1",
+        "status": "PASS",
+        "entry": entry,
+        "source_validation": {
+            "ref": source["ref"],
+            "path": source["path"],
+            "app_yaml": observed,
+            "required_files": [
+                p.relative_to(app_root).as_posix() for p in required
+            ],
+            "tree_sha256": tree_sha256,
+            "file_count": file_count,
+        },
+        "mutation_performed": False,
+    }
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
@@ -206,6 +299,10 @@ def parser() -> argparse.ArgumentParser:
     resolve.add_argument("--app", required=True)
     resolve.add_argument("--version", required=True)
     resolve.add_argument("--target-version", required=True)
+
+    bootstrap = sub.add_parser("bootstrap")
+    bootstrap.add_argument("--entry-file", type=Path, required=True)
+    bootstrap.add_argument("--source-root", type=Path, required=True)
     return p
 
 
@@ -228,6 +325,9 @@ def main() -> int:
             payload = resolve_entry(
                 entries, targets, args.app, args.version, args.target_version
             )
+        elif args.command == "bootstrap":
+            candidate = load_json(args.entry_file)
+            payload = bootstrap_entry(candidate, args.source_root)
         else:
             raise InventoryError(f"unsupported command: {args.command}")
         print(json.dumps(payload, indent=2, sort_keys=True))
