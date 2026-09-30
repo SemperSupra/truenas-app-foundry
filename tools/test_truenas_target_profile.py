@@ -66,14 +66,14 @@ class TargetProfileTests(unittest.TestCase):
         self.assertTrue(got["qualification_only"])
         self.assertFalse(got["apply_qualified"])
 
-    def test_beta3_has_exact_profile_but_retains_t4_runtime_gate(self):
+    def test_beta3_has_exact_profile_and_retains_t6_runtime_gate(self):
         got = mod.discover(observation("TrueNAS-26.0.0-BETA.3"), REGISTRY)
         self.assertEqual(got["status"], "EXACT_PROFILE")
         self.assertEqual(
             got["profile"],
             ".foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json",
         )
-        self.assertEqual(got["accepted_runtime_rung"], "T4")
+        self.assertEqual(got["accepted_runtime_rung"], "T6")
         self.assertFalse(got["apply_qualified"])
 
     def test_registry_profile_paths_exist(self):
