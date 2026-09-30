@@ -37,6 +37,13 @@ class WowSidecarCandidateTests(unittest.TestCase):
             contract["seed_rootfs_exception_scope"],
             "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only",
         )
+        self.assertEqual(contract["seed_inline_config_mode"], "0444")
+        self.assertEqual(contract["persisted_managed_config_mode"], "0400")
+        self.assertEqual(
+            contract["seed_inline_config_scope"],
+            "ephemeral one-shot network-disabled seed inputs only",
+        )
+        self.assertEqual(self.value["render_falsification_followup"]["run"], 36792356264)
 
     def test_hil_cannot_be_claimed_without_render_qualification(self):
         value = copy.deepcopy(self.value)
