@@ -18,14 +18,25 @@ class WowSidecarCandidateTests(unittest.TestCase):
     def setUp(self):
         self.value = json.loads(CANDIDATE.read_text(encoding="utf-8"))
 
-    def test_render_qualified_candidate_is_hil_eligible_but_not_hil_or_cutover_qualified(self):
+    def test_corrected_candidate_is_fail_closed_until_full_render_requalification(self):
         result = MODULE.validate(copy.deepcopy(self.value))
         self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["phase"], "image-published-render-unqualified")
         self.assertIsNotNone(result["registry_reference"])
         self.assertTrue(result["permissions_helper_pinned"])
-        self.assertTrue(result["hil_eligible"])
+        self.assertFalse(result["hil_eligible"])
         self.assertFalse(result["private_hil_claimed"])
         self.assertFalse(result["cutover_claimed"])
+        self.assertEqual(self.value["render_falsification"]["run"], 36791533322)
+
+    def test_seed_rootfs_exception_is_narrow_and_worker_remains_read_only(self):
+        contract = self.value["truenas_contract"]
+        self.assertTrue(contract["worker_root_filesystem_read_only"])
+        self.assertTrue(contract["seed_root_filesystem_writable_for_inline_configs"])
+        self.assertEqual(
+            contract["seed_rootfs_exception_scope"],
+            "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only",
+        )
 
     def test_hil_cannot_be_claimed_without_render_qualification(self):
         value = copy.deepcopy(self.value)
@@ -44,12 +55,19 @@ class WowSidecarCandidateTests(unittest.TestCase):
 
     def test_render_gate_requires_immutable_permissions_helper(self):
         value = copy.deepcopy(self.value)
+        value["phase"] = "render-qualified-private-hil-pending"
+        value["gates"]["public_app_render_qualified"] = True
+        value["gates"]["hil_eligible"] = True
         value["permissions_helper"]["reference"] = None
         with self.assertRaisesRegex(MODULE.ValidationError, "immutable permissions helper"):
             MODULE.validate(value)
 
     def test_render_gate_requires_exact_durable_evidence(self):
         value = copy.deepcopy(self.value)
+        value["phase"] = "render-qualified-private-hil-pending"
+        value["gates"]["public_app_render_qualified"] = True
+        value["gates"]["hil_eligible"] = True
+        value["public_render_evidence"] = copy.deepcopy(value["superseded_public_render_evidence"])
         value["public_render_evidence"]["compose_sha256"] = "0" * 64
         with self.assertRaisesRegex(MODULE.ValidationError, "rendered Compose digest drift"):
             MODULE.validate(value)
