@@ -111,9 +111,10 @@ jobs:
             /bin/bash -lc \
             'git config --global --add safe.directory /work && exec /usr/local/bin/apps_dev_charts_validate validate --path /work'
 
-          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" <<'PY'
-          import json, sys
-          print(json.dumps({
+          receipt="$RUNNER_TEMP/truenas-catalog-validator-v1-receipt.json"
+          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" "$receipt" <<'PY'
+          import json, pathlib, sys
+          payload = {
               "schema": "truenas-foundry-catalog-validator-receipt/v1",
               "classification": "SUPPORTED",
               "oracleSatisfied": True,
@@ -130,5 +131,17 @@ jobs:
                   "no Foundry candidate app admitted",
                   "no catalog-ready claim"
               ]
-          }, indent=2, sort_keys=True))
+          }
+          text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+          pathlib.Path(sys.argv[5]).write_text(text, encoding="utf-8")
+          print(text, end="")
           PY
+
+      - name: Upload native validator evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: truenas-catalog-validator-v1
+          path: ${{ runner.temp }}/truenas-catalog-validator-v1-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
