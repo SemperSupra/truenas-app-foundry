@@ -26,7 +26,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: garm-t6-control-\${{ github.ref }}
+  group: garm-t6-control-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -38,10 +38,10 @@ jobs:
         id: source
         shell: bash
         env:
-          REQUESTED_REF: \${{ inputs.foundry_ref }}
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
         run: |
           set -euo pipefail
-          ref="\${REQUESTED_REF:-}"
+          ref="${REQUESTED_REF:-}"
           if [[ -z "$ref" ]]; then
             ref="$GITHUB_SHA"
           fi
@@ -52,14 +52,14 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           repository: SemperSupra/truenas-app-foundry
-          ref: \${{ steps.source.outputs.ref }}
+          ref: ${{ steps.source.outputs.ref }}
           persist-credentials: false
 
       - name: Validate exporter contract
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "\${{ steps.source.outputs.ref }}" ]]
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
           python3 -m unittest -v tests/test_export_garm_t6_control.py
           python3 -m py_compile tools/export_garm_t6_control.py
 
@@ -78,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/export_garm_t6_control.py \
-            --foundry-ref "\${{ steps.source.outputs.ref }}" \
+            --foundry-ref "${{ steps.source.outputs.ref }}" \
             --output /tmp/garm-t6-control \
             | tee /tmp/garm-t6-export.json
 
@@ -112,7 +112,7 @@ jobs:
           {
             echo "### GARM TrueNAS T6 control export"
             echo
-            echo "Foundry source: \${{ steps.source.outputs.ref }}"
+            echo "Foundry source: ${{ steps.source.outputs.ref }}"
             if [[ -f /tmp/garm-t6-control/control.json ]]; then
               echo "Appliance: $(jq -r '.appliance_reference' /tmp/garm-t6-control/control.json)"
               echo "Runtime compose: $(jq -r '.runtime_compose_sha256' /tmp/garm-t6-control/control.json)"
