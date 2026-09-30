@@ -1,0 +1,35 @@
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
+
+wow:
+  github_app_id: "12345"
+  github_app_private_key: |
+    -----BEGIN PRIVATE KEY-----
+    PUBLIC-QUALIFICATION-FIXTURE
+    -----END PRIVATE KEY-----
+  control_repository: ExampleOrg/control
+  operator_profile_json: |
+    {"schema":"wow-sidecar.operator-profile.v1","profile":"example","authority":{"record":"github-issue-comment:ExampleOrg/control#1:1","revision":null,"state":"open"},"operator":{"kind":"pinned-repository","repository":"ExampleOrg/operator","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","operator_path":"operator.sh","require_main_revision":false,"environment":{}}}
+  poll_seconds: 15
+
+ix_volumes:
+  wow-sidecar-config: /mnt/rdtepool/wow-sidecar-t6/config
+  wow-sidecar-state: /mnt/rdtepool/wow-sidecar-t6/state
+
+storage:
+  config:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: wow-sidecar-config
+      acl_enable: false
+      auto_permissions: true
+      create_host_path: true
+  state:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: wow-sidecar-state
+      acl_enable: false
+      auto_permissions: true
+      create_host_path: true
