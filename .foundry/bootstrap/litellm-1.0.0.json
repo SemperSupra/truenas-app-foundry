@@ -1,0 +1,19 @@
+{
+  "id": "litellm",
+  "version": "1.0.0",
+  "source": {
+    "kind": "foundry-repository",
+    "repository": "https://github.com/SemperSupra/truenas-app-foundry.git",
+    "ref": "bac15635daf231331aef1305d3bbca0e5fbbd5c5",
+    "path": "candidates/litellm-app/ix-dev/community/litellm"
+  },
+  "catalog_train": "community",
+  "target_versions": [
+    "25.04.1",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "catalog_export": {
+    "status": "candidate"
+  }
+}
