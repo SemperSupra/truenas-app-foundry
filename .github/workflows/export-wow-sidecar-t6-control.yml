@@ -20,6 +20,7 @@ on:
       - ".github/workflows/export-wow-sidecar-t6-control.yml"
       - "tools/build_wow_sidecar_t6_control.py"
       - "tests/test_build_wow_sidecar_t6_control.py"
+      - "tests/fixtures/wow-sidecar/t6-truenas-values.yaml"
       - "candidates/wow-sidecar-app/**"
 
 permissions:
@@ -78,6 +79,7 @@ jobs:
           lib_name="base_v${lib_version//./_}"
           mkdir -p "$destination/templates/library"
           cp -a "/tmp/apps/ix-dev/community/ntfy/templates/library/$lib_name" "$destination/templates/library/$lib_name"
+          cp tests/fixtures/wow-sidecar/t6-truenas-values.yaml "$destination/templates/test_values/t6-truenas-values.yaml"
           echo "train=$train" >> "$GITHUB_OUTPUT"
 
       - name: Render exact App through pinned TrueNAS path
@@ -85,7 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 ./.github/scripts/ci.py             --train "${{ steps.materialize.outputs.train }}"             --app wow-sidecar             --test-file basic-values.yaml             --render-only=true
+          python3 ./.github/scripts/ci.py             --train "${{ steps.materialize.outputs.train }}"             --app wow-sidecar             --test-file t6-truenas-values.yaml             --render-only=true
           rendered="ix-dev/${{ steps.materialize.outputs.train }}/wow-sidecar/templates/rendered/docker-compose.yaml"
           test -s "$rendered"
           docker compose -f "$rendered" config --format json > /tmp/wow-sidecar-t6-compose.json
