@@ -13,6 +13,8 @@ APP_NAME = "rdte-t6-wow-sidecar"
 EXPECTED_IMAGE = "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376"
 EXPECTED_HELPER = "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
 FIXTURE_MARKER = "PUBLIC-QUALIFICATION-FIXTURE"
+CONFIG_DIR = "/mnt/rdtepool/wow-sidecar-t6/config"
+STATE_DIR = "/mnt/rdtepool/wow-sidecar-t6/state"
 PRIVATE_REPO_RE = re.compile(r"(?:https://github\.com/)?(?:SemperSupra/)?[A-Za-z0-9_.-]+-private(?![A-Za-z0-9_.-])", re.IGNORECASE)
 
 
@@ -87,6 +89,22 @@ def validate(candidate: dict, compose: dict) -> dict:
 
     if seed.get("network_mode") != "none":
         raise ControlError("seed helper network is not disabled")
+
+    def mount(service: dict, target: str) -> dict:
+        matches = [v for v in service.get("volumes", []) if isinstance(v, dict) and v.get("target") == target]
+        if len(matches) != 1:
+            raise ControlError(f"expected exactly one mount at {target}")
+        return matches[0]
+
+    worker_config = mount(worker, "/etc/wow-sidecar")
+    worker_state = mount(worker, "/var/lib/wow-sidecar")
+    seed_config = mount(seed, "/etc/wow-sidecar")
+    if worker_config.get("source") != CONFIG_DIR or worker_config.get("read_only") is not True:
+        raise ControlError("worker config fixture mount drifted")
+    if worker_state.get("source") != STATE_DIR or worker_state.get("read_only") is True:
+        raise ControlError("worker state fixture mount drifted")
+    if seed_config.get("source") != CONFIG_DIR or seed_config.get("read_only") is True:
+        raise ControlError("seed config fixture mount drifted")
     if perms.get("network_mode") != "none":
         raise ControlError("permissions helper network is not disabled")
 
@@ -135,6 +153,8 @@ def build(candidate_path: Path, compose_path: Path, output: Path, foundry_ref: s
             "expected_fixture_failure_boundary": "github-app-authentication",
             "production_credentials_present": False,
             "fixture_key_marker": FIXTURE_MARKER,
+            "fixture_config_dir": CONFIG_DIR,
+            "fixture_state_dir": STATE_DIR,
         },
         "artifacts": {
             "compose_canonical_sha256": canonical_sha256(compose),
