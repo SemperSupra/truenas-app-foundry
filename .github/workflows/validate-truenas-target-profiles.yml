@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - ".foundry/truenas-target-tracks.json"
+      - ".foundry/app-inventory.json"
       - "tools/truenas_target_profile.py"
       - "tools/test_truenas_target_profile.py"
       - "tools/package_truenas_deployment_artifact.py"
       - "tools/test_package_truenas_deployment_artifact.py"
+      - "tools/foundry_app_inventory.py"
+      - "tools/test_foundry_app_inventory.py"
       - "docs/truenas-target-reconciliation.md"
+      - "docs/foundry-app-inventory.md"
       - ".github/workflows/validate-truenas-target-profiles.yml"
   workflow_dispatch:
 
@@ -25,6 +29,10 @@ jobs:
           persist-credentials: false
       - name: Validate target registry
         run: python3 -m json.tool .foundry/truenas-target-tracks.json >/dev/null
+      - name: Validate Foundry app inventory
+        run: python3 tools/foundry_app_inventory.py validate
+      - name: Exercise Foundry app inventory contract
+        run: python3 -m unittest -v tools/test_foundry_app_inventory.py
       - name: Exercise discovery, plan, and verify contracts
         run: python3 -m unittest -v tools/test_truenas_target_profile.py
       - name: Exercise TrueNAS deployment artifact lowering
