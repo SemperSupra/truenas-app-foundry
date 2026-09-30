@@ -112,8 +112,8 @@ def assert_common_wow_security(
         raise ValidationError(f"{name}: no-new-privileges missing")
     if rootfs_read_only and service.get("read_only") is not True:
         raise ValidationError(f"{name}: root filesystem is not read-only")
-    if not rootfs_read_only and service.get("read_only") is not False:
-        raise ValidationError(f"{name}: bounded writable rootfs exception is not explicit")
+    if not rootfs_read_only and service.get("read_only") is True:
+        raise ValidationError(f"{name}: bounded writable rootfs exception regressed to read-only")
     if service.get("network_mode") == "host":
         raise ValidationError(f"{name}: host network materialized")
     if network_none and service.get("network_mode") != "none":
@@ -344,6 +344,11 @@ def full_compose_behavior(compose: dict[str, Any], root: Path) -> None:
 
 
 def validate(public_pull: bool) -> dict[str, Any]:
+    template_source = (SOURCE / "templates" / "docker-compose.yaml").read_text(encoding="utf-8")
+    if "{% do seed.set_read_only(false) %}" not in template_source:
+        raise ValidationError("seed writable-rootfs exception is not explicit in App source")
+    if "{% do worker.set_read_only(true) %}" not in template_source:
+        raise ValidationError("worker read-only rootfs invariant is not explicit in App source")
     for tool in ("git", "docker", "python3"):
         if not shutil.which(tool):
             raise ValidationError(f"required tool missing: {tool}")
