@@ -1,0 +1,108 @@
+name: Qualify TrueNAS catalog validator toolchain
+
+on:
+  pull_request:
+    paths:
+      - ".foundry/truenas-catalog-toolchain.json"
+      - "tools/validate_foundry_catalog_toolchain.py"
+      - "tools/test_validate_foundry_catalog_toolchain.py"
+      - ".github/workflows/qualify-truenas-catalog-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-validator-v1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Validate exact toolchain contract
+        run: |
+          python3 tools/validate_foundry_catalog_toolchain.py \
+            --contract .foundry/truenas-catalog-toolchain.json
+          python3 -m unittest -v tools/test_validate_foundry_catalog_toolchain.py
+
+      - name: Exercise exact-source TrueNAS dev-catalog validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract=".foundry/truenas-catalog-toolchain.json"
+          apps_repo="$(jq -r '.apps.repository' "$contract")"
+          apps_ref="$(jq -r '.apps.ref' "$contract")"
+          validator_repo="$(jq -r '.apps_validation.repository' "$contract")"
+          validator_ref="$(jq -r '.apps_validation.ref' "$contract")"
+          declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
+
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+
+          fetch_exact() {
+            local repo="$1" ref="$2" dest="$3"
+            git init -q "$dest"
+            git -C "$dest" remote add origin "$repo"
+            git -C "$dest" fetch -q --depth=1 origin "$ref"
+            test "$(git -C "$dest" rev-parse FETCH_HEAD)" = "$ref"
+            git -C "$dest" checkout -q --detach FETCH_HEAD
+          }
+
+          fetch_exact "$apps_repo" "$apps_ref" "$root/apps"
+          fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
+
+          grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
+
+          docker pull --quiet "$declared_base" >/dev/null
+          base_digest="$(
+            docker image inspect "$declared_base" \
+              --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+            | grep '^ghcr.io/truenas/middleware@sha256:' \
+            | head -n1
+          )"
+          test -n "$base_digest"
+
+          python3 - "$root/apps_validation/Dockerfile" "$declared_base" "$base_digest" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          old = "FROM " + sys.argv[2]
+          new = "FROM " + sys.argv[3]
+          text = path.read_text()
+          if text.count(old) != 1:
+              raise SystemExit("validator Dockerfile base contract drift")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          image="foundry/apps-validation:${validator_ref:0:12}"
+          docker build --quiet -t "$image" "$root/apps_validation" >/dev/null
+          image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+          test -n "$image_id"
+
+          docker run --rm \
+            -e FAKE_ENV=1 \
+            -v "$root/apps:/work" \
+            -w /work \
+            "$image" \
+            /usr/local/bin/apps_dev_charts_validate validate --path /work
+
+          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" <<'PY'
+          import json, sys
+          print(json.dumps({
+              "schema": "truenas-foundry-catalog-validator-receipt/v1",
+              "classification": "SUPPORTED",
+              "oracleSatisfied": True,
+              "phase": "native-dev-catalog-validator",
+              "apps_ref": sys.argv[1],
+              "apps_validation_ref": sys.argv[2],
+              "resolved_middleware_base": sys.argv[3],
+              "built_validator_image_id": sys.argv[4],
+              "validator_command": "/usr/local/bin/apps_dev_charts_validate validate --path /work",
+              "non_claims": [
+                  "render/install test suite not yet qualified by this rung",
+                  "no Foundry candidate app admitted",
+                  "no catalog-ready claim"
+              ]
+          }, indent=2, sort_keys=True))
+          PY
