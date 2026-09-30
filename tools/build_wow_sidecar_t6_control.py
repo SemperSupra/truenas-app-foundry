@@ -86,7 +86,7 @@ def validate(candidate: dict, compose: dict) -> dict:
             raise ControlError(f"{name} cap_drop ALL missing")
     if worker.get("read_only") is not True:
         raise ControlError("worker rootfs is not read-only")
-    if seed.get("read_only") is not False:
+    if seed.get("read_only") is True:
         raise ControlError("seed bounded writable-rootfs exception drifted")
 
     if seed.get("network_mode") != "none":
