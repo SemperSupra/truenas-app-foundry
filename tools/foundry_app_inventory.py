@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only Git-backed inventory for Foundry app sources and exact TrueNAS targets."""
+"""Git-backed inventory and bootstrap admission for Foundry TrueNAS app sources."""
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -15,6 +16,16 @@ DEFAULT_INVENTORY = REPO_ROOT / ".foundry" / "app-inventory.json"
 DEFAULT_TARGETS = REPO_ROOT / ".foundry" / "truenas-target-tracks.json"
 APP_ID_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
 ALLOWED_TRAINS = {"test", "community", "stable", "enterprise", "none"}
+BOOTSTRAP_SCHEMA = "truenas-foundry-app-bootstrap/v1"
+INVENTORY_SCHEMA = "truenas-foundry-app-inventory/v1"
+CATALOG_SOURCE_SHAPE = "truenas-apps-ix-dev/v1"
+REQUIRED_CATALOG_FILES = (
+    "README.md",
+    "app.yaml",
+    "ix_values.yaml",
+    "questions.yaml",
+    "templates/docker-compose.yaml",
+)
 
 
 class InventoryError(RuntimeError):
@@ -42,7 +53,10 @@ def validate_source(source: Any, prefix: str) -> None:
         raise InventoryError(f"{prefix}.source.kind is unsupported: {kind!r}")
     require_text(source.get("repository"), f"{prefix}.source.repository")
     require_text(source.get("ref"), f"{prefix}.source.ref")
-    require_text(source.get("path"), f"{prefix}.source.path")
+    source_path = require_text(source.get("path"), f"{prefix}.source.path")
+    path = Path(source_path)
+    if path.is_absolute() or ".." in path.parts:
+        raise InventoryError(f"{prefix}.source.path must be a repository-relative path")
 
 
 def validate_entry(entry: Any, index: int) -> tuple[str, str]:
@@ -70,13 +84,32 @@ def validate_entry(entry: Any, index: int) -> tuple[str, str]:
     if not isinstance(export, dict):
         raise InventoryError(f"{prefix}.catalog_export must be an object")
     require_text(export.get("status"), f"{prefix}.catalog_export.status")
+
+    source_contract = entry.get("source_contract")
+    if source_contract is not None:
+        if not isinstance(source_contract, dict):
+            raise InventoryError(f"{prefix}.source_contract must be an object")
+        if source_contract.get("catalog_source_shape") != CATALOG_SOURCE_SHAPE:
+            raise InventoryError(
+                f"{prefix}.source_contract.catalog_source_shape must be {CATALOG_SOURCE_SHAPE!r}"
+            )
+        require_text(
+            source_contract.get("source_tree_sha256"),
+            f"{prefix}.source_contract.source_tree_sha256",
+        )
+        if source_contract.get("structural_preflight") != "PASS":
+            raise InventoryError(f"{prefix}.source_contract.structural_preflight must be PASS")
+        if source_contract.get("official_validator") not in {"PENDING", "PASS"}:
+            raise InventoryError(
+                f"{prefix}.source_contract.official_validator must be PENDING or PASS"
+            )
     return app_id, version
 
 
 def validate_inventory(doc: Any) -> list[dict[str, Any]]:
     if not isinstance(doc, dict):
         raise InventoryError("inventory must be an object")
-    if doc.get("schema") != "truenas-foundry-app-inventory/v1":
+    if doc.get("schema") != INVENTORY_SCHEMA:
         raise InventoryError("unsupported inventory schema")
     apps = doc.get("apps")
     if not isinstance(apps, list):
@@ -169,6 +202,7 @@ def resolve_entry(
             "id": entry["id"],
             "version": entry["version"],
             "source": entry["source"],
+            "source_contract": entry.get("source_contract"),
             "catalog_train": entry.get("catalog_train", "none"),
             "catalog_export": entry.get("catalog_export", {"status": "not-assessed"}),
         },
@@ -189,6 +223,173 @@ def resolve_entry(
     }
 
 
+def _top_level_yaml_scalar(path: Path, key: str) -> str:
+    pattern = re.compile(rf"^{re.escape(key)}\s*:\s*(.*?)\s*$")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise InventoryError(f"cannot read {path}: {exc}") from exc
+    values: list[str] = []
+    for line in lines:
+        if line.startswith((" ", "\t", "#")):
+            continue
+        match = pattern.match(line)
+        if not match:
+            continue
+        value = match.group(1).strip()
+        if " #" in value:
+            value = value.split(" #", 1)[0].rstrip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values.append(value)
+    if len(values) != 1 or not values[0]:
+        raise InventoryError(f"{path.name} must contain exactly one top-level {key!r} scalar")
+    return values[0]
+
+
+def _source_files(source_root: Path) -> list[Path]:
+    if not source_root.is_dir():
+        raise InventoryError(f"source root is not a directory: {source_root}")
+    for required in REQUIRED_CATALOG_FILES:
+        path = source_root / required
+        if not path.is_file() or path.is_symlink():
+            raise InventoryError(f"catalog source is missing required regular file: {required}")
+
+    test_dir = source_root / "templates" / "test_values"
+    if not test_dir.is_dir() or test_dir.is_symlink():
+        raise InventoryError("catalog source requires templates/test_values directory")
+    test_values = sorted(
+        p
+        for p in test_dir.iterdir()
+        if p.is_file() and not p.is_symlink() and p.suffix.lower() in {".yaml", ".yml"}
+    )
+    if not test_values:
+        raise InventoryError("catalog source requires at least one YAML test-values file")
+
+    files: list[Path] = []
+    for path in sorted(source_root.rglob("*")):
+        rel = path.relative_to(source_root)
+        if ".git" in rel.parts or rel.parts[:2] == ("templates", "rendered"):
+            continue
+        if path.is_symlink():
+            raise InventoryError(f"catalog source must not contain symlinks: {rel.as_posix()}")
+        if path.is_file():
+            files.append(path)
+    return files
+
+
+def structural_source_contract(
+    source_root: Path,
+    *,
+    app_id: str,
+    version: str,
+    train: str,
+) -> dict[str, Any]:
+    files = _source_files(source_root)
+    app_yaml = source_root / "app.yaml"
+    observed = {
+        "name": _top_level_yaml_scalar(app_yaml, "name"),
+        "version": _top_level_yaml_scalar(app_yaml, "version"),
+        "train": _top_level_yaml_scalar(app_yaml, "train"),
+    }
+    expected = {"name": app_id, "version": version, "train": train}
+    if observed != expected:
+        raise InventoryError(
+            f"app.yaml identity mismatch: expected {expected!r}, observed {observed!r}"
+        )
+
+    digest = hashlib.sha256()
+    file_records: list[dict[str, Any]] = []
+    for path in files:
+        rel = path.relative_to(source_root).as_posix()
+        data = path.read_bytes()
+        file_sha = hashlib.sha256(data).hexdigest()
+        digest.update(rel.encode("utf-8") + b"\0")
+        digest.update(data)
+        digest.update(b"\0")
+        file_records.append({"path": rel, "sha256": file_sha})
+
+    test_values = [
+        item["path"]
+        for item in file_records
+        if item["path"].startswith("templates/test_values/")
+        and item["path"].lower().endswith((".yaml", ".yml"))
+    ]
+    return {
+        "catalog_source_shape": CATALOG_SOURCE_SHAPE,
+        "structural_preflight": "PASS",
+        "source_tree_sha256": "sha256:" + digest.hexdigest(),
+        "required_files": list(REQUIRED_CATALOG_FILES),
+        "test_values": test_values,
+        "file_count": len(file_records),
+        "official_validator": "PENDING",
+        "non_claim": (
+            "structural preflight does not replace TrueNAS apps_dev_charts_validate "
+            "or the upstream render/install test suite"
+        ),
+    }
+
+
+def bootstrap_candidate(
+    inventory_doc: dict[str, Any],
+    target_doc: dict[str, Any],
+    spec: dict[str, Any],
+    source_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    entries = validate_inventory(inventory_doc)
+    targets = load_target_map(target_doc)
+    if not isinstance(spec, dict) or spec.get("schema") != BOOTSTRAP_SCHEMA:
+        raise InventoryError("unsupported bootstrap specification schema")
+    raw_entry = spec.get("entry")
+    if not isinstance(raw_entry, dict):
+        raise InventoryError("bootstrap specification requires an entry object")
+
+    entry = json.loads(json.dumps(raw_entry))
+    validate_entry(entry, len(entries))
+    app_id = entry["id"]
+    version = entry["version"]
+    if any(item["id"] == app_id and item["version"] == version for item in entries):
+        raise InventoryError(f"inventory already contains exact app/version {app_id}@{version}")
+    if entry["source"]["kind"] != "foundry-repository":
+        raise InventoryError("bootstrap admits only foundry-repository sources")
+    admitted_targets = entry.get("target_versions", [])
+    if not admitted_targets:
+        raise InventoryError("bootstrap requires at least one exact target version")
+    unknown = sorted(set(admitted_targets) - set(targets))
+    if unknown:
+        raise InventoryError(f"bootstrap references unregistered exact target versions: {unknown!r}")
+    train = entry.get("catalog_train", "none")
+    if train == "none":
+        raise InventoryError("bootstrap requires an explicit catalog train")
+
+    entry["source_contract"] = structural_source_contract(
+        source_root,
+        app_id=app_id,
+        version=version,
+        train=train,
+    )
+    entry.setdefault("catalog_export", {"status": "not-assessed"})
+    proposed = {
+        "schema": INVENTORY_SCHEMA,
+        "apps": sorted_entries(entries + [entry]),
+    }
+    receipt = {
+        "schema": "truenas-foundry-app-bootstrap-receipt/v1",
+        "status": "READY_FOR_GIT_REVIEW",
+        "app": app_id,
+        "version": version,
+        "catalog_train": train,
+        "source": entry["source"],
+        "source_contract": entry["source_contract"],
+        "target_versions": admitted_targets,
+        "proposal_entries": len(proposed["apps"]),
+        "mutation_performed": False,
+        "catalog_ready": False,
+        "next_gate": "official TrueNAS dev-catalog validation and render/install tests",
+    }
+    return receipt, proposed
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
@@ -206,17 +407,24 @@ def parser() -> argparse.ArgumentParser:
     resolve.add_argument("--app", required=True)
     resolve.add_argument("--version", required=True)
     resolve.add_argument("--target-version", required=True)
+
+    bootstrap = sub.add_parser("bootstrap")
+    bootstrap.add_argument("--spec", type=Path, required=True)
+    bootstrap.add_argument("--source-root", type=Path, required=True)
+    bootstrap.add_argument("--proposal-out", type=Path, required=True)
+    bootstrap.add_argument("--receipt-out", type=Path)
     return p
 
 
 def main() -> int:
     args = parser().parse_args()
     try:
-        entries = validate_inventory(load_json(args.inventory))
+        inventory_doc = load_json(args.inventory)
+        entries = validate_inventory(inventory_doc)
         if args.command == "validate":
             payload = {
                 "status": "PASS",
-                "schema": "truenas-foundry-app-inventory/v1",
+                "schema": INVENTORY_SCHEMA,
                 "entries": len(entries),
             }
         elif args.command == "list":
@@ -228,11 +436,30 @@ def main() -> int:
             payload = resolve_entry(
                 entries, targets, args.app, args.version, args.target_version
             )
+        elif args.command == "bootstrap":
+            receipt, proposed = bootstrap_candidate(
+                inventory_doc,
+                load_json(args.targets),
+                load_json(args.spec),
+                args.source_root,
+            )
+            args.proposal_out.parent.mkdir(parents=True, exist_ok=True)
+            args.proposal_out.write_text(
+                json.dumps(proposed, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            if args.receipt_out:
+                args.receipt_out.parent.mkdir(parents=True, exist_ok=True)
+                args.receipt_out.write_text(
+                    json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            payload = receipt
         else:
             raise InventoryError(f"unsupported command: {args.command}")
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
-    except InventoryError as exc:
+    except (InventoryError, OSError) as exc:
         print(json.dumps({"status": "ERROR", "error": str(exc)}, sort_keys=True), file=sys.stderr)
         return 2
 
