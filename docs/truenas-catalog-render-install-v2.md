@@ -1,27 +1,38 @@
-# V2 render/install adapter preparation
+# V2 exact-validator render/install qualification
 
-This branch prepares, but does not yet execute, the V2 TrueNAS-native
-render/install qualification rung.
+V1 native development-catalog validation is accepted under
+`SemperSupra/truenas-app-foundry-private#274`.
 
-The upstream pinned `truenas/apps` CI script owns the behavior we want to
-preserve: library copy, template rendering, Compose validation, container
-start/health assessment, diagnostics, and cleanup.
+V2 now qualifies the next native TrueNAS Apps oracle: the exact pinned
+`truenas/apps` render/install lifecycle.
 
-The only unqualified seam in that script is its hard-coded floating validator
-image:
+The upstream pinned `truenas/apps` CI script remains authoritative for:
 
-`ghcr.io/truenas/apps_validation:latest`.
+- library copy;
+- template rendering;
+- Compose validation;
+- container start;
+- health assessment;
+- failure diagnostics;
+- cleanup.
 
-`tools/patch_truenas_ci_for_exact_validator.py` fail-closes unless the
-audited upstream image constant and `pull_app_catalog_container()` body match
-exactly. It then:
+The only substituted seam is the upstream floating validator image acquisition.
 
-1. replaces the floating image constant with a local
-   `foundry/apps-validation:<exact-commit-prefix>` tag;
-2. replaces the network pull with `docker image inspect` of that prebuilt
-   image;
-3. leaves the rest of the upstream CI script byte-for-byte unchanged.
+`tools/patch_truenas_ci_for_exact_validator.py` fail-closes unless the audited
+upstream image constant and `pull_app_catalog_container()` body match exactly.
+It replaces only:
 
-The V2 execution workflow is deliberately not added on this preparation branch.
-V1 native dev-catalog validator qualification under private authority #274 must
-be accepted first.
+1. `ghcr.io/truenas/apps_validation:latest` with the local validator image
+   built from the exact V1 `apps_validation` commit and resolved middleware
+   base digest; and
+2. the network pull with `docker image inspect` of that exact local image.
+
+The V2 workflow then runs the exact pinned upstream `.github/scripts/ci.py`
+against the `community/element-web` `basic-values.yaml` control.
+
+A V2 PASS proves the reproducible native render/install harness. It does not by
+itself make a Foundry app catalog-ready. F6 requires an actual Foundry bootstrap
+candidate to pass both V1 source validation and V2 render/install before catalog
+export readiness may be asserted.
+
+Authority: `SemperSupra/truenas-app-foundry-private#274`.
