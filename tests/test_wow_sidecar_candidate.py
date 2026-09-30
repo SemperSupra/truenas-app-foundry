@@ -14,6 +14,30 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 CANDIDATE = ROOT / "candidates" / "wow-sidecar-app" / "candidate.json"
 
+def qualify(value):
+    value["phase"] = "render-qualified-private-hil-pending"
+    value["gates"]["public_app_render_qualified"] = True
+    value["gates"]["hil_eligible"] = True
+    value["public_render_evidence"] = {
+        "schema": "wow-sidecar-public-app-qualification/v2",
+        "result": "PASS",
+        "run": 99999999999,
+        "qualified_head": "a" * 40,
+        "compose_sha256": "b" * 64,
+        "ghcr_anonymous_pull": True,
+        "seed_behavior": "PASS:create-once/preserve/fail-partial",
+        "full_compose_behavior": "PASS:permissions/seed/worker",
+        "materializer_commit": value["truenas_source"]["commit"],
+        "wow_image": value["container"]["registry_reference"],
+        "permissions_helper": value["permissions_helper"]["reference"],
+        "worker_rootfs_read_only": True,
+        "seed_rootfs_read_only": False,
+        "seed_inline_config_mode": "0444",
+        "persisted_managed_config_mode": "0400",
+        "corrects_falsifier_runs": [36791533322, 36792356264],
+    }
+    return value
+
 class WowSidecarCandidateTests(unittest.TestCase):
     def setUp(self):
         self.value = json.loads(CANDIDATE.read_text(encoding="utf-8"))
@@ -62,21 +86,16 @@ class WowSidecarCandidateTests(unittest.TestCase):
 
     def test_render_gate_requires_immutable_permissions_helper(self):
         value = copy.deepcopy(self.value)
-        value["phase"] = "render-qualified-private-hil-pending"
-        value["gates"]["public_app_render_qualified"] = True
-        value["gates"]["hil_eligible"] = True
+        qualify(value)
         value["permissions_helper"]["reference"] = None
         with self.assertRaisesRegex(MODULE.ValidationError, "immutable permissions helper"):
             MODULE.validate(value)
 
     def test_render_gate_requires_exact_durable_evidence(self):
         value = copy.deepcopy(self.value)
-        value["phase"] = "render-qualified-private-hil-pending"
-        value["gates"]["public_app_render_qualified"] = True
-        value["gates"]["hil_eligible"] = True
-        value["public_render_evidence"] = copy.deepcopy(value["superseded_public_render_evidence"])
-        value["public_render_evidence"]["compose_sha256"] = "0" * 64
-        with self.assertRaisesRegex(MODULE.ValidationError, "rendered Compose digest drift"):
+        qualify(value)
+        value["public_render_evidence"]["compose_sha256"] = "not-a-digest"
+        with self.assertRaisesRegex(MODULE.ValidationError, "rendered Compose digest invalid"):
             MODULE.validate(value)
 
     def test_runtime_identity_is_fixed_numeric_nonroot(self):
