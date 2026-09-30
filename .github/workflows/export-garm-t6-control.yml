@@ -1,0 +1,122 @@
+name: Export GARM TrueNAS T6 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact Foundry commit; blank uses this workflow commit
+        required: false
+        type: string
+  push:
+    branches:
+      - prep/garm-truenas-t6-control-v1
+    paths:
+      - ".github/workflows/export-garm-t6-control.yml"
+      - "tools/export_garm_t6_control.py"
+      - "tests/test_export_garm_t6_control.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: garm-t6-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Resolve exact Foundry source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          if [[ -z "$ref" ]]; then
+            ref="$GITHUB_SHA"
+          fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact Foundry source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Validate exporter contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tests/test_export_garm_t6_control.py
+          python3 -m py_compile tools/export_garm_t6_control.py
+
+      - name: Resolve exact GARM appliance identity
+        id: appliance
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(jq -r '.appliance.reference' candidates/garm-controller-app/candidate.json)"
+          [[ "$image" == ghcr.io/sempersupra/garm-appliance@sha256:* ]]
+          docker pull "$image" >/dev/null
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Export public-safe GARM T6 control
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/export_garm_t6_control.py \
+            --foundry-ref "${{ steps.source.outputs.ref }}" \
+            --output /tmp/garm-t6-control \
+            | tee /tmp/garm-t6-export.json
+
+          jq -e '
+            .schema == "semper-supra.garm-truenas-t6-control/1" and
+            .private_secrets_captured == false and
+            .fixture_secret_values_retained == false and
+            .github_credentials_present == false and
+            .runtime.app_name == "rdte-t6-garm" and
+            .runtime.config_root == "/mnt/rdtepool/garm-t6/config"
+          ' /tmp/garm-t6-control/control.json >/dev/null
+
+          test -s /tmp/garm-t6-control/compose.json
+          test -s /tmp/garm-t6-control/deployment.json
+          ! grep -R -q -- 'BEGIN PRIVATE KEY\|PRIVATE-QUALIFICATION-FIXTURE\|PUBLIC-QUALIFICATION-FIXTURE' /tmp/garm-t6-control
+          grep -q '__EPHEMERAL_NESTED_GARM_CONFIG__' /tmp/garm-t6-control/compose.json
+          grep -q '__EPHEMERAL_NESTED_TLS__' /tmp/garm-t6-control/compose.json
+
+      - name: Upload exact GARM T6 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: garm-truenas-t6-control
+          path: /tmp/garm-t6-control/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record public-safe export evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### GARM TrueNAS T6 control export"
+            echo
+            echo "Foundry source: ${{ steps.source.outputs.ref }}"
+            if [[ -f /tmp/garm-t6-control/control.json ]]; then
+              echo "Appliance: $(jq -r '.appliance_reference' /tmp/garm-t6-control/control.json)"
+              echo "Runtime compose: $(jq -r '.runtime_compose_sha256' /tmp/garm-t6-control/control.json)"
+              echo "Private secrets captured: $(jq -r '.private_secrets_captured' /tmp/garm-t6-control/control.json)"
+            else
+              echo "Control bundle: not produced"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
