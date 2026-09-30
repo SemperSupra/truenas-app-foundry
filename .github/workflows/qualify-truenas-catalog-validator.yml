@@ -54,14 +54,31 @@ jobs:
           fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
 
           # Match the upstream validator's PR topology without introducing a
-          # floating branch: local master is pinned to the exact admitted apps
-          # commit, then one harmless README-only working-tree delta forces the
-          # native validator to exercise a real changed app.
+          # floating branch. The exact admitted apps commit is the local master
+          # base; the ephemeral candidate changes README and bumps the catalog
+          # version exactly one patch so TrueNAS must validate a real, policy-
+          # conformant changed app.
           git -C "$root/apps" branch -f master "$apps_ref"
           printf '\n<!-- Foundry V1 native-validator positive control; ephemeral only -->\n' \
             >> "$root/apps/ix-dev/community/element-web/README.md"
-          test "$(git -C "$root/apps" diff --name-only master)" = \
-            "ix-dev/community/element-web/README.md"
+          python3 - "$root/apps/ix-dev/community/element-web/app.yaml" <<'PY'
+          import pathlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          match = re.search(r"^version:\\s*(\\d+)\\.(\\d+)\\.(\\d+)\\s*$", text, re.MULTILINE)
+          if not match:
+              raise SystemExit("element-web catalog version scalar not found")
+          major, minor, patch = map(int, match.groups())
+          old = match.group(0)
+          new = f"version: {major}.{minor}.{patch + 1}"
+          if text.count(old) != 1:
+              raise SystemExit("element-web catalog version scalar is not unique")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          mapfile -t changed < <(git -C "$root/apps" diff --name-only master)
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "ix-dev/community/element-web/README.md"
+          test "${changed[1]}" = "ix-dev/community/element-web/app.yaml"
 
           grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
 
@@ -111,7 +128,7 @@ jobs:
               "built_validator_image_id": sys.argv[4],
               "validator_command": "/usr/local/bin/apps_dev_charts_validate validate --path /work",
               "base_ref": sys.argv[1],
-              "positive_control": "community/element-web README-only ephemeral diff",
+              "positive_control": "community/element-web ephemeral README change + one patch catalog-version bump",
               "non_claims": [
                   "render/install test suite not yet qualified by this rung",
                   "no Foundry candidate app admitted",
