@@ -54,6 +54,7 @@ def validate(candidate: dict, compose: dict) -> dict:
     helper = candidate.get("permissions_helper") or {}
     source = candidate.get("truenas_source") or {}
     gates = candidate.get("gates") or {}
+    contract = candidate.get("truenas_contract") or {}
 
     if container.get("registry_reference") != EXPECTED_IMAGE:
         raise ControlError("WOW image identity drifted")
@@ -63,6 +64,15 @@ def validate(candidate: dict, compose: dict) -> dict:
         raise ControlError("candidate is not public-render qualified")
     if gates.get("hil_eligible") is not True:
         raise ControlError("candidate is not HIL eligible")
+    expected_contract = {
+        "worker_root_filesystem_read_only": True,
+        "seed_root_filesystem_writable_for_inline_configs": True,
+        "seed_inline_config_mode": "0444",
+        "persisted_managed_config_mode": "0400",
+    }
+    for key, expected in expected_contract.items():
+        if contract.get(key) != expected:
+            raise ControlError(f"candidate corrected seed contract drifted: {key}")
 
     services = compose.get("services")
     if not isinstance(services, dict) or set(services) != {"wow-sidecar", "wow-sidecar-config-seed", "permissions"}:
@@ -84,10 +94,15 @@ def validate(candidate: dict, compose: dict) -> dict:
         caps = {str(x).upper() for x in service.get("cap_drop") or []}
         if "ALL" not in caps:
             raise ControlError(f"{name} cap_drop ALL missing")
+        security_opts = {str(x).lower().replace(":", "=") for x in service.get("security_opt") or []}
+        if not any(x.startswith("no-new-privileges=true") for x in security_opts):
+            raise ControlError(f"{name} no-new-privileges missing")
     if worker.get("read_only") is not True:
         raise ControlError("worker rootfs is not read-only")
-    if seed.get("read_only") is True:
+    if seed.get("read_only") is not False:
         raise ControlError("seed bounded writable-rootfs exception drifted")
+    if worker.get("configs"):
+        raise ControlError("worker received inline seed configs directly")
 
     seed_inputs = {
         str(item.get("target") or ""): str(item.get("mode") or "")
@@ -99,6 +114,9 @@ def validate(candidate: dict, compose: dict) -> dict:
         "/seed/operator-profile.json": "0444",
     }:
         raise ControlError("seed inline config mode/target drifted")
+    seed_command = " ".join(str(x) for x in seed.get("command") or [])
+    if "chmod 0400" not in seed_command:
+        raise ControlError("persisted managed config mode enforcement drifted")
 
     if seed.get("network_mode") != "none":
         raise ControlError("seed helper network is not disabled")
@@ -120,6 +138,8 @@ def validate(candidate: dict, compose: dict) -> dict:
         raise ControlError("seed config fixture mount drifted")
     if perms.get("network_mode") != "none":
         raise ControlError("permissions helper network is not disabled")
+    if perms.get("privileged"):
+        raise ControlError("permissions helper became privileged")
 
     serialized = json.dumps(compose, sort_keys=True)
     if FIXTURE_MARKER not in serialized:
