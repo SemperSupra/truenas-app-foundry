@@ -72,6 +72,7 @@ def build(manifest: dict[str, Any], foundry_ref: str, control_id: str) -> dict[s
             "lib_version_hash": control["lib_version_hash"],
             "source_path": control["source_path"],
             "source_blob_sha": control["source_blob_sha"],
+            "runtime_fixture_source": control.get("runtime_fixture_source"),
         },
         "runtime": {
             "app_name": app_name,
