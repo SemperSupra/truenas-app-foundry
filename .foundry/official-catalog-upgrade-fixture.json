@@ -44,5 +44,113 @@
     "runtime_claim_requires_app_upgrade_execution": true,
     "runtime_claim_requires_post_upgrade_identity": true
   },
-  "claim_boundary": "source fixture only; no target runtime or executed native-upgrade qualification implied"
+  "claim_boundary": "source fixture only; no target runtime or executed native-upgrade qualification implied",
+  "runtime_adapters": {
+    "25.04.1": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "24467b692f4e6667d61c8b02043e239c6ded2d81"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "7e38b58e2568a2a5e0c945fdb6ca9e7f7bc8756e"
+      }
+    },
+    "25.04.2.6": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "24467b692f4e6667d61c8b02043e239c6ded2d81"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "7e38b58e2568a2a5e0c945fdb6ca9e7f7bc8756e"
+      }
+    },
+    "25.10.7": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "07502a36a181f8b87e82aca40779a9dbcbc0cef7"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "fc94ebe24a5b246bcfa087d82433f936c18f832d"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "81ed20cb87c4015419f53070a7ecbc09804c6e5b"
+      }
+    },
+    "26.0.0-BETA.3": {
+      "status": "GAP",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "reason": "catalog.update_git_repository was refactored into an internal async function and is no longer the same callable service actuator; no exact fixture-injection method has been qualified.",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "f37dd79deac67d8faaec06275c8dea2795c404f1"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "e1930b7e5ffc553f44ce818c9fa8ce5287c388db"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "bfcaac5937229b4d3755df29f7ce91a13394fd80"
+      }
+    }
+  }
 }
