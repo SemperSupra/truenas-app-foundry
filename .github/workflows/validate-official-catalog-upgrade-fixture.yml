@@ -1,0 +1,52 @@
+name: Validate official catalog upgrade fixture
+
+on:
+  pull_request:
+    paths:
+      - ".foundry/truenas-target-tracks.json"
+      - ".foundry/official-catalog-upgrade-fixture.json"
+      - "tools/official_catalog_upgrade_fixture.py"
+      - "tools/test_official_catalog_upgrade_fixture.py"
+      - "docs/official-catalog-upgrade-fixture.md"
+      - ".github/workflows/validate-official-catalog-upgrade-fixture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Exercise fail-closed fixture contract
+        run: python3 -m unittest -v tools/test_official_catalog_upgrade_fixture.py
+
+      - name: Fetch exact generated catalog sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          from_commit="$(python3 -c 'import json; print(json.load(open(".foundry/official-catalog-upgrade-fixture.json"))["from"]["commit"])')"
+          to_commit="$(python3 -c 'import json; print(json.load(open(".foundry/official-catalog-upgrade-fixture.json"))["to"]["commit"])')"
+          git init /tmp/catalog-from
+          git -C /tmp/catalog-from remote add origin https://github.com/truenas/apps.git
+          git -C /tmp/catalog-from fetch --depth=1 origin "$from_commit"
+          git -C /tmp/catalog-from checkout --detach FETCH_HEAD
+          git init /tmp/catalog-to
+          git -C /tmp/catalog-to remote add origin https://github.com/truenas/apps.git
+          git -C /tmp/catalog-to fetch --depth=1 origin "$to_commit"
+          git -C /tmp/catalog-to checkout --detach FETCH_HEAD
+
+      - name: Verify exact generated catalog pair
+        run: |
+          python3 tools/official_catalog_upgrade_fixture.py             --from-dir /tmp/catalog-from             --to-dir /tmp/catalog-to             --out official-catalog-upgrade-fixture-receipt.json
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-catalog-upgrade-fixture-source-receipt
+          path: official-catalog-upgrade-fixture-receipt.json
+          if-no-files-found: error
