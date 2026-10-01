@@ -1,0 +1,18 @@
+{
+  "schema": "truenas-foundry-seeded-fixture/v1",
+  "fixture": "foundry-rdte-probe",
+  "source_seed": {
+    "repository": "https://github.com/truenas/apps.git",
+    "ref": "c0178eff355ed4c8a27b05d03f6fc14b9f25eb92",
+    "app": "element-web",
+    "library_tree_sha": "8f0a886a1431540cdee9a8e5990fec8445be8d42",
+    "role": "schema/runtime control seed only"
+  },
+  "foundry_identity": {
+    "name": "foundry-rdte-probe",
+    "version": "1.0.0",
+    "train": "community"
+  },
+  "publication_intent": false,
+  "purpose": "pre-catalog bootstrap, native validation, render-install, materialization, lifecycle RDTE"
+}
