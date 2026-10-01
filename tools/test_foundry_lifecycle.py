@@ -115,8 +115,13 @@ class LifecycleV2Tests(unittest.TestCase):
         obs["capabilities"]["bootstrap_probes"]["core.get_methods"] = False
         got = MOD.plan(obs, intent("ENSURE_RUNNING"), registry)
         self.assertEqual((got["status"], got["action"]), ("BLOCKED", "BLOCKED"))
-        self.assertTrue(
-            any("bootstrap probes=core.get_methods" in item for item in got["blockers"])
+        self.assertIn(
+            "observed target capabilities do not satisfy the exact profile",
+            got["blockers"],
+        )
+        self.assertEqual(
+            got["target"]["missing_bootstrap_probes"],
+            ["core.get_methods"],
         )
 
     def test_running_and_stopped_desired_state_converge_to_noop(self):
