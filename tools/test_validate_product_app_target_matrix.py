@@ -4,7 +4,7 @@ import pathlib
 import tempfile
 import unittest
 
-from validate_product_app_target_matrix import MatrixError, validate
+from tools.validate_product_app_target_matrix import MatrixError, validate
 
 
 VERSIONS = ["25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3"]
