@@ -135,6 +135,12 @@ class WowSidecarT6ControlTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ControlError,"seed bounded writable-rootfs exception drifted"):
             MODULE.validate(candidate(),value)
 
+    def test_accepts_compose_omitted_writable_seed_default(self):
+        value=compose()
+        del value["services"]["wow-sidecar-config-seed"]["read_only"]
+        result=MODULE.validate(candidate(),value)
+        self.assertEqual(result["wow_image"],MODULE.EXPECTED_IMAGE)
+
     def test_rejects_worker_writable_rootfs_regression(self):
         value=compose()
         value["services"]["wow-sidecar"]["read_only"]=False
