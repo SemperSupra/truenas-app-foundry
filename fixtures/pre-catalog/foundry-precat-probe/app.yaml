@@ -1,0 +1,32 @@
+app_version: "1.0.0"
+capabilities: []
+categories:
+  - productivity
+changelog_url: https://github.com/SemperSupra/truenas-app-foundry
+date_added: "2026-10-01"
+description: Disposable pre-catalog qualification control for TrueNAS App Foundry.
+home: https://github.com/SemperSupra/truenas-app-foundry
+host_mounts: []
+icon: https://media.sys.truenas.net/apps/element-web/icons/icon.svg
+keywords:
+  - foundry
+  - qualification
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+  - email: 1854350+mark-e-deyoung@users.noreply.github.com
+    name: SemperSupra
+    url: https://github.com/SemperSupra
+name: foundry-precat-probe
+run_as_context:
+  - description: The probe runs as an unprivileged application user.
+    gid: 568
+    group_name: apps
+    uid: 568
+    user_name: apps
+screenshots: []
+sources:
+  - https://github.com/SemperSupra/truenas-app-foundry
+title: Foundry Pre-Catalog Probe
+train: community
+version: 1.0.0
