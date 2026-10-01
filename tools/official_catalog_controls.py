@@ -126,7 +126,7 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
         if item.get("custom_app_fallback") is not False:
             raise ControlError(f"{cid}: Custom App fallback is prohibited")
 
-        for field in ("source_path", "source_blob_sha", "catalog_version", "app_version", "lib_version"):
+        for field in ("source_path", "source_blob_sha", "catalog_version", "app_version", "lib_version", "lib_version_hash"):
             if not isinstance(item.get(field), str) or not item[field]:
                 raise ControlError(f"{cid}: {field} must be a non-empty string")
         if not HEX40.fullmatch(item["source_blob_sha"]):
