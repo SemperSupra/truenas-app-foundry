@@ -1,0 +1,45 @@
+name: Validate official catalog controls
+
+on:
+  pull_request:
+    paths:
+      - ".foundry/truenas-target-tracks.json"
+      - ".foundry/official-catalog-controls.json"
+      - "tools/official_catalog_controls.py"
+      - "tools/test_official_catalog_controls.py"
+      - "docs/official-catalog-controls.md"
+      - ".github/workflows/validate-official-catalog-controls.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise fail-closed control contract
+        run: python3 -m unittest -v tools/test_official_catalog_controls.py
+      - name: Fetch exact pinned TrueNAS catalog source
+        shell: bash
+        run: |
+          set -euo pipefail
+          catalog_commit="$(python3 -c 'import json; print(json.load(open(".foundry/official-catalog-controls.json"))["catalog_source"]["commit"])')"
+          git init external/truenas-apps
+          git -C external/truenas-apps remote add origin https://github.com/truenas/apps.git
+          git -C external/truenas-apps fetch --depth=1 origin "$catalog_commit"
+          git -C external/truenas-apps checkout --detach FETCH_HEAD
+      - name: Verify exact upstream catalog blobs and emit discovery receipt
+        run: |
+          python3 tools/official_catalog_controls.py \
+            --catalog-dir external/truenas-apps \
+            --out official-catalog-controls-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: official-catalog-controls-source-receipt
+          path: official-catalog-controls-receipt.json
+          if-no-files-found: error
