@@ -1,0 +1,48 @@
+{
+  "schema": "truenas-foundry-official-catalog-upgrade-fixture/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#281",
+  "app": {
+    "id": "ntfy",
+    "train": "community"
+  },
+  "from": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "c751f183ab5203ae06aae0573f5484fc5cff5a40",
+    "generated_path": "trains/community/ntfy/app_versions.json",
+    "generated_blob_sha": "2534b330a8b70eb5a75c2afd7a4ec3b2b8d4da35",
+    "catalog_version": "1.1.20",
+    "human_version": "v2.28.0_1.1.20",
+    "app_version": "v2.28.0",
+    "lib_version": "2.3.4",
+    "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "to": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "c60d966e198721ab1e84cf815d969acf8bb11a0b",
+    "generated_path": "trains/community/ntfy/app_versions.json",
+    "generated_blob_sha": "4b37e81949d84a2d491de8685022bea7c8ade9de",
+    "catalog_version": "1.1.21",
+    "human_version": "v2.28.0_1.1.21",
+    "app_version": "v2.28.0",
+    "lib_version": "2.3.4",
+    "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "target_versions": [
+    "25.04.1",
+    "25.04.2.6",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "runtime_qualified_targets": [],
+  "executed_upgrade_qualified": false,
+  "policy": {
+    "native_catalog_semantics_required": true,
+    "custom_app_fallback_allowed": false,
+    "from_and_to_must_share_app_lineage": true,
+    "generated_catalog_source_required": true,
+    "runtime_claim_requires_observed_upgrade_available": true,
+    "runtime_claim_requires_app_upgrade_execution": true,
+    "runtime_claim_requires_post_upgrade_identity": true
+  },
+  "claim_boundary": "source fixture only; no target runtime or executed native-upgrade qualification implied"
+}
