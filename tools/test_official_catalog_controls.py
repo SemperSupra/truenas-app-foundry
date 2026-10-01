@@ -24,6 +24,13 @@ class OfficialCatalogControlTests(unittest.TestCase):
         self.assertFalse(ntfy["universal_qualified"])
         self.assertEqual(set(ntfy["pending_targets"]), set(result["required_targets"]))
 
+    def test_universal_candidate_requires_runtime_fixture_identity_and_values(self):
+        manifest = copy.deepcopy(MANIFEST)
+        ntfy = next(x for x in manifest["controls"] if x["id"] == "ntfy")
+        ntfy.pop("runtime_fixture_source")
+        with self.assertRaisesRegex(MOD.ControlError, "runtime_fixture_source"):
+            MOD.validate(manifest, copy.deepcopy(REGISTRY))
+
     def test_matrix_growth_invalidates_stale_universal_candidate(self):
         registry = copy.deepcopy(REGISTRY)
         registry["targets"].append({"version": "26.0.0-RC.1"})
