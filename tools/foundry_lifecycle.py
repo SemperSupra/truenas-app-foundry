@@ -410,7 +410,7 @@ def lifecycle_recipe() -> dict[str, Any]:
             },
         ],
         "adapter_rule": {
-            "foundry-custom": "CREATE/UPDATE through materialization planner; no app.upgrade",
+            "foundry-custom": "CREATE/materialization UPDATE through materialization planner; no app.upgrade",
             "official-catalog": "native catalog lifecycle; app.upgrade only when observed and applicable",
         },
     }
