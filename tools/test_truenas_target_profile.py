@@ -114,6 +114,27 @@ class TargetProfileTests(unittest.TestCase):
             self.assertIn("app.create", contract["required_public_methods"])
             self.assertIn("app.delete", contract["required_public_methods"])
 
+    def test_profiles_bind_native_catalog_upgrade_as_adapter_specific_contract(self):
+        expected = {
+            "25.04.1": "b22da7e2d512161979adec60548b796ab56943e2",
+            "25.04.2.6": "b22da7e2d512161979adec60548b796ab56943e2",
+            "25.10.7": "0363f8e3ad87628147ea3eff57fe1c512de24aab",
+            "26.0.0-BETA.3": "8812e396537f9d6675cb1e6fce48ca0d22091460",
+        }
+        for target in REGISTRY["targets"]:
+            profile = mod.load_json(HERE.parent / target["profile"])
+            runtime = profile["runtime_api"]["app_upgrade"]
+            self.assertEqual(runtime["method"], "app.upgrade", target["version"])
+            self.assertEqual(runtime["arguments"], "app_name-plus-options", target["version"])
+            self.assertTrue(runtime["job_backed"], target["version"])
+            self.assertEqual(runtime["adapter"], "official-catalog", target["version"])
+            source = next(
+                item
+                for item in profile["source_contract"]
+                if item["path"] == "src/middlewared/middlewared/plugins/apps/upgrade.py"
+            )
+            self.assertEqual(source["blob_sha"], expected[target["version"]])
+
     def test_exact_version_alone_does_not_satisfy_profile(self):
         obs = observation("TrueNAS-25.10.7")
         obs["capabilities"]["methods"].remove("app.delete")
