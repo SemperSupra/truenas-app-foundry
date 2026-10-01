@@ -1,0 +1,42 @@
+{% set probe = {
+  "services": {
+    values.consts.container_name: {
+      "image": values.images.image.repository ~ ":" ~ values.images.image.tag,
+      "platform": "linux/amd64",
+      "user": "568:568",
+      "restart": "unless-stopped",
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges=true"],
+      "environment": {
+        "ELEMENT_WEB_PORT": "8080"
+      },
+      "ports": [
+        {
+          "target": 8080,
+          "published": values.web_port,
+          "protocol": "tcp",
+          "mode": "ingress"
+        }
+      ],
+      "tmpfs": [
+        "/etc/nginx/conf.d:uid=568,gid=568"
+      ],
+      "healthcheck": {
+        "test": ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/version"],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "10s"
+      },
+      "deploy": {
+        "resources": {
+          "limits": {
+            "cpus": values.resources.limits.cpus,
+            "memory": (values.resources.limits.memory | string) ~ "M"
+          }
+        }
+      }
+    }
+  }
+} %}
+{{ probe | tojson }}

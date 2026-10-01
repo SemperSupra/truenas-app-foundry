@@ -1,0 +1,239 @@
+name: Qualify Foundry-born pre-catalog app
+
+on:
+  pull_request:
+    paths:
+      - "fixtures/pre-catalog/foundry-precat-probe/**"
+      - "tools/foundry_app_inventory.py"
+      - "tools/foundry_inventory_materialize.py"
+      - "tools/package_truenas_deployment_artifact.py"
+      - "tools/patch_truenas_ci_for_exact_validator.py"
+      - ".foundry/truenas-catalog-toolchain.json"
+      - ".foundry/truenas-target-tracks.json"
+      - ".github/workflows/qualify-foundry-precat-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  precatalog-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Bootstrap Foundry-owned source identity
+        id: bootstrap
+        shell: bash
+        env:
+          SOURCE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/foundry-precat-probe"
+          mkdir -p "$root"
+          spec="$root/bootstrap-spec.json"
+          python3 - "$SOURCE_REF" "$spec" <<'PY'
+          import json, pathlib, sys
+          ref, out = sys.argv[1:]
+          payload = {
+              "schema": "truenas-foundry-app-bootstrap/v1",
+              "entry": {
+                  "id": "foundry-precat-probe",
+                  "version": "1.0.0",
+                  "runtime_app_name": "foundry-precat-probe",
+                  "source": {
+                      "kind": "foundry-repository",
+                      "repository": "https://github.com/SemperSupra/truenas-app-foundry.git",
+                      "ref": ref,
+                      "path": "fixtures/pre-catalog/foundry-precat-probe",
+                  },
+                  "catalog_train": "community",
+                  "target_versions": ["25.04.1", "25.10.7", "26.0.0-BETA.3"],
+                  "catalog_export": {"status": "not-assessed"},
+              },
+          }
+          pathlib.Path(out).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+          PY
+          python3 tools/foundry_app_inventory.py \
+            --inventory .foundry/app-inventory.json \
+            --targets .foundry/truenas-target-tracks.json \
+            bootstrap \
+            --spec "$spec" \
+            --source-root fixtures/pre-catalog/foundry-precat-probe \
+            --proposal-out "$root/proposed-inventory.json" \
+            --receipt-out "$root/bootstrap-receipt.json"
+
+      - name: Exercise exact TrueNAS native source and render-install gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/foundry-precat-probe"
+          contract=".foundry/truenas-catalog-toolchain.json"
+          apps_repo="$(jq -r '.apps.repository' "$contract")"
+          apps_ref="$(jq -r '.apps.ref' "$contract")"
+          validator_repo="$(jq -r '.apps_validation.repository' "$contract")"
+          validator_ref="$(jq -r '.apps_validation.ref' "$contract")"
+          declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
+          base_digest="$(jq -r '.apps_validation.admitted_base_digest' "$contract")"
+
+          root="$(mktemp -d)"
+          trap 'sudo rm -rf -- "$root"' EXIT
+
+          fetch_exact() {
+            local repo="$1" ref="$2" dest="$3"
+            git init -q "$dest"
+            git -C "$dest" remote add origin "$repo"
+            git -C "$dest" fetch -q --depth=1 origin "$ref"
+            test "$(git -C "$dest" rev-parse FETCH_HEAD)" = "$ref"
+            git -C "$dest" checkout -q --detach FETCH_HEAD
+          }
+
+          fetch_exact "$apps_repo" "$apps_ref" "$root/apps"
+          fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
+
+          candidate="$root/apps/ix-dev/community/foundry-precat-probe"
+          cp -a fixtures/pre-catalog/foundry-precat-probe "$candidate"
+          git -C "$root/apps" branch -f master "$apps_ref"
+          git -C "$root/apps" add -N ix-dev/community/foundry-precat-probe
+          test -n "$(git -C "$root/apps" diff --name-only master -- ix-dev/community/foundry-precat-probe)"
+
+          grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
+          docker pull --quiet "$base_digest" >/dev/null
+          python3 - "$root/apps_validation/Dockerfile" "$declared_base" "$base_digest" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          old = "FROM " + sys.argv[2]
+          new = "FROM " + sys.argv[3]
+          text = path.read_text(encoding="utf-8")
+          if text.count(old) != 1:
+              raise SystemExit("validator Dockerfile base contract drift")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          image="foundry/apps-validation:${validator_ref:0:12}"
+          docker build --quiet -t "$image" "$root/apps_validation" >/dev/null
+          image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+
+          docker run --rm \
+            -e FAKE_ENV=1 \
+            -v "$root/apps:/work" \
+            -w /work \
+            "$image" \
+            /bin/bash -lc \
+            'git config --global --add safe.directory /work && exec /usr/local/bin/apps_dev_charts_validate validate --path /work'
+
+          python3 tools/patch_truenas_ci_for_exact_validator.py \
+            --input "$root/apps/.github/scripts/ci.py" \
+            --output "$root/apps/.github/scripts/ci.py.patched" \
+            --image "$image"
+          mv "$root/apps/.github/scripts/ci.py.patched" "$root/apps/.github/scripts/ci.py"
+
+          (
+            cd "$root/apps"
+            python3 .github/scripts/ci.py \
+              --train community \
+              --app foundry-precat-probe \
+              --test-file basic-values.yaml
+          )
+
+          rendered="$candidate/templates/rendered/docker-compose.yaml"
+          test -f "$rendered"
+          docker compose \
+            -p foundry-precat-probe-normalize \
+            -f "$rendered" \
+            config --format json > "$evidence/normalized-compose.json"
+
+          python3 - "$evidence/proposed-inventory.json" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          doc = json.loads(path.read_text())
+          entry = doc["apps"][0]
+          entry["source_contract"]["official_validator"] = "PASS"
+          entry["catalog_export"] = {
+              "status": "validated-pre-catalog-control",
+              "native_source_validator": "PASS",
+              "native_render_install": "PASS",
+          }
+          path.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
+          PY
+
+          python3 tools/foundry_inventory_materialize.py \
+            --inventory "$evidence/proposed-inventory.json" \
+            --targets .foundry/truenas-target-tracks.json \
+            --compose "$evidence/normalized-compose.json" \
+            --app foundry-precat-probe \
+            --version 1.0.0 \
+            --target-version 25.10.7 \
+            --artifact-out "$evidence/deployment-artifact.json" \
+            --receipt-out "$evidence/materialization-receipt.json"
+
+          python3 - \
+            "$evidence/bootstrap-receipt.json" \
+            "$evidence/materialization-receipt.json" \
+            "$evidence/deployment-artifact.json" \
+            "$apps_ref" "$validator_ref" "$base_digest" "$image_id" \
+            "$evidence/final-receipt.json" <<'PY'
+          import hashlib, json, pathlib, sys
+          bootstrap = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          materialization = json.loads(pathlib.Path(sys.argv[2]).read_text())
+          artifact = json.loads(pathlib.Path(sys.argv[3]).read_text())
+          payload = {
+              "schema": "truenas-foundry-precat-e2e-receipt/v1",
+              "classification": "SUPPORTED",
+              "oracleSatisfied": True,
+              "candidate": {
+                  "id": "foundry-precat-probe",
+                  "version": "1.0.0",
+                  "source_tree_sha256": bootstrap["source_contract"]["source_tree_sha256"],
+                  "official_catalog_dependency": False,
+              },
+              "gates": {
+                  "bootstrap_structural": "PASS",
+                  "native_source_validator": "PASS",
+                  "native_render_install": "PASS",
+                  "inventory_materialization": "PASS",
+              },
+              "toolchain": {
+                  "apps_ref": sys.argv[4],
+                  "apps_validation_ref": sys.argv[5],
+                  "middleware_base": sys.argv[6],
+                  "built_validator_image_id": sys.argv[7],
+              },
+              "deployment": {
+                  "schema": artifact["schema"],
+                  "app_name": artifact["app_name"],
+                  "materialization_identity": artifact["materialization_identity"],
+                  "artifact_sha256": artifact["artifact_sha256"],
+                  "target_version": materialization["target_version"],
+                  "mutation_eligible": materialization["mutation_eligible"],
+              },
+              "non_claims": [
+                  "candidate is not published in the official TrueNAS catalog",
+                  "no TrueNAS host mutation occurred",
+                  "runtime target apply qualification remains separately gated",
+              ],
+          }
+          body = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+          payload["receipt_sha256"] = "sha256:" + hashlib.sha256(body.encode()).hexdigest()
+          pathlib.Path(sys.argv[8]).write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload pre-catalog E2E evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-precat-probe-e2e
+          path: |
+            ${{ runner.temp }}/foundry-precat-probe/bootstrap-receipt.json
+            ${{ runner.temp }}/foundry-precat-probe/proposed-inventory.json
+            ${{ runner.temp }}/foundry-precat-probe/materialization-receipt.json
+            ${{ runner.temp }}/foundry-precat-probe/deployment-artifact.json
+            ${{ runner.temp }}/foundry-precat-probe/final-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
