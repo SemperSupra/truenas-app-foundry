@@ -37,6 +37,7 @@ jobs:
           validator_repo="$(jq -r '.apps_validation.repository' "$contract")"
           validator_ref="$(jq -r '.apps_validation.ref' "$contract")"
           declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
+          base_digest="$(jq -r '.apps_validation.admitted_base_digest' "$contract")"
 
           root="$(mktemp -d)"
           # The pinned TrueNAS validator container writes rendered files as root.
@@ -57,14 +58,8 @@ jobs:
           fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
           grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
 
-          docker pull --quiet "$declared_base" >/dev/null
-          base_digest="$(
-            docker image inspect "$declared_base" \
-              --format '{{range .RepoDigests}}{{println .}}{{end}}' \
-            | grep '^ghcr.io/truenas/middleware@sha256:' \
-            | head -n1
-          )"
           test -n "$base_digest"
+          docker pull --quiet "$base_digest" >/dev/null
 
           python3 - "$root/apps_validation/Dockerfile" "$declared_base" "$base_digest" <<'PY'
           import pathlib, sys
