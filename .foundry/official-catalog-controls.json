@@ -68,24 +68,26 @@
           "config": {
             "type": "ix_volume",
             "ix_volume_config": {
-              "dataset_name": "config",
-              "create_host_path": true
+              "dataset_name": "config"
             }
           },
           "data": {
             "type": "ix_volume",
             "ix_volume_config": {
-              "dataset_name": "data",
-              "create_host_path": true
+              "dataset_name": "data"
             }
           },
           "additional_storage": []
         }
       },
-      "runtime_fixture_note": "Public runtime values are derived from the exact upstream basic-values fixture; ix_volumes is intentionally omitted because it is renderer-generated context. A non-empty base_url is mandatory because the template always configures attachment-cache-dir.",
+      "runtime_fixture_note": "Public runtime values are a user-schema projection of the exact upstream basic-values renderer fixture. Renderer-only ix_volumes and ix_volume_config.create_host_path are intentionally omitted because they are not fields in the pinned questions.yaml user schema. A non-empty base_url is mandatory because the template always configures attachment-cache-dir.",
       "runtime_fixture_source": {
         "path": "trains/community/ntfy/1.1.21/templates/test_values/basic-values.yaml",
         "blob_sha": "64aef815ff089ec606f8c9d053c318b500daf259"
+      },
+      "runtime_schema_source": {
+        "path": "ix-dev/community/ntfy/questions.yaml",
+        "blob_sha": "1a40af4dbcf0e58b182eb4f09ef669440d8e87dd"
       }
     },
     {
