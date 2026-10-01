@@ -24,11 +24,12 @@ def good():
             "repository": "https://github.com/truenas/apps_validation.git",
             "ref": "b" * 40,
             "declared_base": "ghcr.io/truenas/middleware:master",
+            "admitted_base_digest": "ghcr.io/truenas/middleware@sha256:" + "c" * 64,
             "validator_cli": "/usr/local/bin/apps_dev_charts_validate",
         },
         "policy": {
             "exact_git_refs_required": True,
-            "resolve_floating_base_to_digest_per_run": True,
+            "admitted_base_digest_required": True,
             "floating_validator_image_forbidden": True,
             "catalog_ready_requires_native_validator_and_render_install": True,
         },
@@ -51,9 +52,9 @@ class ToolchainTests(unittest.TestCase):
         with self.assertRaises(MOD.ToolchainError):
             MOD.validate(data)
 
-    def test_rejects_unacknowledged_floating_base(self):
+    def test_rejects_non_digest_admitted_base(self):
         data = good()
-        data["policy"]["resolve_floating_base_to_digest_per_run"] = False
+        data["apps_validation"]["admitted_base_digest"] = "ghcr.io/truenas/middleware:master"
         with self.assertRaises(MOD.ToolchainError):
             MOD.validate(data)
 

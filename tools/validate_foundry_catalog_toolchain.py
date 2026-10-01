@@ -45,12 +45,17 @@ def validate(data: dict[str, Any]) -> dict[str, Any]:
         raise ToolchainError("apps_validation.validator_cli is unexpected")
     if av.get("declared_base") != "ghcr.io/truenas/middleware:master":
         raise ToolchainError("apps_validation.declared_base no longer matches the audited Dockerfile contract")
+    admitted = av.get("admitted_base_digest")
+    if not isinstance(admitted, str) or not re.fullmatch(
+        r"ghcr\.io/truenas/middleware@sha256:[0-9a-f]{64}", admitted
+    ):
+        raise ToolchainError("apps_validation.admitted_base_digest must be an exact middleware digest")
     policy = data.get("policy")
     if not isinstance(policy, dict):
         raise ToolchainError("policy must be an object")
     for key in (
         "exact_git_refs_required",
-        "resolve_floating_base_to_digest_per_run",
+        "admitted_base_digest_required",
         "floating_validator_image_forbidden",
         "catalog_ready_requires_native_validator_and_render_install",
     ):
@@ -62,6 +67,7 @@ def validate(data: dict[str, Any]) -> dict[str, Any]:
         "apps_ref": apps["ref"],
         "apps_validation_ref": av["ref"],
         "declared_base": av["declared_base"],
+        "admitted_base_digest": av["admitted_base_digest"],
     }
 
 def main() -> int:
