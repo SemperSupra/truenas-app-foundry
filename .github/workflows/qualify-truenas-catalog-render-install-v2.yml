@@ -39,7 +39,10 @@ jobs:
           declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
 
           root="$(mktemp -d)"
-          trap 'rm -rf "$root"' EXIT
+          # The pinned TrueNAS validator container writes rendered files as root.
+          # Cleanup is post-oracle only; use runner sudo so a successful native
+          # render/install rep is not converted into a false harness failure.
+          trap 'sudo rm -rf -- "$root"' EXIT
 
           fetch_exact() {
             local repo="$1" ref="$2" dest="$3"
