@@ -30,6 +30,11 @@ class OfficialCatalogUpgradeFixtureTests(unittest.TestCase):
         self.assertEqual(result["from_catalog_version"], "1.1.20")
         self.assertEqual(result["to_catalog_version"], "1.1.21")
         self.assertEqual(result["runtime_qualified_targets"], [])
+        self.assertEqual(
+            result["source_bound_targets"],
+            ["25.04.1", "25.04.2.6", "25.10.7"],
+        )
+        self.assertIn("26.0.0-BETA.3", result["adapter_gaps"])
         self.assertFalse(result["executed_upgrade_qualified"])
 
     def test_catalog_version_must_strictly_increase(self):
@@ -54,6 +59,18 @@ class OfficialCatalogUpgradeFixtureTests(unittest.TestCase):
         fixture = copy.deepcopy(FIXTURE)
         fixture["executed_upgrade_qualified"] = True
         with self.assertRaisesRegex(MOD.FixtureError, "exactly reflect"):
+            MOD.validate(fixture, copy.deepcopy(REGISTRY))
+
+    def test_gap_adapter_cannot_receive_runtime_qualification(self):
+        fixture = copy.deepcopy(FIXTURE)
+        fixture["runtime_qualified_targets"] = ["26.0.0-BETA.3"]
+        with self.assertRaisesRegex(MOD.FixtureError, "GAP adapters"):
+            MOD.validate(fixture, copy.deepcopy(REGISTRY))
+
+    def test_runtime_adapters_must_cover_matrix(self):
+        fixture = copy.deepcopy(FIXTURE)
+        fixture["runtime_adapters"].pop("25.10.7")
+        with self.assertRaisesRegex(MOD.FixtureError, "exactly cover"):
             MOD.validate(fixture, copy.deepcopy(REGISTRY))
 
     def test_custom_app_fallback_remains_forbidden(self):
