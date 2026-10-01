@@ -78,8 +78,8 @@
       "middleware_ref": "release/25.04.2.6",
       "middleware_commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6",
       "source_qualification": "qualified",
-      "runtime_qualification": "consumer-specific-private-hil",
-      "accepted_runtime_rung": "consumer-specific",
+      "runtime_qualification": "public-gha-rdte-t5-accepted",
+      "accepted_runtime_rung": "T5",
       "apply_qualified": false,
       "profile_contract": {
         "profile_blob_sha": "1b5b62b3ac13163ece5b09342b2a58a9f631b295",
