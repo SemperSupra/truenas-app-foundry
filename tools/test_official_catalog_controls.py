@@ -31,6 +31,20 @@ class OfficialCatalogControlTests(unittest.TestCase):
         with self.assertRaisesRegex(MOD.ControlError, "runtime_fixture_source"):
             MOD.validate(manifest, copy.deepcopy(REGISTRY))
 
+    def test_runtime_schema_identity_is_required(self):
+        manifest = copy.deepcopy(MANIFEST)
+        ntfy = next(x for x in manifest["controls"] if x["id"] == "ntfy")
+        ntfy.pop("runtime_schema_source")
+        with self.assertRaisesRegex(MOD.ControlError, "runtime_schema_source"):
+            MOD.validate(manifest, copy.deepcopy(REGISTRY))
+
+    def test_renderer_only_fields_are_forbidden_in_runtime_values(self):
+        manifest = copy.deepcopy(MANIFEST)
+        ntfy = next(x for x in manifest["controls"] if x["id"] == "ntfy")
+        ntfy["runtime_create_values"]["storage"]["config"]["ix_volume_config"]["create_host_path"] = True
+        with self.assertRaisesRegex(MOD.ControlError, "renderer-only"):
+            MOD.validate(manifest, copy.deepcopy(REGISTRY))
+
     def test_matrix_growth_invalidates_stale_universal_candidate(self):
         registry = copy.deepcopy(REGISTRY)
         registry["targets"].append({"version": "26.0.0-RC.1"})
