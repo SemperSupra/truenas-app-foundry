@@ -133,3 +133,18 @@ become a second mutable truth.
 
 Private design/acceptance authority:
 `SemperSupra/truenas-app-foundry-private#274`.
+
+
+## Complete TrueNAS matrix coverage
+
+Generic Foundry inventory entries are required to name every exact target currently admitted
+by `.foundry/truenas-target-tracks.json`. This applies equally to Foundry-owned/pre-catalog
+applications and official TrueNAS catalog applications selected as generic materializer
+controls.
+
+The invariant is intentionally fail-closed: when a new exact recent/current/frontier target
+is added to the registry, an existing generic app becomes matrix-incomplete until that exact
+target is added and independently qualified. Train/family similarity does not inherit support.
+
+A version-specific experiment can exist outside the generic inventory/qualification claim, but
+it cannot establish Foundry-wide materializer or lifecycle support.
