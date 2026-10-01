@@ -163,5 +163,8 @@
     }
   ],
   "all_required_product_cells_qualified": false,
-  "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied."
+  "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied.",
+  "required_external_product_ids": [
+    "litellm-app"
+  ]
 }
