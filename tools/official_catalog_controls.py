@@ -78,6 +78,20 @@ def validate_catalog_checkout(manifest: dict[str, Any], catalog_dir: Path) -> No
             raise ControlError(
                 f"{control.get('id')} source blob mismatch: expected {expected_blob}, observed {observed_blob}"
             )
+        fixture = control.get("runtime_fixture_source")
+        if fixture is not None:
+            if not isinstance(fixture, dict):
+                raise ControlError(f"{control.get('id')}: runtime_fixture_source must be an object")
+            fixture_path = str(fixture.get("path", ""))
+            fixture_blob = str(fixture.get("blob_sha", ""))
+            if not fixture_path or not HEX40.fullmatch(fixture_blob):
+                raise ControlError(f"{control.get('id')}: runtime fixture source identity is invalid")
+            observed_fixture_blob = git("rev-parse", f"HEAD:{fixture_path}", cwd=catalog_dir)
+            if observed_fixture_blob != fixture_blob:
+                raise ControlError(
+                    f"{control.get('id')} runtime fixture blob mismatch: "
+                    f"expected {fixture_blob}, observed {observed_fixture_blob}"
+                )
 
 
 def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
@@ -129,6 +143,17 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
         for field in ("source_path", "source_blob_sha", "catalog_version", "app_version", "lib_version", "lib_version_hash"):
             if not isinstance(item.get(field), str) or not item[field]:
                 raise ControlError(f"{cid}: {field} must be a non-empty string")
+        if role in UNIVERSAL_ROLES:
+            fixture = item.get("runtime_fixture_source")
+            values = item.get("runtime_create_values")
+            if not isinstance(fixture, dict):
+                raise ControlError(f"{cid}: universal candidate requires runtime_fixture_source")
+            if not isinstance(fixture.get("path"), str) or not fixture["path"]:
+                raise ControlError(f"{cid}: runtime fixture path must be non-empty")
+            if not isinstance(fixture.get("blob_sha"), str) or not HEX40.fullmatch(fixture["blob_sha"]):
+                raise ControlError(f"{cid}: runtime fixture blob must be exact Git identity")
+            if not isinstance(values, dict) or not values:
+                raise ControlError(f"{cid}: universal candidate requires runtime_create_values")
         if not HEX40.fullmatch(item["source_blob_sha"]):
             raise ControlError(f"{cid}: source_blob_sha must be exact Git blob identity")
         if not re.fullmatch(r"[0-9a-f]{64}", item["lib_version_hash"]):
