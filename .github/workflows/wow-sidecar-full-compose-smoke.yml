@@ -1,0 +1,109 @@
+name: WOW Sidecar full Compose smoke
+
+on:
+  push:
+    branches:
+      - experiment/wow-sidecar-full-compose-smoke-v1
+    paths:
+      - ".github/workflows/wow-sidecar-full-compose-smoke.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/wow-sidecar-full-compose-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact qualified Foundry producer source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: 68d08ce9561b0ccf68d2e7eb446a76514e1a8ed2
+          persist-credentials: false
+
+      - name: Materialize exact WOW candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=candidates/wow-sidecar-app/candidate.json
+          upstream="$(jq -r '.truenas_source.repository' "$manifest")"
+          commit="$(jq -r '.truenas_source.commit' "$manifest")"
+          train="$(jq -r '.truenas_source.train' "$manifest")"
+          lib_version="$(jq -r '.truenas_source.lib_version' "$manifest")"
+          git init -q /tmp/apps
+          git -C /tmp/apps remote add origin "$upstream"
+          git -C /tmp/apps fetch --quiet --depth=1 origin "$commit"
+          git -C /tmp/apps checkout -q --detach FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$commit" ]]
+          destination="/tmp/apps/ix-dev/$train/wow-sidecar"
+          cp -a candidates/wow-sidecar-app/ix-dev/community/wow-sidecar "$destination"
+          lib_name="base_v${lib_version//./_}"
+          mkdir -p "$destination/templates/library"
+          cp -a "/tmp/apps/ix-dev/community/ntfy/templates/library/$lib_name" "$destination/templates/library/$lib_name"
+          cp tests/fixtures/wow-sidecar/t6-truenas-values.yaml "$destination/templates/test_values/t6-truenas-values.yaml"
+          printf '%s' "$train" > /tmp/train
+
+      - name: Render exact T6 Compose
+        working-directory: /tmp/apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          train="$(cat /tmp/train)"
+          python3 ./.github/scripts/ci.py             --train "$train"             --app wow-sidecar             --test-file t6-truenas-values.yaml             --render-only=true
+          rendered="ix-dev/$train/wow-sidecar/templates/rendered/docker-compose.yaml"
+          docker compose -f "$rendered" config --format json > /tmp/wow-compose.json
+          sha256sum /tmp/wow-compose.json
+          jq -e '(.services | keys | sort) == ["permissions","wow-sidecar","wow-sidecar-config-seed"]' /tmp/wow-compose.json >/dev/null
+
+      - name: Exercise exact three-service Compose
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/rdtepool/wow-sidecar-t6/config /mnt/rdtepool/wow-sidecar-t6/state
+          sudo chown root:root /mnt/rdtepool/wow-sidecar-t6/config /mnt/rdtepool/wow-sidecar-t6/state
+          sudo chmod 0750 /mnt/rdtepool/wow-sidecar-t6/config /mnt/rdtepool/wow-sidecar-t6/state
+          cleanup() {
+            docker compose -p wow-t6-smoke -f /tmp/wow-compose.json down --remove-orphans >/dev/null 2>&1 || true
+            sudo rm -rf /mnt/rdtepool/wow-sidecar-t6
+          }
+          trap cleanup EXIT
+
+          docker compose -p wow-t6-smoke -f /tmp/wow-compose.json up -d
+
+          for i in $(seq 1 30); do
+            worker="$(docker inspect -f '{{.State.Status}}' wow-t6-smoke-wow-sidecar-1 2>/dev/null || true)"
+            perms="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' wow-t6-smoke-permissions-1 2>/dev/null || true)"
+            seed="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' wow-t6-smoke-wow-sidecar-config-seed-1 2>/dev/null || true)"
+            if [[ "$worker" == "running" && "$perms" == "exited:0" && "$seed" == "exited:0" ]]; then
+              break
+            fi
+            sleep 1
+          done
+
+          docker compose -p wow-t6-smoke -f /tmp/wow-compose.json ps -a
+          worker="$(docker inspect -f '{{.State.Status}}' wow-t6-smoke-wow-sidecar-1)"
+          perms="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' wow-t6-smoke-permissions-1)"
+          seed="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' wow-t6-smoke-wow-sidecar-config-seed-1)"
+          [[ "$worker" == "running" ]]
+          [[ "$perms" == "exited:0" ]]
+          [[ "$seed" == "exited:0" ]]
+
+          stat -c 'config=%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/config
+          stat -c 'state=%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/state
+          stat -c 'key=%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/config/github-app.pem
+          stat -c 'profile=%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/config/profiles/operator.json
+          stat -c 'marker=%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/config/.initialized-v1
+          [[ "$(stat -c '%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/config)" == "10001:10001:750" ]]
+          [[ "$(stat -c '%u:%g:%a' /mnt/rdtepool/wow-sidecar-t6/state)" == "10001:10001:750" ]]
+          [[ "$(stat -c '%a' /mnt/rdtepool/wow-sidecar-t6/config/github-app.pem)" == "400" ]]
+          [[ "$(stat -c '%a' /mnt/rdtepool/wow-sidecar-t6/config/profiles/operator.json)" == "400" ]]
+          [[ "$(stat -c '%a' /mnt/rdtepool/wow-sidecar-t6/config/.initialized-v1)" == "444" ]]
+
+          # The public fixture intentionally cannot authenticate. The bounded service must stay alive.
+          sleep 6
+          [[ "$(docker inspect -f '{{.State.Status}}' wow-t6-smoke-wow-sidecar-1)" == "running" ]]
+          docker logs --tail 20 wow-t6-smoke-wow-sidecar-1 2>&1             | sed -E 's/(ghp_|github_pat_|sk-)[A-Za-z0-9_-]+/<redacted-token>/g'
