@@ -25,9 +25,13 @@ class BuildOfficialCatalogT6ControlTests(unittest.TestCase):
         self.assertEqual(got["runtime"]["create_payload"]["values"]["TZ"], "Etc/UTC")
         self.assertEqual(
             got["runtime"]["create_payload"]["values"]["ntfy"]["base_url"],
-            "http://localhost:30184",
+            "http://localhost:8080",
         )
         self.assertEqual(got["control"]["app_version"], "v2.28.0")
+        self.assertEqual(
+            got["control"]["runtime_fixture_source"]["blob_sha"],
+            "64aef815ff089ec606f8c9d053c318b500daf259",
+        )
         self.assertEqual(got["control"]["lib_version"], "2.3.4")
         self.assertEqual(
             got["control"]["lib_version_hash"],
