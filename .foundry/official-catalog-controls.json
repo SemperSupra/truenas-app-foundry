@@ -33,7 +33,8 @@
       ],
       "runtime_qualified_targets": [],
       "universal_qualified": false,
-      "selection_note": "Primary low-coupling native-catalog control: no host mounts and no external service dependency is declared by the catalog metadata."
+      "selection_note": "Primary low-coupling native-catalog control: no host mounts and no external service dependency is declared by the catalog metadata.",
+      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
     },
     {
       "id": "element-web",
@@ -56,7 +57,8 @@
       ],
       "runtime_qualified_targets": [],
       "universal_qualified": false,
-      "selection_note": "Secondary low-coupling native-catalog control retained as an independent fallback/discriminator."
+      "selection_note": "Secondary low-coupling native-catalog control retained as an independent fallback/discriminator.",
+      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
     },
     {
       "id": "forgejo-runner",
@@ -76,7 +78,8 @@
       "target_versions": [],
       "runtime_qualified_targets": [],
       "universal_qualified": false,
-      "selection_note": "Retained for runner-specific qualification, but not selected to define the generic lifecycle oracle because it couples the control to the host Docker socket and a newer app library revision."
+      "selection_note": "Retained for runner-specific qualification, but not selected to define the generic lifecycle oracle because it couples the control to the host Docker socket and a newer app library revision.",
+      "lib_version_hash": "644cb2c53051941e9128fbd4d666094573af5c57a62c037bc56820d25427e454"
     }
   ]
 }
