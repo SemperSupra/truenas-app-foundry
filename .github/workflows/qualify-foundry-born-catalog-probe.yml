@@ -144,9 +144,43 @@ jobs:
             config --format json \
             > "$RUNNER_TEMP/foundry-rdte-probe.compose.json"
 
+          qualification_evidence="$RUNNER_TEMP/foundry-rdte-probe.qualification-evidence.json"
+          qualified_inventory="$RUNNER_TEMP/foundry-rdte-probe.qualified.inventory.json"
+          qualification_receipt="$RUNNER_TEMP/foundry-rdte-probe.qualification.json"
+
+          jq -n \
+            --arg source_tree_sha "$(jq -r '.source_contract.source_tree_sha256' "$bootstrap_receipt")" \
+            --arg apps_ref "$apps_ref" \
+            --arg validator_ref "$validator_ref" \
+            --arg base_digest "$base_digest" \
+            '{
+              schema:"truenas-foundry-catalog-candidate-evidence/v1",
+              app:"foundry-rdte-probe",
+              version:"1.0.0",
+              source_tree_sha256:$source_tree_sha,
+              gates:{native_validator:"PASS",render_install:"PASS"},
+              toolchain:{
+                apps_ref:$apps_ref,
+                apps_validation_ref:$validator_ref,
+                middleware_base:$base_digest
+              }
+            }' > "$qualification_evidence"
+
+          python3 tools/foundry_app_inventory.py \
+            --inventory "$proposal" \
+            qualify \
+            --evidence "$qualification_evidence" \
+            --qualified-out "$qualified_inventory" \
+            --receipt-out "$qualification_receipt"
+
+          test "$(jq -r '.status' "$qualification_receipt")" = "CATALOG_READY_CANDIDATE"
+          test "$(jq -r '.apps[0].source_contract.official_validator' "$qualified_inventory")" = "PASS"
+          test "$(jq -r '.apps[0].catalog_export.status' "$qualified_inventory")" = "catalog-ready-candidate"
+          test "$(jq -r '.apps[0].catalog_qualification.status' "$qualified_inventory")" = "PASS"
+
           for version in 25.04.1 25.10.7 26.0.0-BETA.3; do
             python3 tools/foundry_inventory_materialize.py \
-              --inventory "$proposal" \
+              --inventory "$qualified_inventory" \
               --targets .foundry/truenas-target-tracks.json \
               --compose "$RUNNER_TEMP/foundry-rdte-probe.compose.json" \
               --app foundry-rdte-probe \
@@ -154,6 +188,7 @@ jobs:
               --target-version "$version" \
               --artifact-out "$RUNNER_TEMP/foundry-rdte-probe.$version.artifact.json" \
               --receipt-out "$RUNNER_TEMP/foundry-rdte-probe.$version.materialize.json"
+            test "$(jq -r '.catalog_validator' "$RUNNER_TEMP/foundry-rdte-probe.$version.materialize.json")" = "PASS"
           done
 
           test "$(cat "$RUNNER_TEMP"/foundry-rdte-probe.*.materialize.json | jq -r '.materialization_identity' | sort -u | wc -l)" -eq 1
@@ -175,7 +210,7 @@ jobs:
               phase:"foundry-born-pre-catalog",
               app:{id:"foundry-rdte-probe",version:"1.0.0",source_ref:$source_ref,source_tree_sha256:$source_tree_sha},
               toolchain:{apps_ref:$apps_ref,apps_validation_ref:$validator_ref,middleware_base:$base_digest,validator_image_id:$image_id,upstream_ci_sha256:$original_ci_sha,patched_ci_sha256:$patched_ci_sha},
-              gates:{bootstrap:"PASS",native_validator:"PASS",render_install:"PASS",inventory_materialization:"PASS"},
+              gates:{bootstrap:"PASS",native_validator:"PASS",render_install:"PASS",catalog_qualification:"PASS",inventory_materialization:"PASS"},
               exact_targets:["25.04.1","25.10.7","26.0.0-BETA.3"],
               materialization_identity:$materialization_identity,
               catalog_ready_candidate:true,
@@ -192,6 +227,9 @@ jobs:
           path: |
             ${{ runner.temp }}/foundry-rdte-probe.bootstrap.json
             ${{ runner.temp }}/foundry-rdte-probe.inventory.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualified.inventory.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualification-evidence.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualification.json
             ${{ runner.temp }}/resolve-*.json
             ${{ runner.temp }}/foundry-rdte-probe.compose.json
             ${{ runner.temp }}/foundry-rdte-probe.*.artifact.json
