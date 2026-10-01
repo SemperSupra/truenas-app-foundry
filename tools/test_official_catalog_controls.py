@@ -51,6 +51,13 @@ class OfficialCatalogControlTests(unittest.TestCase):
         with self.assertRaisesRegex(MOD.ControlError, "Custom App fallback"):
             MOD.validate(manifest, copy.deepcopy(REGISTRY))
 
+    def test_library_hash_must_be_exact_sha256(self):
+        manifest = copy.deepcopy(MANIFEST)
+        ntfy = next(x for x in manifest["controls"] if x["id"] == "ntfy")
+        ntfy["lib_version_hash"] = "latest"
+        with self.assertRaisesRegex(MOD.ControlError, "lib_version_hash"):
+            MOD.validate(manifest, copy.deepcopy(REGISTRY))
+
     def test_specialized_runner_does_not_claim_generic_matrix(self):
         result = MOD.validate(copy.deepcopy(MANIFEST), copy.deepcopy(REGISTRY))
         forgejo = next(x for x in result["controls"] if x["id"] == "forgejo-runner")
