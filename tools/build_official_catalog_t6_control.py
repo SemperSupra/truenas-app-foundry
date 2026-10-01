@@ -43,13 +43,16 @@ def build(manifest: dict[str, Any], foundry_ref: str, control_id: str) -> dict[s
         raise BuildError("catalog_source is missing")
 
     app_name = f"rdte-t6-catalog-{control_id}"
+    runtime_create_values = control.get("runtime_create_values")
+    if not isinstance(runtime_create_values, dict) or not runtime_create_values:
+        raise BuildError("universal T6 control must define non-empty runtime_create_values")
     create_payload = {
         "custom_app": False,
         "catalog_app": control_id,
         "app_name": app_name,
         "train": control["train"],
         "version": control["catalog_version"],
-        "values": {"TZ": "Etc/UTC"},
+        "values": runtime_create_values,
     }
     update_payload = {"values": {"TZ": "Europe/Berlin"}}
     result = {
