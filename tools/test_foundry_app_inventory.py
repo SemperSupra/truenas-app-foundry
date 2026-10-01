@@ -27,7 +27,7 @@ def sample_entry(app_id="probe-app", version="1.0.0", targets=None):
             "path": "truenas",
         },
         "catalog_train": "community",
-        "target_versions": targets or ["25.10.7", "26.0.0-BETA.3"],
+        "target_versions": targets or ["25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3"],
         "catalog_export": {"status": "not-assessed"},
     }
 
@@ -36,6 +36,8 @@ def target_doc():
     return {
         "schema_version": 1,
         "targets": [
+            {"version": "25.04.1", "apply_qualified": False},
+            {"version": "25.04.2.6", "apply_qualified": False},
             {"version": "25.10.7", "apply_qualified": False},
             {
                 "version": "26.0.0-BETA.3",
@@ -109,6 +111,27 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(result["entry"]["source"]["kind"], "foundry-repository")
         with self.assertRaises(MOD.InventoryError):
             MOD.show_entry(entries, "probe-app", "latest")
+
+    def test_generic_inventory_entry_must_cover_complete_exact_matrix(self):
+        targets = MOD.load_target_map(target_doc())
+        complete = sample_entry()
+        MOD.validate_matrix_coverage([complete], targets)
+
+        incomplete = sample_entry(
+            targets=["25.04.1", "25.10.7", "26.0.0-BETA.3"]
+        )
+        with self.assertRaisesRegex(MOD.InventoryError, "complete exact TrueNAS materialization matrix"):
+            MOD.validate_matrix_coverage([incomplete], targets)
+
+    def test_matrix_growth_intentionally_invalidates_stale_generic_entry(self):
+        targets_doc = target_doc()
+        entry = sample_entry()
+        targets_doc["targets"].append(
+            {"version": "26.0.0-RC.1", "apply_qualified": False}
+        )
+        targets = MOD.load_target_map(targets_doc)
+        with self.assertRaisesRegex(MOD.InventoryError, "26.0.0-RC.1"):
+            MOD.validate_matrix_coverage([entry], targets)
 
     def test_resolve_joins_exact_target_without_granting_apply(self):
         entries = MOD.validate_inventory(
