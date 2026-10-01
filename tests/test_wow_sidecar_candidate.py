@@ -42,16 +42,21 @@ class WowSidecarCandidateTests(unittest.TestCase):
     def setUp(self):
         self.value = json.loads(CANDIDATE.read_text(encoding="utf-8"))
 
-    def test_corrected_candidate_is_fail_closed_until_full_render_requalification(self):
+    def test_corrected_candidate_is_promoted_only_from_strengthened_render_evidence(self):
         result = MODULE.validate(copy.deepcopy(self.value))
         self.assertEqual(result["result"], "PASS")
-        self.assertEqual(result["phase"], "image-published-render-unqualified")
+        self.assertEqual(result["phase"], "render-qualified-private-hil-pending")
         self.assertIsNotNone(result["registry_reference"])
         self.assertTrue(result["permissions_helper_pinned"])
-        self.assertFalse(result["hil_eligible"])
+        self.assertTrue(result["hil_eligible"])
         self.assertFalse(result["private_hil_claimed"])
         self.assertFalse(result["cutover_claimed"])
+        evidence = self.value["public_render_evidence"]
+        self.assertEqual(evidence["run"], 36793252392)
+        self.assertEqual(evidence["qualified_head"], "6c4c20efe98048bc496e68894f249a2a227b92c6")
+        self.assertEqual(evidence["corrects_falsifier_runs"], [36791533322, 36792356264])
         self.assertEqual(self.value["render_falsification"]["run"], 36791533322)
+        self.assertEqual(self.value["render_falsification_followup"]["run"], 36792356264)
 
     def test_seed_rootfs_exception_is_narrow_and_worker_remains_read_only(self):
         contract = self.value["truenas_contract"]
