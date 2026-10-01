@@ -1,0 +1,26 @@
+name: Validate Foundry lifecycle contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/foundry_lifecycle.py"
+      - "tools/test_foundry_lifecycle.py"
+      - "docs/foundry-lifecycle.md"
+      - ".github/workflows/validate-foundry-lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise public lifecycle planner and verifier
+        run: |
+          python3 -m unittest -v tools/test_foundry_lifecycle.py
+          python3 -m py_compile tools/foundry_lifecycle.py
