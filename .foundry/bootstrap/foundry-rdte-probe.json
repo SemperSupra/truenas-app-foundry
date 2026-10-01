@@ -7,7 +7,7 @@
     "source": {
       "kind": "foundry-repository",
       "repository": "https://github.com/SemperSupra/truenas-app-foundry.git",
-      "ref": "26b59b0982c3091b9504b9eeb9e1463200637f78",
+      "ref": "c4fa7cc1287592036866c2510f83b98e047165ac",
       "path": "fixtures/foundry-rdte-probe"
     },
     "catalog_train": "community",
