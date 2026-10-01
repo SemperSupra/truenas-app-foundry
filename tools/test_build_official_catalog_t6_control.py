@@ -22,6 +22,11 @@ class BuildOfficialCatalogT6ControlTests(unittest.TestCase):
         self.assertFalse(got["runtime"]["create_payload"]["custom_app"])
         self.assertEqual(got["runtime"]["create_payload"]["catalog_app"], "ntfy")
         self.assertEqual(got["runtime"]["create_payload"]["version"], "1.1.21")
+        self.assertEqual(got["runtime"]["create_payload"]["values"]["TZ"], "Etc/UTC")
+        self.assertEqual(
+            got["runtime"]["create_payload"]["values"]["ntfy"]["base_url"],
+            "http://localhost:30184",
+        )
         self.assertEqual(got["control"]["app_version"], "v2.28.0")
         self.assertEqual(got["control"]["lib_version"], "2.3.4")
         self.assertEqual(
@@ -34,6 +39,19 @@ class BuildOfficialCatalogT6ControlTests(unittest.TestCase):
         self.assertTrue(got["runtime"]["upgrade"]["not_applicable_requires_receipt"])
         self.assertFalse(got["secrets_captured"])
         self.assertFalse(got["universal_qualified"])
+
+    def test_missing_runtime_create_values_fails_closed(self):
+        manifest = copy.deepcopy(MANIFEST)
+        item = next(x for x in manifest["controls"] if x["id"] == "ntfy")
+        item.pop("runtime_create_values")
+        with self.assertRaisesRegex(MOD.BuildError, "runtime_create_values"):
+            MOD.build(manifest, REF, "ntfy")
+
+    def test_ntfy_runtime_fixture_never_pairs_attachment_cache_with_empty_base_url(self):
+        got = MOD.build(copy.deepcopy(MANIFEST), REF, "ntfy")
+        base_url = got["runtime"]["create_payload"]["values"]["ntfy"]["base_url"]
+        self.assertTrue(base_url.startswith("http://"))
+        self.assertNotEqual(base_url.strip(), "")
 
     def test_specialized_control_cannot_be_exported_as_generic_t6_control(self):
         with self.assertRaisesRegex(MOD.BuildError, "universal candidate"):
