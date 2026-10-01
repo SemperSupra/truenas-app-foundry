@@ -19,14 +19,13 @@
       "accepted_runtime_rung": "T5",
       "apply_qualified": false,
       "profile_contract": {
-        "profile_blob_sha": "e8bd580a7dfce489e980e09733ad6abe16ae0d98",
+        "profile_blob_sha": "c33285e89a3e57e1981f9cc87f12df8a5ec7884b",
         "middleware_commit": "74ab5a2d373be4097dece257d00e1086376333ba",
         "source_api_family": "v25_04_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
         "apps_gate_semantics": "system.license:JAILS",
         "required_public_methods": [
           "system.version",
-          "core.get_methods",
           "app.query",
           "app.config",
           "app.create",
@@ -35,7 +34,8 @@
           "app.stop",
           "app.start",
           "app.delete"
-        ]
+        ],
+        "bootstrap_capability_probe": "core.get_methods"
       },
       "runtime_evidence": {
         "run_id": 36878595744,
@@ -82,14 +82,13 @@
       "accepted_runtime_rung": "T5",
       "apply_qualified": false,
       "profile_contract": {
-        "profile_blob_sha": "1b5b62b3ac13163ece5b09342b2a58a9f631b295",
+        "profile_blob_sha": "70d13a2d31e3cc6eda46412fbccf803d1e7b1852",
         "middleware_commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6",
         "source_api_family": "v25_04_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
         "apps_gate_semantics": "system.license:JAILS",
         "required_public_methods": [
           "system.version",
-          "core.get_methods",
           "app.query",
           "app.config",
           "app.create",
@@ -98,7 +97,8 @@
           "app.stop",
           "app.start",
           "app.delete"
-        ]
+        ],
+        "bootstrap_capability_probe": "core.get_methods"
       }
     },
     {
@@ -120,14 +120,13 @@
         "oracle_satisfied": true
       },
       "profile_contract": {
-        "profile_blob_sha": "d1e672ea076a89c144b60d9d3b40b67bfb9916fd",
+        "profile_blob_sha": "f731325e58be116200594984eb7c42074fa1e2fb",
         "middleware_commit": "8ede398839710e56893d88ce85088139d8fab18e",
         "source_api_family": "v25_10_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
         "apps_gate_semantics": "system.license:JAILS",
         "required_public_methods": [
           "system.version",
-          "core.get_methods",
           "app.query",
           "app.config",
           "app.create",
@@ -136,7 +135,8 @@
           "app.stop",
           "app.start",
           "app.delete"
-        ]
+        ],
+        "bootstrap_capability_probe": "core.get_methods"
       }
     },
     {
@@ -198,14 +198,13 @@
         ]
       },
       "profile_contract": {
-        "profile_blob_sha": "876be17246430a91fe99f89507adbdf0efe87ac6",
+        "profile_blob_sha": "e5a109c6a88771c517ddf1e067333d59b16944d7",
         "middleware_commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3",
         "source_api_family": "v26_0_0",
         "storage_semantics": "zfs.resource.query_impl/pool.dataset.create_impl/zfs.resource.mount",
         "apps_gate_semantics": "system.feature_enabled:APPS",
         "required_public_methods": [
           "system.version",
-          "core.get_methods",
           "app.query",
           "app.config",
           "app.create",
@@ -214,7 +213,8 @@
           "app.stop",
           "app.start",
           "app.delete"
-        ]
+        ],
+        "bootstrap_capability_probe": "core.get_methods"
       }
     }
   ],
