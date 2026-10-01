@@ -105,5 +105,21 @@ class MatrixTests(unittest.TestCase):
         self.assertTrue(result["all_required_product_cells_qualified"])
 
 
+    def test_required_external_product_cannot_be_omitted(self):
+        matrix = copy.deepcopy(MATRIX)
+        matrix["entries"] = [x for x in matrix["entries"] if x["id"] != "litellm-app"]
+        with self.assertRaisesRegex(MOD.MatrixError, "required external products omitted"):
+            MOD.validate(matrix, copy.deepcopy(REGISTRY), HERE.parent)
+
+    def test_required_external_product_cannot_masquerade_as_candidate(self):
+        matrix = copy.deepcopy(MATRIX)
+        row = next(x for x in matrix["entries"] if x["id"] == "litellm-app")
+        row["source"] = {
+            "kind": "foundry-candidate",
+            "candidate_path": "candidates/garm-controller-app/candidate.json",
+        }
+        with self.assertRaisesRegex(MOD.MatrixError, "required external product"):
+            MOD.validate(matrix, copy.deepcopy(REGISTRY), HERE.parent)
+
 if __name__ == "__main__":
     unittest.main()
