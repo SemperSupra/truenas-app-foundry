@@ -25,6 +25,12 @@ The sanitized observation envelope supplied to public logic includes:
 - target App presence/state and a Foundry materialization identity when owned;
 - an explicit ownership state: `absent`, `owned`, or `foreign`.
 
+Exact version text is necessary but is not a sufficient runtime fingerprint. Each admitted
+target also binds an exact compatibility-profile Git blob, middleware source commit/API
+family, release-specific storage semantics, Apps-gate semantics, and a minimum public
+method set. Discovery rejects mutation readiness when the observed public method set no
+longer satisfies that exact profile.
+
 ## Discover
 
 `tools/truenas_target_profile.py discover` matches the exact observed version against
@@ -33,6 +39,11 @@ The sanitized observation envelope supplied to public logic includes:
 Exact release identity is mandatory for mutation. A train/family match is useful for
 qualification routing only. Unknown releases, anticipated RCs, and nightly builds are
 never promoted from a floating selector into an apply claim.
+
+For an exact target, discovery emits a content-bound profile identity and hashes both
+the sanitized observation and selected profile identity. Planning carries those hashes
+forward. Apply must re-observe immediately before mutation and refuse the operation if
+the target/profile fingerprint changed.
 
 The initial matrix tracks:
 
@@ -55,8 +66,9 @@ owned state. It fails closed when:
 - desired materialization identity is absent.
 
 For an apply-qualified profile, the convergent action is one of `CREATE`, `UPDATE`,
-or `NOOP`. The plan requires version, method, and ownership re-observation immediately
-before apply.
+or `NOOP`. The plan binds the observation hash, exact profile-identity hash, and desired
+materialization identity. It requires version, profile-capability, method, and ownership
+re-observation immediately before apply.
 
 ## Apply
 
@@ -80,3 +92,20 @@ workflow is green. Promotion requires exact source/profile identity plus accepte
 real-system runtime evidence. For 26.0.0-BETA.3, Agent Dispatch T4 Apps runtime and T5
 lifecycle are required before generic Foundry apply/verify qualification can be
 claimed.
+
+
+## Adapter boundary
+
+The planner and ownership model are shared across application origins, but realization
+adapters remain explicit:
+
+- Foundry-owned/pre-catalog applications use catalog-compatible source validation and
+  normalized materialization followed by the qualified Custom App realization path.
+- Official TrueNAS catalog applications retain native catalog semantics when catalog
+  lifecycle is the oracle. They are not silently converted to Custom Apps merely to
+  reuse a runtime path.
+
+A control advertised as a generic Foundry materialization control must pass its
+applicable contract across every exact supported target in the Foundry matrix. A control
+that only exists or works on a subset must be labeled version-specific and cannot
+establish generic materializer support.
