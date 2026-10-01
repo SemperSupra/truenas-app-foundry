@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
 
-import truenas_target_profile as target
+HERE = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_file_location(
+    "truenas_target_profile", HERE / "truenas_target_profile.py"
+)
+target = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader
+SPEC.loader.exec_module(target)
 
 
 SCHEMA = "truenas-foundry-lifecycle-intent/v1"
