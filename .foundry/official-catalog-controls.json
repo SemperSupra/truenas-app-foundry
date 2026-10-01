@@ -143,7 +143,11 @@
           "additional_storage": []
         }
       },
-      "runtime_fixture_note": "Public runtime values are derived from the exact upstream basic-values fixture."
+      "runtime_fixture_note": "Public runtime values are derived from the exact upstream basic-values fixture.",
+      "runtime_schema_source": {
+        "path": "ix-dev/community/element-web/questions.yaml",
+        "blob_sha": "6e66d345517b9ba5ee3a859ed0671c68727fbeeb"
+      }
     },
     {
       "id": "forgejo-runner",
