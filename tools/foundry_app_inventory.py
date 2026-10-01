@@ -17,6 +17,7 @@ DEFAULT_TARGETS = REPO_ROOT / ".foundry" / "truenas-target-tracks.json"
 APP_ID_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
 ALLOWED_TRAINS = {"test", "community", "stable", "enterprise", "none"}
 BOOTSTRAP_SCHEMA = "truenas-foundry-app-bootstrap/v1"
+QUALIFICATION_SCHEMA = "truenas-foundry-catalog-candidate-evidence/v1"
 INVENTORY_SCHEMA = "truenas-foundry-app-inventory/v1"
 CATALOG_SOURCE_SHAPE = "truenas-apps-ix-dev/v1"
 REQUIRED_CATALOG_FILES = (
@@ -102,6 +103,28 @@ def validate_entry(entry: Any, index: int) -> tuple[str, str]:
         if source_contract.get("official_validator") not in {"PENDING", "PASS"}:
             raise InventoryError(
                 f"{prefix}.source_contract.official_validator must be PENDING or PASS"
+            )
+
+    qualification = entry.get("catalog_qualification")
+    if qualification is not None:
+        if not isinstance(qualification, dict):
+            raise InventoryError(f"{prefix}.catalog_qualification must be an object")
+        if qualification.get("status") != "PASS":
+            raise InventoryError(f"{prefix}.catalog_qualification.status must be PASS")
+        require_text(
+            qualification.get("source_tree_sha256"),
+            f"{prefix}.catalog_qualification.source_tree_sha256",
+        )
+        require_text(
+            qualification.get("evidence_sha256"),
+            f"{prefix}.catalog_qualification.evidence_sha256",
+        )
+        gates = qualification.get("gates")
+        if not isinstance(gates, dict):
+            raise InventoryError(f"{prefix}.catalog_qualification.gates must be an object")
+        if gates.get("native_validator") != "PASS" or gates.get("render_install") != "PASS":
+            raise InventoryError(
+                f"{prefix}.catalog_qualification requires native_validator=PASS and render_install=PASS"
             )
     return app_id, version
 
@@ -390,6 +413,82 @@ def bootstrap_candidate(
     return receipt, proposed
 
 
+def qualify_candidate(
+    inventory_doc: dict[str, Any],
+    evidence: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    entries = validate_inventory(inventory_doc)
+    if not isinstance(evidence, dict) or evidence.get("schema") != QUALIFICATION_SCHEMA:
+        raise InventoryError("unsupported catalog qualification evidence schema")
+
+    app_id = require_text(evidence.get("app"), "evidence.app")
+    version = require_text(evidence.get("version"), "evidence.version")
+    source_tree_sha = require_text(
+        evidence.get("source_tree_sha256"),
+        "evidence.source_tree_sha256",
+    )
+    gates = evidence.get("gates")
+    if not isinstance(gates, dict):
+        raise InventoryError("evidence.gates must be an object")
+    if gates.get("native_validator") != "PASS":
+        raise InventoryError("catalog qualification requires native_validator=PASS")
+    if gates.get("render_install") != "PASS":
+        raise InventoryError("catalog qualification requires render_install=PASS")
+
+    entry = find_entry(entries, app_id, version)
+    source_contract = entry.get("source_contract")
+    if not isinstance(source_contract, dict):
+        raise InventoryError("inventory entry has no bootstrap source contract")
+    if source_contract.get("source_tree_sha256") != source_tree_sha:
+        raise InventoryError("catalog qualification source-tree identity mismatch")
+    if source_contract.get("structural_preflight") != "PASS":
+        raise InventoryError("catalog qualification requires structural preflight PASS")
+
+    toolchain = evidence.get("toolchain")
+    if not isinstance(toolchain, dict):
+        raise InventoryError("evidence.toolchain must be an object")
+    for field in ("apps_ref", "apps_validation_ref", "middleware_base"):
+        require_text(toolchain.get(field), f"evidence.toolchain.{field}")
+
+    evidence_sha = "sha256:" + hashlib.sha256(
+        json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+    qualified = json.loads(json.dumps(inventory_doc))
+    qualified_entries = validate_inventory(qualified)
+    qualified_entry = find_entry(qualified_entries, app_id, version)
+    qualified_entry["source_contract"]["official_validator"] = "PASS"
+    qualified_entry["catalog_export"] = {
+        "status": "catalog-ready-candidate",
+        "publication_performed": False,
+    }
+    qualified_entry["catalog_qualification"] = {
+        "status": "PASS",
+        "source_tree_sha256": source_tree_sha,
+        "gates": {
+            "native_validator": "PASS",
+            "render_install": "PASS",
+        },
+        "toolchain": toolchain,
+        "evidence_sha256": evidence_sha,
+    }
+    validate_inventory(qualified)
+
+    receipt = {
+        "schema": "truenas-foundry-catalog-qualification-receipt/v1",
+        "status": "CATALOG_READY_CANDIDATE",
+        "app": app_id,
+        "version": version,
+        "source_tree_sha256": source_tree_sha,
+        "official_validator": "PASS",
+        "catalog_export_status": "catalog-ready-candidate",
+        "evidence_sha256": evidence_sha,
+        "publication_performed": False,
+        "mutation_performed": False,
+    }
+    return receipt, qualified
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
@@ -413,6 +512,11 @@ def parser() -> argparse.ArgumentParser:
     bootstrap.add_argument("--source-root", type=Path, required=True)
     bootstrap.add_argument("--proposal-out", type=Path, required=True)
     bootstrap.add_argument("--receipt-out", type=Path)
+
+    qualify = sub.add_parser("qualify")
+    qualify.add_argument("--evidence", type=Path, required=True)
+    qualify.add_argument("--qualified-out", type=Path, required=True)
+    qualify.add_argument("--receipt-out", type=Path)
     return p
 
 
@@ -446,6 +550,23 @@ def main() -> int:
             args.proposal_out.parent.mkdir(parents=True, exist_ok=True)
             args.proposal_out.write_text(
                 json.dumps(proposed, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            if args.receipt_out:
+                args.receipt_out.parent.mkdir(parents=True, exist_ok=True)
+                args.receipt_out.write_text(
+                    json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            payload = receipt
+        elif args.command == "qualify":
+            receipt, qualified = qualify_candidate(
+                inventory_doc,
+                load_json(args.evidence),
+            )
+            args.qualified_out.parent.mkdir(parents=True, exist_ok=True)
+            args.qualified_out.write_text(
+                json.dumps(qualified, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
             if args.receipt_out:
