@@ -99,7 +99,9 @@ def validate(candidate: dict, compose: dict) -> dict:
             raise ControlError(f"{name} no-new-privileges missing")
     if worker.get("read_only") is not True:
         raise ControlError("worker rootfs is not read-only")
-    if seed.get("read_only") is not False:
+    # docker compose config may omit an explicit false because writable is
+    # the Compose default. Reject only a materialized read-only seed.
+    if seed.get("read_only") is True:
         raise ControlError("seed bounded writable-rootfs exception drifted")
     if worker.get("configs"):
         raise ControlError("worker received inline seed configs directly")
