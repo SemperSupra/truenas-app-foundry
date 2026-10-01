@@ -110,6 +110,15 @@
         "call('app.start', 'actual-budget', job=True)",
         "call('app.delete', 'actual-budget', {'remove_ix_volumes': True, 'remove_images': True}, job=True)"
       ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/upgrade.py",
+      "blob_sha": "0363f8e3ad87628147ea3eff57fe1c512de24aab",
+      "contains": [
+        "def upgrade(self, job, app_name, options):",
+        "if app['upgrade_available'] is False:",
+        "if app['custom_app'] or app['metadata']['name'] == IX_APP_NAME:"
+      ]
     }
   ],
   "platform_features": {
@@ -212,7 +221,8 @@
       "exact 25.10.7 source-level Apps create/update/delete/query contract",
       "exact 25.10.7 Custom App compose contract",
       "exact 25.10.7 certificate and ixVolume normalization/action identities",
-      "exact 25.10.7 app state and Docker status schemas"
+      "exact 25.10.7 app state and Docker status schemas",
+      "exact 25.10.7 native catalog upgrade source contract"
     ],
     "does_not_qualify": [
       "live TrueNAS API transport or RBAC",
@@ -293,6 +303,13 @@
       "method": "app.start",
       "arguments": "app_name",
       "job_backed": true
+    },
+    "app_upgrade": {
+      "method": "app.upgrade",
+      "arguments": "app_name-plus-options",
+      "job_backed": true,
+      "adapter": "official-catalog",
+      "applicability": "observed custom_app=false and upgrade_available=true"
     }
   }
 }
