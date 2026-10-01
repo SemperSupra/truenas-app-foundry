@@ -1,0 +1,40 @@
+groups:
+  - name: Network Configuration
+    description: Configure the disposable probe port.
+  - name: Resources Configuration
+    description: Configure bounded probe resources.
+
+questions:
+  - variable: web_port
+    group: Network Configuration
+    label: Web Port
+    schema:
+      type: int
+      default: 38080
+      min: 1024
+      max: 65535
+      required: true
+
+  - variable: resources
+    group: Resources Configuration
+    label: Resources
+    schema:
+      type: dict
+      attrs:
+        - variable: limits
+          label: Limits
+          schema:
+            type: dict
+            attrs:
+              - variable: cpus
+                label: CPUs
+                schema:
+                  type: int
+                  default: 1
+                  required: true
+              - variable: memory
+                label: Memory (MB)
+                schema:
+                  type: int
+                  default: 256
+                  required: true
