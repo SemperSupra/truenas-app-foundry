@@ -21,12 +21,24 @@ def candidate():
         "container": {"registry_reference": MODULE.EXPECTED_IMAGE, "runtime_user": "10001:10001"},
         "permissions_helper": {"reference": MODULE.EXPECTED_HELPER},
         "truenas_source": {"commit": "a"*40, "lib_version": "2.3.4", "lib_hash": "b"*64},
+        "truenas_contract": {
+            "worker_root_filesystem_read_only": True,
+            "seed_root_filesystem_writable_for_inline_configs": True,
+            "seed_inline_config_mode": "0444",
+            "persisted_managed_config_mode": "0400",
+        },
         "gates": {"public_app_render_qualified": True, "hil_eligible": True},
     }
 
 
 def compose():
-    common = {"user":"10001:10001","privileged":False,"read_only":True,"cap_drop":["ALL"]}
+    common = {
+        "user":"10001:10001",
+        "privileged":False,
+        "read_only":True,
+        "cap_drop":["ALL"],
+        "security_opt":["no-new-privileges=true"],
+    }
     return {
         "services": {
             "wow-sidecar": {
@@ -46,9 +58,16 @@ def compose():
                 "read_only": False,
                 "image": MODULE.EXPECTED_IMAGE,
                 "network_mode":"none",
+                "configs": [
+                    {"source":"wow-github-app-private-key","target":"/seed/github-app.pem","mode":"0444"},
+                    {"source":"wow-operator-profile","target":"/seed/operator-profile.json","mode":"0444"},
+                ],
                 "volumes": [
                     {"source": MODULE.CONFIG_DIR, "target": "/etc/wow-sidecar", "read_only": False},
                 ],
+                "command": ["-ec", "cp /seed/github-app.pem /etc/wow-sidecar/github-app.pem; "
+                                     "cp /seed/operator-profile.json /etc/wow-sidecar/profiles/operator.json; "
+                                     "chmod 0400 /etc/wow-sidecar/github-app.pem /etc/wow-sidecar/profiles/operator.json"],
                 "environment": {"FIXTURE": MODULE.FIXTURE_MARKER},
             },
             "permissions": {
@@ -88,6 +107,38 @@ class WowSidecarT6ControlTests(unittest.TestCase):
         value=compose()
         value["services"]["wow-sidecar"]["image"]="ghcr.io/sempersupra/wow-sidecar:latest"
         with self.assertRaisesRegex(MODULE.ControlError,"image drifted"):
+            MODULE.validate(candidate(),value)
+
+    def test_rejects_worker_inline_seed_configs(self):
+        value=compose()
+        value["services"]["wow-sidecar"]["configs"]=[
+            {"source":"wow-github-app-private-key","target":"/seed/github-app.pem","mode":"0444"}
+        ]
+        with self.assertRaisesRegex(MODULE.ControlError,"worker received inline seed configs"):
+            MODULE.validate(candidate(),value)
+
+    def test_rejects_seed_inline_mode_drift(self):
+        value=compose()
+        value["services"]["wow-sidecar-config-seed"]["configs"][0]["mode"]="0400"
+        with self.assertRaisesRegex(MODULE.ControlError,"seed inline config mode/target drifted"):
+            MODULE.validate(candidate(),value)
+
+    def test_rejects_persisted_mode_contract_drift(self):
+        cand=candidate()
+        cand["truenas_contract"]["persisted_managed_config_mode"]="0444"
+        with self.assertRaisesRegex(MODULE.ControlError,"candidate corrected seed contract drifted"):
+            MODULE.validate(cand,compose())
+
+    def test_rejects_seed_read_only_regression(self):
+        value=compose()
+        value["services"]["wow-sidecar-config-seed"]["read_only"]=True
+        with self.assertRaisesRegex(MODULE.ControlError,"seed bounded writable-rootfs exception drifted"):
+            MODULE.validate(candidate(),value)
+
+    def test_rejects_missing_no_new_privileges(self):
+        value=compose()
+        value["services"]["wow-sidecar-config-seed"]["security_opt"]=[]
+        with self.assertRaisesRegex(MODULE.ControlError,"no-new-privileges"):
             MODULE.validate(candidate(),value)
 
 
