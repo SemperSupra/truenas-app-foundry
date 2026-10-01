@@ -21,7 +21,13 @@ class BuildOfficialCatalogT6ControlTests(unittest.TestCase):
         self.assertEqual(got["schema"], "semper-supra.official-catalog-truenas-t6-control/1")
         self.assertFalse(got["runtime"]["create_payload"]["custom_app"])
         self.assertEqual(got["runtime"]["create_payload"]["catalog_app"], "ntfy")
-        self.assertEqual(got["runtime"]["create_payload"]["version"], "1.1.21")\n        self.assertEqual(got["control"]["app_version"], "v2.28.0")\n        self.assertEqual(got["control"]["lib_version"], "2.3.4")\n        self.assertEqual(got["control"]["lib_version_hash"], "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242")
+        self.assertEqual(got["runtime"]["create_payload"]["version"], "1.1.21")
+        self.assertEqual(got["control"]["app_version"], "v2.28.0")
+        self.assertEqual(got["control"]["lib_version"], "2.3.4")
+        self.assertEqual(
+            got["control"]["lib_version_hash"],
+            "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+        )
         self.assertEqual(got["runtime"]["config_oracle"]["updated"]["TZ"], "Europe/Berlin")
         self.assertFalse(got["runtime"]["delete_options"]["remove_ix_volumes"])
         self.assertFalse(got["runtime"]["delete_options"]["remove_images"])
