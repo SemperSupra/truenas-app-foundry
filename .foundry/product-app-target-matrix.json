@@ -42,7 +42,22 @@
         },
         "26.0.0-BETA.3": {
           "status": "OPEN",
-          "evidence": null
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36790011622,
+            "artifact_id": 11131414132,
+            "artifact_digest": "sha256:2db7bfb199e79a39814ab6f1c10445cb7269436fcfc3bf62bda60f3ce8b98542",
+            "source_identity": "Foundry control 7fd0d2474248b61cf8e290fc80f40b761cea5e98; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "scope": "G1a product-specific controller realization",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 controller realization with config/db persistence, HTTPS health, stop/start persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5/G1b matrix recipe."
+          },
+          "additional_partial_evidence": {
+            "g2_provider_run_id": 36812808256,
+            "g2_artifact_id": 11141155297,
+            "g2_artifact_digest": "sha256:7d984b6a02b4032968bd15e60f51f2e9660ebe51df7be47d970607b72b36bc77",
+            "scope": "provider transport/adoption only",
+            "note": "Accepted G2 provider WSS/API-key transport/adoption evidence is retained as adjacent product evidence; it does not replace G1b/F0-F5 App lifecycle qualification."
+          }
         }
       }
     },
@@ -71,7 +86,15 @@
         },
         "26.0.0-BETA.3": {
           "status": "OPEN",
-          "evidence": null
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36804168961,
+            "artifact_id": 11137183004,
+            "artifact_digest": "sha256:7c510524f72c2360416b115c3fc5c842c22219b4a7425dea722399e35d34cace",
+            "source_identity": "Foundry ref 9ac2eef97581caff5b0de740560c55a778fa3f1c",
+            "scope": "corrected product-specific T6",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 WOW realization with exact image/config readback, permissions/create-once seed behavior, worker RUNNING, restart persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5 matrix recipe."
+          }
         }
       }
     },
