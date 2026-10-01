@@ -1,0 +1,23 @@
+{
+  "schema": "truenas-foundry-app-bootstrap/v1",
+  "entry": {
+    "id": "foundry-rdte-probe",
+    "version": "1.0.0",
+    "runtime_app_name": "foundry-rdte-probe",
+    "source": {
+      "kind": "foundry-repository",
+      "repository": "https://github.com/SemperSupra/truenas-app-foundry.git",
+      "ref": "26b59b0982c3091b9504b9eeb9e1463200637f78",
+      "path": "fixtures/foundry-rdte-probe"
+    },
+    "catalog_train": "community",
+    "target_versions": [
+      "25.04.1",
+      "25.10.7",
+      "26.0.0-BETA.3"
+    ],
+    "catalog_export": {
+      "status": "not-assessed"
+    }
+  }
+}
