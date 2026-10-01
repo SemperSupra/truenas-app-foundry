@@ -174,6 +174,26 @@ def sorted_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(entries, key=lambda item: (str(item["id"]), str(item["version"])))
 
 
+def required_target_versions(targets: dict[str, dict[str, Any]]) -> list[str]:
+    return sorted(targets)
+
+
+def validate_matrix_coverage(
+    entries: list[dict[str, Any]],
+    targets: dict[str, dict[str, Any]],
+) -> None:
+    required = set(required_target_versions(targets))
+    for entry in entries:
+        actual = set(entry.get("target_versions", []))
+        missing = sorted(required - actual)
+        extra = sorted(actual - required)
+        if missing or extra:
+            raise InventoryError(
+                f"{entry['id']}@{entry['version']} must cover the complete exact TrueNAS "
+                f"materialization matrix; missing={missing!r} extra={extra!r}"
+            )
+
+
 def list_entries(entries: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "schema": "truenas-foundry-app-inventory-list/v1",
@@ -217,6 +237,7 @@ def resolve_entry(
     if target is None:
         raise InventoryError(f"exact TrueNAS target is not registered: {target_version}")
 
+    validate_matrix_coverage([entry], targets)
     allowed_targets = entry.get("target_versions", [])
     if allowed_targets and target_version not in allowed_targets:
         raise InventoryError(
@@ -385,6 +406,7 @@ def bootstrap_candidate(
     unknown = sorted(set(admitted_targets) - set(targets))
     if unknown:
         raise InventoryError(f"bootstrap references unregistered exact target versions: {unknown!r}")
+    validate_matrix_coverage([entry], targets)
     train = entry.get("catalog_train", "none")
     if train == "none":
         raise InventoryError("bootstrap requires an explicit catalog train")
@@ -530,10 +552,14 @@ def main() -> int:
         inventory_doc = load_json(args.inventory)
         entries = validate_inventory(inventory_doc)
         if args.command == "validate":
+            targets = load_target_map(load_json(args.targets))
+            validate_matrix_coverage(entries, targets)
             payload = {
                 "status": "PASS",
                 "schema": INVENTORY_SCHEMA,
                 "entries": len(entries),
+                "required_target_versions": required_target_versions(targets),
+                "matrix_coverage": "PASS",
             }
         elif args.command == "list":
             payload = list_entries(entries)
