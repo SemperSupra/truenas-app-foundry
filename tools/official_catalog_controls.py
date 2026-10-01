@@ -131,6 +131,8 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
                 raise ControlError(f"{cid}: {field} must be a non-empty string")
         if not HEX40.fullmatch(item["source_blob_sha"]):
             raise ControlError(f"{cid}: source_blob_sha must be exact Git blob identity")
+        if not re.fullmatch(r"[0-9a-f]{64}", item["lib_version_hash"]):
+            raise ControlError(f"{cid}: lib_version_hash must be exact SHA256 identity")
 
         declared = item.get("target_versions", [])
         qualified = item.get("runtime_qualified_targets", [])
