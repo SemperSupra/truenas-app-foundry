@@ -34,7 +34,14 @@
       "runtime_qualified_targets": [],
       "universal_qualified": false,
       "selection_note": "Primary low-coupling native-catalog control: no host mounts and no external service dependency is declared by the catalog metadata.",
-      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+      "runtime_create_values": {
+        "TZ": "Etc/UTC",
+        "ntfy": {
+          "base_url": "http://localhost:30184"
+        }
+      },
+      "runtime_fixture_note": "ntfy requires a non-empty base-url whenever attachment-cache-dir is configured; the TrueNAS template always configures attachment-cache-dir."
     },
     {
       "id": "element-web",
