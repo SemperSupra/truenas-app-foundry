@@ -92,6 +92,20 @@ def validate_catalog_checkout(manifest: dict[str, Any], catalog_dir: Path) -> No
                     f"{control.get('id')} runtime fixture blob mismatch: "
                     f"expected {fixture_blob}, observed {observed_fixture_blob}"
                 )
+        schema_source = control.get("runtime_schema_source")
+        if schema_source is not None:
+            if not isinstance(schema_source, dict):
+                raise ControlError(f"{control.get('id')}: runtime_schema_source must be an object")
+            schema_path = str(schema_source.get("path", ""))
+            schema_blob = str(schema_source.get("blob_sha", ""))
+            if not schema_path or not HEX40.fullmatch(schema_blob):
+                raise ControlError(f"{control.get('id')}: runtime schema source identity is invalid")
+            observed_schema_blob = git("rev-parse", f"HEAD:{schema_path}", cwd=catalog_dir)
+            if observed_schema_blob != schema_blob:
+                raise ControlError(
+                    f"{control.get('id')} runtime schema blob mismatch: "
+                    f"expected {schema_blob}, observed {observed_schema_blob}"
+                )
 
 
 def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
@@ -145,6 +159,7 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
                 raise ControlError(f"{cid}: {field} must be a non-empty string")
         if role in UNIVERSAL_ROLES:
             fixture = item.get("runtime_fixture_source")
+            schema_source = item.get("runtime_schema_source")
             values = item.get("runtime_create_values")
             if not isinstance(fixture, dict):
                 raise ControlError(f"{cid}: universal candidate requires runtime_fixture_source")
@@ -152,8 +167,25 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
                 raise ControlError(f"{cid}: runtime fixture path must be non-empty")
             if not isinstance(fixture.get("blob_sha"), str) or not HEX40.fullmatch(fixture["blob_sha"]):
                 raise ControlError(f"{cid}: runtime fixture blob must be exact Git identity")
+            if not isinstance(schema_source, dict):
+                raise ControlError(f"{cid}: universal candidate requires runtime_schema_source")
+            if not isinstance(schema_source.get("path"), str) or not schema_source["path"]:
+                raise ControlError(f"{cid}: runtime schema path must be non-empty")
+            if not isinstance(schema_source.get("blob_sha"), str) or not HEX40.fullmatch(schema_source["blob_sha"]):
+                raise ControlError(f"{cid}: runtime schema blob must be exact Git identity")
             if not isinstance(values, dict) or not values:
                 raise ControlError(f"{cid}: universal candidate requires runtime_create_values")
+            forbidden_runtime_keys = {"ix_volumes", "create_host_path"}
+            def _walk_runtime(value):
+                if isinstance(value, dict):
+                    for key, child in value.items():
+                        if key in forbidden_runtime_keys:
+                            raise ControlError(f"{cid}: renderer-only runtime value leaked into create payload: {key}")
+                        _walk_runtime(child)
+                elif isinstance(value, list):
+                    for child in value:
+                        _walk_runtime(child)
+            _walk_runtime(values)
         if not HEX40.fullmatch(item["source_blob_sha"]):
             raise ControlError(f"{cid}: source_blob_sha must be exact Git blob identity")
         if not re.fullmatch(r"[0-9a-f]{64}", item["lib_version_hash"]):
