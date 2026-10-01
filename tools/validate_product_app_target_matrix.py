@@ -89,6 +89,12 @@ def validate(matrix: dict[str, Any], registry: dict[str, Any], repo_root: pathli
     if not isinstance(entries, list) or not entries:
         raise MatrixError("matrix requires entries")
 
+    required_external = matrix.get("required_external_product_ids")
+    if not isinstance(required_external, list) or any(
+        not isinstance(x, str) or not x for x in required_external
+    ) or len(required_external) != len(set(required_external)):
+        raise MatrixError("required_external_product_ids must be a unique non-empty string list")
+
     ids: set[str] = set()
     represented_candidates: set[str] = set()
     required_product_passes: list[bool] = []
@@ -146,6 +152,17 @@ def validate(matrix: dict[str, Any], registry: dict[str, Any], repo_root: pathli
             "status": {v: statuses[v]["status"] for v in required},
         })
 
+    missing_external = sorted(set(required_external) - ids)
+    if missing_external:
+        raise MatrixError(f"required external products omitted from matrix: {missing_external}")
+    for external_id in required_external:
+        external = next(x for x in entries if x.get("id") == external_id)
+        if external.get("classification") != "product":
+            raise MatrixError(f"{external_id}: required external entry must be a product")
+        source = external.get("source") or {}
+        if source.get("kind") == "foundry-candidate" or source.get("candidate_path") is not None:
+            raise MatrixError(f"{external_id}: required external product must use external source authority")
+
     discovered = candidate_paths(repo_root)
     missing = sorted(discovered - represented_candidates)
     if missing:
@@ -162,6 +179,7 @@ def validate(matrix: dict[str, Any], registry: dict[str, Any], repo_root: pathli
         "status": "PASS",
         "required_target_versions": required,
         "discovered_candidate_paths": sorted(discovered),
+        "required_external_product_ids": required_external,
         "entries": summary,
         "all_required_product_cells_qualified": computed_all,
         "claim_boundary": "coverage/receipt contract only; runtime support exists only in PASS cells",
