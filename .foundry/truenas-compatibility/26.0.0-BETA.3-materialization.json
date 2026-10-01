@@ -110,6 +110,15 @@
         "call(\"app.stop\", \"actual-budget\", job=True)",
         "call(\"app.start\", \"actual-budget\", job=True)"
       ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/upgrade.py",
+      "blob_sha": "8812e396537f9d6675cb1e6fce48ca0d22091460",
+      "contains": [
+        "async def upgrade(self, job, app_name, options):",
+        "app.upgrade_impl",
+        "if app['upgrade_available'] is False:"
+      ]
     }
   ],
   "platform_features": {
@@ -212,7 +221,8 @@
       "exact 26.0.0-BETA.3 source-level Apps create/update/delete/query contract",
       "exact 26.0.0-BETA.3 Custom App compose contract",
       "exact 26.0.0-BETA.3 certificate and ixVolume normalization/action identities",
-      "exact 26.0.0-BETA.3 app state and Docker status schemas"
+      "exact 26.0.0-BETA.3 app state and Docker status schemas",
+      "exact 26.0.0-BETA.3 native catalog upgrade source contract"
     ],
     "does_not_qualify": [
       "T4/T5 live runtime behavior until Agent Dispatch evidence is accepted",
@@ -292,6 +302,13 @@
       "method": "app.start",
       "arguments": "app_name",
       "job_backed": true
+    },
+    "app_upgrade": {
+      "method": "app.upgrade",
+      "arguments": "app_name-plus-options",
+      "job_backed": true,
+      "adapter": "official-catalog",
+      "applicability": "observed custom_app=false and upgrade_available=true"
     }
   }
 }
