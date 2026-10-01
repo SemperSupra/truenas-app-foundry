@@ -128,6 +128,52 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
     if not isinstance(qualified, list) or not set(qualified).issubset(set(declared)):
         raise FixtureError("runtime_qualified_targets must be a subset of target_versions")
 
+    adapters = manifest.get("runtime_adapters")
+    if not isinstance(adapters, dict) or set(adapters) != set(required):
+        raise FixtureError("runtime_adapters must exactly cover the target registry")
+    source_bound = set()
+    gaps = {}
+    for version, adapter in adapters.items():
+        if not isinstance(adapter, dict):
+            raise FixtureError(f"{version}: runtime adapter must be an object")
+        status = adapter.get("status")
+        if adapter.get("catalog_location") != "/mnt/.ix-apps/truenas_catalog":
+            raise FixtureError(f"{version}: unexpected catalog location")
+        if adapter.get("mapping_method") != "catalog.train_to_apps_version_mapping":
+            raise FixtureError(f"{version}: upgrade mapping method drifted")
+        if adapter.get("mapping_semantics") != "cache-only":
+            raise FixtureError(f"{version}: upgrade mapping must remain cache-only")
+        if adapter.get("cache_refresh_method") != "catalog.apps":
+            raise FixtureError(f"{version}: cache refresh method drifted")
+        refresh = adapter.get("cache_refresh_arguments")
+        if refresh != {"cache": False, "cache_only": False, "retrieve_all_trains": True}:
+            raise FixtureError(f"{version}: cache refresh arguments drifted")
+        for source_field in ("switch_source", "apps_details_source", "location_source"):
+            source = adapter.get(source_field)
+            if not isinstance(source, dict) or not HEX40.fullmatch(str(source.get("blob_sha", ""))):
+                raise FixtureError(f"{version}: {source_field} must bind an exact source blob")
+        if status == "SOURCE_BOUND":
+            if adapter.get("switch_method") != "catalog.update_git_repository":
+                raise FixtureError(f"{version}: source-bound switch method drifted")
+            if adapter.get("switch_arguments") != "location-repository-branch":
+                raise FixtureError(f"{version}: source-bound switch arguments drifted")
+            if adapter.get("switch_visibility") != "private-callable":
+                raise FixtureError(f"{version}: source-bound switch visibility drifted")
+            source_bound.add(version)
+        elif status == "GAP":
+            reason = adapter.get("reason")
+            if not isinstance(reason, str) or not reason:
+                raise FixtureError(f"{version}: GAP adapter requires a reason")
+            gaps[version] = reason
+        else:
+            raise FixtureError(f"{version}: unsupported runtime adapter status {status!r}")
+
+    unexecutable_claims = sorted(set(qualified) - source_bound)
+    if unexecutable_claims:
+        raise FixtureError(
+            f"runtime qualification cannot claim GAP adapters: {unexecutable_claims}"
+        )
+
     for side in (before, after):
         for field in (
             "repository",
@@ -183,6 +229,8 @@ def validate(manifest: dict[str, Any], registry: dict[str, Any]) -> dict[str, An
         "to_catalog_version": after["catalog_version"],
         "target_versions": required,
         "runtime_qualified_targets": qualified,
+        "source_bound_targets": sorted(source_bound),
+        "adapter_gaps": gaps,
         "executed_upgrade_qualified": fully,
         "claim_boundary": "source fixture only; runtime app.upgrade execution remains unqualified",
     }
