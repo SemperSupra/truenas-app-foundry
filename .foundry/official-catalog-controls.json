@@ -37,11 +37,56 @@
       "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
       "runtime_create_values": {
         "TZ": "Etc/UTC",
+        "resources": {
+          "limits": {
+            "cpus": 2,
+            "memory": 4096
+          }
+        },
         "ntfy": {
-          "base_url": "http://localhost:30184"
+          "base_url": "http://localhost:8080",
+          "additional_envs": []
+        },
+        "network": {
+          "host_network": false,
+          "http_port": {
+            "bind_mode": "published",
+            "port_number": 8080
+          },
+          "https_port": {
+            "bind_mode": "published",
+            "port_number": 8443
+          },
+          "certificate_id": null,
+          "additional_ports": []
+        },
+        "run_as": {
+          "user": 568,
+          "group": 568
+        },
+        "storage": {
+          "config": {
+            "type": "ix_volume",
+            "ix_volume_config": {
+              "dataset_name": "config",
+              "create_host_path": true
+            }
+          },
+          "data": {
+            "type": "ix_volume",
+            "ix_volume_config": {
+              "dataset_name": "data",
+              "create_host_path": true
+            }
+          },
+          "additional_storage": []
         }
       },
-      "runtime_fixture_note": "ntfy requires a non-empty base-url whenever attachment-cache-dir is configured; the TrueNAS template always configures attachment-cache-dir."
+      "runtime_fixture_note": "Public runtime values are derived from the exact upstream basic-values fixture; ix_volumes is intentionally omitted because it is renderer-generated context. A non-empty base_url is mandatory because the template always configures attachment-cache-dir.",
+      "runtime_fixture_source": {
+        "path": "trains/community/ntfy/1.1.21/templates/test_values/basic-values.yaml",
+        "blob_sha": "64aef815ff089ec606f8c9d053c318b500daf259"
+      }
     },
     {
       "id": "element-web",
@@ -65,7 +110,38 @@
       "runtime_qualified_targets": [],
       "universal_qualified": false,
       "selection_note": "Secondary low-coupling native-catalog control retained as an independent fallback/discriminator.",
-      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+      "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+      "runtime_fixture_source": {
+        "path": "trains/community/element-web/1.1.27/templates/test_values/basic-values.yaml",
+        "blob_sha": "b80094ca5ecce989b64fa97fb88d2f7151db1b3e"
+      },
+      "runtime_create_values": {
+        "TZ": "Etc/UTC",
+        "resources": {
+          "limits": {
+            "cpus": 2,
+            "memory": 4096
+          }
+        },
+        "element_web": {
+          "additional_envs": []
+        },
+        "run_as": {
+          "user": 568,
+          "group": 568
+        },
+        "network": {
+          "web_port": {
+            "bind_mode": "published",
+            "port_number": 8080
+          },
+          "host_network": false
+        },
+        "storage": {
+          "additional_storage": []
+        }
+      },
+      "runtime_fixture_note": "Public runtime values are derived from the exact upstream basic-values fixture."
     },
     {
       "id": "forgejo-runner",
