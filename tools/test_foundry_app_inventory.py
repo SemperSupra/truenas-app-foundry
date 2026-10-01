@@ -163,6 +163,71 @@ class InventoryTests(unittest.TestCase):
                 ["templates/test_values/basic-values.yaml"],
             )
 
+    def test_qualify_promotes_matching_native_evidence(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = pathlib.Path(td) / "source"
+            write_source(source)
+            inventory = {"schema": MOD.INVENTORY_SCHEMA, "apps": []}
+            spec = {"schema": MOD.BOOTSTRAP_SCHEMA, "entry": sample_entry()}
+            _, proposal = MOD.bootstrap_candidate(inventory, target_doc(), spec, source)
+            source_sha = proposal["apps"][0]["source_contract"]["source_tree_sha256"]
+            evidence = {
+                "schema": MOD.QUALIFICATION_SCHEMA,
+                "app": "probe-app",
+                "version": "1.0.0",
+                "source_tree_sha256": source_sha,
+                "gates": {
+                    "native_validator": "PASS",
+                    "render_install": "PASS",
+                },
+                "toolchain": {
+                    "apps_ref": "a" * 40,
+                    "apps_validation_ref": "b" * 40,
+                    "middleware_base": "ghcr.io/truenas/middleware@sha256:" + "c" * 64,
+                },
+            }
+            receipt, qualified = MOD.qualify_candidate(proposal, evidence)
+            entry = qualified["apps"][0]
+            self.assertEqual(receipt["status"], "CATALOG_READY_CANDIDATE")
+            self.assertEqual(entry["source_contract"]["official_validator"], "PASS")
+            self.assertEqual(entry["catalog_export"]["status"], "catalog-ready-candidate")
+            self.assertEqual(entry["catalog_qualification"]["status"], "PASS")
+            self.assertEqual(
+                entry["catalog_qualification"]["source_tree_sha256"],
+                source_sha,
+            )
+            MOD.validate_inventory(qualified)
+
+    def test_qualify_rejects_source_drift_or_missing_gate(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = pathlib.Path(td) / "source"
+            write_source(source)
+            inventory = {"schema": MOD.INVENTORY_SCHEMA, "apps": []}
+            spec = {"schema": MOD.BOOTSTRAP_SCHEMA, "entry": sample_entry()}
+            _, proposal = MOD.bootstrap_candidate(inventory, target_doc(), spec, source)
+            source_sha = proposal["apps"][0]["source_contract"]["source_tree_sha256"]
+            evidence = {
+                "schema": MOD.QUALIFICATION_SCHEMA,
+                "app": "probe-app",
+                "version": "1.0.0",
+                "source_tree_sha256": "sha256:" + "d" * 64,
+                "gates": {
+                    "native_validator": "PASS",
+                    "render_install": "PASS",
+                },
+                "toolchain": {
+                    "apps_ref": "a" * 40,
+                    "apps_validation_ref": "b" * 40,
+                    "middleware_base": "ghcr.io/truenas/middleware@sha256:" + "c" * 64,
+                },
+            }
+            with self.assertRaises(MOD.InventoryError):
+                MOD.qualify_candidate(proposal, evidence)
+            evidence["source_tree_sha256"] = source_sha
+            evidence["gates"]["render_install"] = "FAIL"
+            with self.assertRaises(MOD.InventoryError):
+                MOD.qualify_candidate(proposal, evidence)
+
     def test_bootstrap_rejects_identity_drift_and_missing_test_values(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
