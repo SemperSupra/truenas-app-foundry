@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import hashlib
 import importlib.util
 import unittest
 from pathlib import Path
@@ -24,7 +25,18 @@ def observation(
         "schema_version": 1,
         "system": {"version": version, "platform": "linux-amd64"},
         "capabilities": {
-            "methods": ["app.query", "app.create", "app.update", "app.redeploy"]
+            "methods": [
+                "system.version",
+                "core.get_methods",
+                "app.query",
+                "app.config",
+                "app.create",
+                "app.update",
+                "app.redeploy",
+                "app.stop",
+                "app.start",
+                "app.delete",
+            ]
         },
         "ownership": {"state": ownership},
         "app": {
@@ -82,6 +94,52 @@ class TargetProfileTests(unittest.TestCase):
             profile = target.get("profile")
             if profile:
                 self.assertTrue((HERE.parent / profile).is_file(), profile)
+
+
+    def test_registry_binds_exact_profile_blob_and_dependency_contract(self):
+        for target in REGISTRY["targets"]:
+            profile = target.get("profile")
+            contract = target.get("profile_contract")
+            self.assertIsInstance(contract, dict, target["version"])
+            path = HERE.parent / profile
+            raw = path.read_bytes()
+            blob_sha = hashlib.sha1(
+                f"blob {len(raw)}\0".encode() + raw
+            ).hexdigest()
+            self.assertEqual(contract["profile_blob_sha"], blob_sha, target["version"])
+            self.assertEqual(contract["middleware_commit"], target["middleware_commit"])
+            self.assertTrue(contract["source_api_family"])
+            self.assertTrue(contract["storage_semantics"])
+            self.assertTrue(contract["apps_gate_semantics"])
+            self.assertIn("app.create", contract["required_public_methods"])
+            self.assertIn("app.delete", contract["required_public_methods"])
+
+    def test_exact_version_alone_does_not_satisfy_profile(self):
+        obs = observation("TrueNAS-25.10.7")
+        obs["capabilities"]["methods"].remove("app.delete")
+        got = mod.discover(obs, REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE_CAPABILITY_MISMATCH")
+        self.assertTrue(got["exact_version_match"])
+        self.assertFalse(got["profile_contract_match"])
+        self.assertIn("app.delete", got["missing_profile_methods"])
+        self.assertFalse(got["apply_qualified"])
+        self.assertTrue(got["qualification_only"])
+
+    def test_plan_binds_observation_and_exact_profile_identity(self):
+        registry = copy.deepcopy(REGISTRY)
+        registry["targets"][0]["apply_qualified"] = True
+        obs = observation()
+        got = mod.plan(obs, DESIRED, registry)
+        self.assertEqual(got["status"], "READY")
+        self.assertEqual(got["action"], "CREATE")
+        self.assertEqual(got["observation_sha256"], mod.canonical_sha256(obs))
+        self.assertEqual(
+            got["profile_identity_sha256"],
+            got["target"]["profile_identity_sha256"],
+        )
+        self.assertTrue(got["preconditions"]["reobserve_profile_contract_before_apply"])
+        self.assertTrue(got["preconditions"]["require_observation_sha256_match_before_apply"])
+        self.assertTrue(got["preconditions"]["require_profile_identity_sha256_match_before_apply"])
 
     def test_exact_nightly_is_never_promoted_from_family_match(self):
         got = mod.discover(
