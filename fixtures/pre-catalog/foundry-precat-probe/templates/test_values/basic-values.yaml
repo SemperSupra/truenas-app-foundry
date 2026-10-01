@@ -1,0 +1,6 @@
+web_port: 38080
+
+resources:
+  limits:
+    cpus: 1
+    memory: 256
