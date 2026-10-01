@@ -1,0 +1,144 @@
+{
+  "schema": "truenas-foundry-product-target-matrix/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#282",
+  "parent_authority": "SemperSupra/truenas-app-foundry-private#274",
+  "target_registry": ".foundry/truenas-target-tracks.json",
+  "required_target_versions": [
+    "25.04.1",
+    "25.04.2.6",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "policy": {
+    "exact_target_cell_required": true,
+    "system_substrate_evidence_not_inherited": true,
+    "control_evidence_not_product_evidence": true,
+    "source_or_render_evidence_not_runtime_evidence": true,
+    "workflow_green_not_acceptance": true,
+    "matrix_growth_invalidates_stale_coverage": true
+  },
+  "entries": [
+    {
+      "id": "garm-controller-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/garm-controller-app/candidate.json"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    },
+    {
+      "id": "wow-sidecar-truenas-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/wow-sidecar-app/candidate.json",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#276"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    },
+    {
+      "id": "litellm-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#262"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36746485575,
+            "artifact_id": 11113851964,
+            "artifact_digest": "sha256:a4031c69ed45b173f9196c231efaaf098a9d8442485e89265e4bb54c3bdc8ae0",
+            "note": "Accepted product-specific T6 evidence exists, but it predates the complete profile-driven F0-F5 recipe and therefore does not satisfy this matrix cell."
+          }
+        }
+      }
+    },
+    {
+      "id": "foundry-rdte-probe",
+      "classification": "qualification-control",
+      "required_for_all_products_claim": false,
+      "source": {
+        "kind": "foundry-born-control",
+        "public_pr": "SemperSupra/truenas-app-foundry#82",
+        "private_authority": "SemperSupra/truenas-app-foundry-private#274"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "all_required_product_cells_qualified": false,
+  "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied."
+}
