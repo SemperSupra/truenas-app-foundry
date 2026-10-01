@@ -1,0 +1,82 @@
+{
+  "schema": "truenas-foundry-official-catalog-controls/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#281",
+  "catalog_source": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "8d93ac087336ab642492209cb707aa1f9556d324"
+  },
+  "policy": {
+    "required_targets_from": ".foundry/truenas-target-tracks.json",
+    "native_catalog_semantics_required": true,
+    "custom_app_fallback_allowed": false,
+    "universal_claim_requires_all_exact_targets_runtime_qualified": true
+  },
+  "controls": [
+    {
+      "id": "ntfy",
+      "role": "universal-candidate-primary",
+      "train": "community",
+      "source_path": "ix-dev/community/ntfy/app.yaml",
+      "source_blob_sha": "187931529f5171bb30f35076e97e16e11cb9fadf",
+      "catalog_version": "1.1.21",
+      "app_version": "v2.28.0",
+      "lib_version": "2.3.4",
+      "date_added": "2025-05-29",
+      "host_mounts": [],
+      "native_catalog_semantics": true,
+      "custom_app_fallback": false,
+      "target_versions": [
+        "25.04.1",
+        "25.04.2.6",
+        "25.10.7",
+        "26.0.0-BETA.3"
+      ],
+      "runtime_qualified_targets": [],
+      "universal_qualified": false,
+      "selection_note": "Primary low-coupling native-catalog control: no host mounts and no external service dependency is declared by the catalog metadata."
+    },
+    {
+      "id": "element-web",
+      "role": "universal-candidate-secondary",
+      "train": "community",
+      "source_path": "ix-dev/community/element-web/app.yaml",
+      "source_blob_sha": "f01c9984a6014948d2da1458b0cb5dece33474f9",
+      "catalog_version": "1.1.27",
+      "app_version": "v1.12.30",
+      "lib_version": "2.3.4",
+      "date_added": "2025-08-14",
+      "host_mounts": [],
+      "native_catalog_semantics": true,
+      "custom_app_fallback": false,
+      "target_versions": [
+        "25.04.1",
+        "25.04.2.6",
+        "25.10.7",
+        "26.0.0-BETA.3"
+      ],
+      "runtime_qualified_targets": [],
+      "universal_qualified": false,
+      "selection_note": "Secondary low-coupling native-catalog control retained as an independent fallback/discriminator."
+    },
+    {
+      "id": "forgejo-runner",
+      "role": "specialized-control",
+      "train": "community",
+      "source_path": "ix-dev/community/forgejo-runner/app.yaml",
+      "source_blob_sha": "a0bc32d4dcf9f710e8dc876805430d911d93eb55",
+      "catalog_version": "2.0.24",
+      "app_version": "13.2.0",
+      "lib_version": "2.3.13",
+      "date_added": "2025-08-22",
+      "host_mounts": [
+        "/var/run/docker.sock"
+      ],
+      "native_catalog_semantics": true,
+      "custom_app_fallback": false,
+      "target_versions": [],
+      "runtime_qualified_targets": [],
+      "universal_qualified": false,
+      "selection_note": "Retained for runner-specific qualification, but not selected to define the generic lifecycle oracle because it couples the control to the host Docker socket and a newer app library revision."
+    }
+  ]
+}
