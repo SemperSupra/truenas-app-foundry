@@ -38,7 +38,7 @@ jobs:
           python3 tools/official_catalog_controls.py \
             --catalog-dir external/truenas-apps \
             --out official-catalog-controls-receipt.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: official-catalog-controls-source-receipt
           path: official-catalog-controls-receipt.json
