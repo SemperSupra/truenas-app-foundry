@@ -11,12 +11,13 @@
     "ref": "d0cb4cbd76b4327c9827cb161234a49ea977a371",
     "dockerfile": "Dockerfile",
     "declared_base": "ghcr.io/truenas/middleware:master",
-    "validator_cli": "/usr/local/bin/apps_dev_charts_validate"
+    "validator_cli": "/usr/local/bin/apps_dev_charts_validate",
+    "admitted_base_digest": "ghcr.io/truenas/middleware@sha256:551176afbe48f1f71f64421101238b2ecd7868983a6428b0657aa8213ed600e7"
   },
   "policy": {
     "exact_git_refs_required": true,
-    "resolve_floating_base_to_digest_per_run": true,
     "floating_validator_image_forbidden": true,
-    "catalog_ready_requires_native_validator_and_render_install": true
+    "catalog_ready_requires_native_validator_and_render_install": true,
+    "admitted_base_digest_required": true
   }
 }

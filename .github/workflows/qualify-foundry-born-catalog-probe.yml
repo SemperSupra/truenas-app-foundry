@@ -1,0 +1,239 @@
+name: Qualify Foundry-born catalog probe
+
+on:
+  pull_request:
+    paths:
+      - "fixtures/foundry-rdte-probe/**"
+      - "fixtures/foundry-rdte-probe.seed.json"
+      - ".foundry/bootstrap/foundry-rdte-probe.json"
+      - ".foundry/truenas-catalog-toolchain.json"
+      - "tools/foundry_app_inventory.py"
+      - "tools/foundry_inventory_materialize.py"
+      - "tools/package_truenas_deployment_artifact.py"
+      - "tools/patch_truenas_ci_for_exact_validator.py"
+      - ".github/workflows/qualify-foundry-born-catalog-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundry-born-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Bootstrap exact Foundry source into proposed inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          spec=".foundry/bootstrap/foundry-rdte-probe.json"
+          source_ref="$(jq -r '.entry.source.ref' "$spec")"
+          source_path="$(jq -r '.entry.source.path' "$spec")"
+          test "$source_path" = "fixtures/foundry-rdte-probe"
+          git cat-file -e "$source_ref^{commit}"
+          git diff --quiet "$source_ref" HEAD -- "$source_path"
+
+          proposal="$RUNNER_TEMP/foundry-rdte-probe.inventory.json"
+          bootstrap_receipt="$RUNNER_TEMP/foundry-rdte-probe.bootstrap.json"
+          python3 tools/foundry_app_inventory.py bootstrap \
+            --spec "$spec" \
+            --source-root "$source_path" \
+            --proposal-out "$proposal" \
+            --receipt-out "$bootstrap_receipt"
+
+          test "$(jq -r '.status' "$bootstrap_receipt")" = "READY_FOR_GIT_REVIEW"
+          test "$(jq -r '.source_contract.structural_preflight' "$bootstrap_receipt")" = "PASS"
+          test "$(jq -r '.source_contract.official_validator' "$bootstrap_receipt")" = "PENDING"
+
+          for version in 25.04.1 25.10.7 26.0.0-BETA.3; do
+            python3 tools/foundry_app_inventory.py \
+              --inventory "$proposal" \
+              --targets .foundry/truenas-target-tracks.json \
+              resolve \
+              --app foundry-rdte-probe \
+              --version 1.0.0 \
+              --target-version "$version" \
+              > "$RUNNER_TEMP/resolve-$version.json"
+            test "$(jq -r '.target.version' "$RUNNER_TEMP/resolve-$version.json")" = "$version"
+          done
+
+      - name: Native validate, render-install, and materialize exact Foundry source
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract=".foundry/truenas-catalog-toolchain.json"
+          apps_repo="$(jq -r '.apps.repository' "$contract")"
+          apps_ref="$(jq -r '.apps.ref' "$contract")"
+          validator_repo="$(jq -r '.apps_validation.repository' "$contract")"
+          validator_ref="$(jq -r '.apps_validation.ref' "$contract")"
+          declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
+          base_digest="$(jq -r '.apps_validation.admitted_base_digest' "$contract")"
+          source_ref="$(jq -r '.entry.source.ref' .foundry/bootstrap/foundry-rdte-probe.json)"
+          proposal="$RUNNER_TEMP/foundry-rdte-probe.inventory.json"
+          bootstrap_receipt="$RUNNER_TEMP/foundry-rdte-probe.bootstrap.json"
+
+          root="$(mktemp -d)"
+          trap 'sudo rm -rf -- "$root"' EXIT
+
+          fetch_exact() {
+            local repo="$1" ref="$2" dest="$3"
+            git init -q "$dest"
+            git -C "$dest" remote add origin "$repo"
+            git -C "$dest" fetch -q --depth=1 origin "$ref"
+            test "$(git -C "$dest" rev-parse FETCH_HEAD)" = "$ref"
+            git -C "$dest" checkout -q --detach FETCH_HEAD
+          }
+
+          fetch_exact "$apps_repo" "$apps_ref" "$root/apps"
+          fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
+          git -C "$root/apps" branch -f master "$apps_ref"
+
+          cp -a fixtures/foundry-rdte-probe "$root/apps/ix-dev/community/foundry-rdte-probe"
+          git -C "$root/apps" config user.name "Foundry RDTE"
+          git -C "$root/apps" config user.email "foundry-rdte@invalid.example"
+          git -C "$root/apps" add ix-dev/community/foundry-rdte-probe
+          git -C "$root/apps" commit -q -m "Foundry RDTE probe candidate"
+          test -n "$(git -C "$root/apps" diff --name-only master -- ix-dev/community/foundry-rdte-probe)"
+
+          grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
+          test -n "$base_digest"
+          docker pull --quiet "$base_digest" >/dev/null
+          python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); t=p.read_text(encoding="utf-8"); old="FROM "+sys.argv[2]; new="FROM "+sys.argv[3]; assert t.count(old)==1; p.write_text(t.replace(old,new,1),encoding="utf-8")' \
+            "$root/apps_validation/Dockerfile" "$declared_base" "$base_digest"
+
+          image="foundry/apps-validation:${validator_ref:0:12}"
+          docker build --quiet -t "$image" "$root/apps_validation" >/dev/null
+          image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+          test -n "$image_id"
+
+          docker run --rm \
+            -e FAKE_ENV=1 \
+            -v "$root/apps:/work" \
+            -w /work \
+            "$image" \
+            /bin/bash -lc \
+            'git config --global --add safe.directory /work && exec /usr/local/bin/apps_dev_charts_validate validate --path /work'
+
+          original_ci_sha="$(sha256sum "$root/apps/.github/scripts/ci.py" | awk '{print $1}')"
+          python3 tools/patch_truenas_ci_for_exact_validator.py \
+            --input "$root/apps/.github/scripts/ci.py" \
+            --output "$root/apps/.github/scripts/ci.py.patched" \
+            --image "$image"
+          mv "$root/apps/.github/scripts/ci.py.patched" "$root/apps/.github/scripts/ci.py"
+          patched_ci_sha="$(sha256sum "$root/apps/.github/scripts/ci.py" | awk '{print $1}')"
+          test "$original_ci_sha" != "$patched_ci_sha"
+
+          (
+            cd "$root/apps"
+            python3 .github/scripts/ci.py \
+              --train community \
+              --app foundry-rdte-probe \
+              --test-file basic-values.yaml
+          )
+
+          rendered="$root/apps/ix-dev/community/foundry-rdte-probe/templates/rendered/docker-compose.yaml"
+          test -f "$rendered"
+          docker compose \
+            -p foundry-rdte-probe-materialize \
+            -f "$rendered" \
+            config --format json \
+            > "$RUNNER_TEMP/foundry-rdte-probe.compose.json"
+
+          qualification_evidence="$RUNNER_TEMP/foundry-rdte-probe.qualification-evidence.json"
+          qualified_inventory="$RUNNER_TEMP/foundry-rdte-probe.qualified.inventory.json"
+          qualification_receipt="$RUNNER_TEMP/foundry-rdte-probe.qualification.json"
+
+          jq -n \
+            --arg source_tree_sha "$(jq -r '.source_contract.source_tree_sha256' "$bootstrap_receipt")" \
+            --arg apps_ref "$apps_ref" \
+            --arg validator_ref "$validator_ref" \
+            --arg base_digest "$base_digest" \
+            '{
+              schema:"truenas-foundry-catalog-candidate-evidence/v1",
+              app:"foundry-rdte-probe",
+              version:"1.0.0",
+              source_tree_sha256:$source_tree_sha,
+              gates:{native_validator:"PASS",render_install:"PASS"},
+              toolchain:{
+                apps_ref:$apps_ref,
+                apps_validation_ref:$validator_ref,
+                middleware_base:$base_digest
+              }
+            }' > "$qualification_evidence"
+
+          python3 tools/foundry_app_inventory.py \
+            --inventory "$proposal" \
+            qualify \
+            --evidence "$qualification_evidence" \
+            --qualified-out "$qualified_inventory" \
+            --receipt-out "$qualification_receipt"
+
+          test "$(jq -r '.status' "$qualification_receipt")" = "CATALOG_READY_CANDIDATE"
+          test "$(jq -r '.apps[0].source_contract.official_validator' "$qualified_inventory")" = "PASS"
+          test "$(jq -r '.apps[0].catalog_export.status' "$qualified_inventory")" = "catalog-ready-candidate"
+          test "$(jq -r '.apps[0].catalog_qualification.status' "$qualified_inventory")" = "PASS"
+
+          for version in 25.04.1 25.10.7 26.0.0-BETA.3; do
+            python3 tools/foundry_inventory_materialize.py \
+              --inventory "$qualified_inventory" \
+              --targets .foundry/truenas-target-tracks.json \
+              --compose "$RUNNER_TEMP/foundry-rdte-probe.compose.json" \
+              --app foundry-rdte-probe \
+              --version 1.0.0 \
+              --target-version "$version" \
+              --artifact-out "$RUNNER_TEMP/foundry-rdte-probe.$version.artifact.json" \
+              --receipt-out "$RUNNER_TEMP/foundry-rdte-probe.$version.materialize.json"
+            test "$(jq -r '.catalog_validator' "$RUNNER_TEMP/foundry-rdte-probe.$version.materialize.json")" = "PASS"
+          done
+
+          test "$(cat "$RUNNER_TEMP"/foundry-rdte-probe.*.materialize.json | jq -r '.materialization_identity' | sort -u | wc -l)" -eq 1
+
+          jq -n \
+            --arg source_ref "$source_ref" \
+            --arg apps_ref "$apps_ref" \
+            --arg validator_ref "$validator_ref" \
+            --arg base_digest "$base_digest" \
+            --arg image_id "$image_id" \
+            --arg original_ci_sha "sha256:$original_ci_sha" \
+            --arg patched_ci_sha "sha256:$patched_ci_sha" \
+            --arg source_tree_sha "$(jq -r '.source_contract.source_tree_sha256' "$bootstrap_receipt")" \
+            --arg materialization_identity "$(jq -r '.materialization_identity' "$RUNNER_TEMP/foundry-rdte-probe.25.10.7.materialize.json")" \
+            '{
+              schema:"truenas-foundry-born-catalog-probe-receipt/v1",
+              classification:"SUPPORTED",
+              oracleSatisfied:true,
+              phase:"foundry-born-pre-catalog",
+              app:{id:"foundry-rdte-probe",version:"1.0.0",source_ref:$source_ref,source_tree_sha256:$source_tree_sha},
+              toolchain:{apps_ref:$apps_ref,apps_validation_ref:$validator_ref,middleware_base:$base_digest,validator_image_id:$image_id,upstream_ci_sha256:$original_ci_sha,patched_ci_sha256:$patched_ci_sha},
+              gates:{bootstrap:"PASS",native_validator:"PASS",render_install:"PASS",catalog_qualification:"PASS",inventory_materialization:"PASS"},
+              exact_targets:["25.04.1","25.10.7","26.0.0-BETA.3"],
+              materialization_identity:$materialization_identity,
+              catalog_ready_candidate:true,
+              non_claims:["not submitted to the official TrueNAS catalog","no target mutation","no publication approval","runtime compatibility remains exact-version gated"]
+            }' > "$RUNNER_TEMP/foundry-rdte-probe.overall.json"
+
+          cat "$RUNNER_TEMP/foundry-rdte-probe.overall.json"
+
+      - name: Upload Foundry-born probe evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-born-catalog-probe
+          path: |
+            ${{ runner.temp }}/foundry-rdte-probe.bootstrap.json
+            ${{ runner.temp }}/foundry-rdte-probe.inventory.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualified.inventory.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualification-evidence.json
+            ${{ runner.temp }}/foundry-rdte-probe.qualification.json
+            ${{ runner.temp }}/resolve-*.json
+            ${{ runner.temp }}/foundry-rdte-probe.compose.json
+            ${{ runner.temp }}/foundry-rdte-probe.*.artifact.json
+            ${{ runner.temp }}/foundry-rdte-probe.*.materialize.json
+            ${{ runner.temp }}/foundry-rdte-probe.overall.json
+          if-no-files-found: warn
+          retention-days: 7

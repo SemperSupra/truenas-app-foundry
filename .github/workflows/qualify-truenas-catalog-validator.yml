@@ -37,6 +37,7 @@ jobs:
           validator_repo="$(jq -r '.apps_validation.repository' "$contract")"
           validator_ref="$(jq -r '.apps_validation.ref' "$contract")"
           declared_base="$(jq -r '.apps_validation.declared_base' "$contract")"
+          base_digest="$(jq -r '.apps_validation.admitted_base_digest' "$contract")"
 
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
@@ -54,25 +55,32 @@ jobs:
           fetch_exact "$validator_repo" "$validator_ref" "$root/apps_validation"
 
           # Match the upstream validator's PR topology without introducing a
-          # floating branch: local master is pinned to the exact admitted apps
-          # commit, then one harmless README-only working-tree delta forces the
-          # native validator to exercise a real changed app.
+          # floating branch. The exact admitted apps commit is the local master
+          # base; the ephemeral candidate changes README and bumps the catalog
+          # version exactly one patch so TrueNAS must validate a real, policy-
+          # conformant changed app.
           git -C "$root/apps" branch -f master "$apps_ref"
           printf '\n<!-- Foundry V1 native-validator positive control; ephemeral only -->\n' \
             >> "$root/apps/ix-dev/community/element-web/README.md"
-          test "$(git -C "$root/apps" diff --name-only master)" = \
-            "ix-dev/community/element-web/README.md"
+          python3 - "$root/apps/ix-dev/community/element-web/app.yaml" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          old = "version: 1.1.27"
+          new = "version: 1.1.28"
+          if text.count(old) != 1:
+              raise SystemExit("exact pinned element-web catalog version drifted")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          mapfile -t changed < <(git -C "$root/apps" diff --name-only master)
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "ix-dev/community/element-web/README.md"
+          test "${changed[1]}" = "ix-dev/community/element-web/app.yaml"
 
           grep -Fxq "FROM $declared_base" "$root/apps_validation/Dockerfile"
 
-          docker pull --quiet "$declared_base" >/dev/null
-          base_digest="$(
-            docker image inspect "$declared_base" \
-              --format '{{range .RepoDigests}}{{println .}}{{end}}' \
-            | grep '^ghcr.io/truenas/middleware@sha256:' \
-            | head -n1
-          )"
           test -n "$base_digest"
+          docker pull --quiet "$base_digest" >/dev/null
 
           python3 - "$root/apps_validation/Dockerfile" "$declared_base" "$base_digest" <<'PY'
           import pathlib, sys
@@ -98,9 +106,10 @@ jobs:
             /bin/bash -lc \
             'git config --global --add safe.directory /work && exec /usr/local/bin/apps_dev_charts_validate validate --path /work'
 
-          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" <<'PY'
-          import json, sys
-          print(json.dumps({
+          receipt="$RUNNER_TEMP/truenas-catalog-validator-v1-receipt.json"
+          python3 - "$apps_ref" "$validator_ref" "$base_digest" "$image_id" "$receipt" <<'PY'
+          import json, pathlib, sys
+          payload = {
               "schema": "truenas-foundry-catalog-validator-receipt/v1",
               "classification": "SUPPORTED",
               "oracleSatisfied": True,
@@ -111,11 +120,23 @@ jobs:
               "built_validator_image_id": sys.argv[4],
               "validator_command": "/usr/local/bin/apps_dev_charts_validate validate --path /work",
               "base_ref": sys.argv[1],
-              "positive_control": "community/element-web README-only ephemeral diff",
+              "positive_control": "community/element-web ephemeral README change + one patch catalog-version bump",
               "non_claims": [
                   "render/install test suite not yet qualified by this rung",
                   "no Foundry candidate app admitted",
                   "no catalog-ready claim"
               ]
-          }, indent=2, sort_keys=True))
+          }
+          text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+          pathlib.Path(sys.argv[5]).write_text(text, encoding="utf-8")
+          print(text, end="")
           PY
+
+      - name: Upload native validator evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: truenas-catalog-validator-v1
+          path: ${{ runner.temp }}/truenas-catalog-validator-v1-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
