@@ -126,6 +126,10 @@ def validate_entry(entry: Any, index: int) -> tuple[str, str]:
             raise InventoryError(
                 f"{prefix}.catalog_qualification requires native_validator=PASS and render_install=PASS"
             )
+        if not isinstance(source_contract, dict) or source_contract.get("official_validator") != "PASS":
+            raise InventoryError(
+                f"{prefix}.catalog_qualification requires source_contract.official_validator=PASS"
+            )
     return app_id, version
 
 
