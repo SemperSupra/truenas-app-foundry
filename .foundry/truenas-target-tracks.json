@@ -19,7 +19,7 @@
       "accepted_runtime_rung": null,
       "apply_qualified": false,
       "profile_contract": {
-        "profile_blob_sha": "aee2996b85f72f3ca06ca79894e1f67fa1d1e8c1",
+        "profile_blob_sha": "e8bd580a7dfce489e980e09733ad6abe16ae0d98",
         "middleware_commit": "74ab5a2d373be4097dece257d00e1086376333ba",
         "source_api_family": "v25_04_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
@@ -49,7 +49,7 @@
       "accepted_runtime_rung": "consumer-specific",
       "apply_qualified": false,
       "profile_contract": {
-        "profile_blob_sha": "6395faa7e0420b9c9927bd402f7e4a416dc1cc71",
+        "profile_blob_sha": "1b5b62b3ac13163ece5b09342b2a58a9f631b295",
         "middleware_commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6",
         "source_api_family": "v25_04_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
@@ -87,7 +87,7 @@
         "oracle_satisfied": true
       },
       "profile_contract": {
-        "profile_blob_sha": "1320cc849a9cc1e7ff6bd78989fc0e4708397248",
+        "profile_blob_sha": "d1e672ea076a89c144b60d9d3b40b67bfb9916fd",
         "middleware_commit": "8ede398839710e56893d88ce85088139d8fab18e",
         "source_api_family": "v25_10_0",
         "storage_semantics": "zfs.dataset.query/create/mount",
@@ -165,7 +165,7 @@
         ]
       },
       "profile_contract": {
-        "profile_blob_sha": "a8ebc533dc84172520eba2237ffeeb52b102dc24",
+        "profile_blob_sha": "876be17246430a91fe99f89507adbdf0efe87ac6",
         "middleware_commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3",
         "source_api_family": "v26_0_0",
         "storage_semantics": "zfs.resource.query_impl/pool.dataset.create_impl/zfs.resource.mount",
