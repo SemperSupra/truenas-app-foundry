@@ -25,9 +25,9 @@ def observation(
         "schema_version": 1,
         "system": {"version": version, "platform": "linux-amd64"},
         "capabilities": {
+            "bootstrap_probes": {"core.get_methods": True},
             "methods": [
                 "system.version",
-                "core.get_methods",
                 "app.query",
                 "app.config",
                 "app.create",
@@ -111,6 +111,8 @@ class TargetProfileTests(unittest.TestCase):
             self.assertTrue(contract["source_api_family"])
             self.assertTrue(contract["storage_semantics"])
             self.assertTrue(contract["apps_gate_semantics"])
+            self.assertEqual(contract["bootstrap_capability_probe"], "core.get_methods")
+            self.assertNotIn("core.get_methods", contract["required_public_methods"])
             self.assertIn("app.create", contract["required_public_methods"])
             self.assertIn("app.delete", contract["required_public_methods"])
 
@@ -134,6 +136,21 @@ class TargetProfileTests(unittest.TestCase):
                 if item["path"] == "src/middlewared/middlewared/plugins/apps/upgrade.py"
             )
             self.assertEqual(source["blob_sha"], expected[target["version"]])
+
+    def test_bootstrap_probe_is_proven_directly_not_by_self_listing(self):
+        obs = observation()
+        self.assertNotIn("core.get_methods", obs["capabilities"]["methods"])
+        got = mod.discover(obs, REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE")
+        self.assertTrue(got["bootstrap_probe_satisfied"])
+        self.assertEqual(got["missing_bootstrap_probes"], [])
+
+        failed = observation()
+        failed["capabilities"]["bootstrap_probes"]["core.get_methods"] = False
+        got = mod.discover(failed, REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE_CAPABILITY_MISMATCH")
+        self.assertFalse(got["bootstrap_probe_satisfied"])
+        self.assertEqual(got["missing_bootstrap_probes"], ["core.get_methods"])
 
     def test_exact_version_alone_does_not_satisfy_profile(self):
         obs = observation("TrueNAS-25.10.7")
