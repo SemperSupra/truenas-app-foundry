@@ -61,9 +61,37 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
 
     exact = next((t for t in registry["targets"] if t.get("version") == version), None)
     if exact is not None:
+        contract = required_mapping(exact.get("profile_contract"), f"target {version}.profile_contract")
+        required_methods = contract.get("required_public_methods")
+        if not isinstance(required_methods, list) or not required_methods or not all(
+            isinstance(x, str) and x for x in required_methods
+        ):
+            raise TargetProfileError(f"target {version}.profile_contract.required_public_methods must be non-empty strings")
+        missing_profile_methods = sorted(set(required_methods) - _methods(observation))
+        profile_identity = {
+            "profile": exact.get("profile"),
+            "profile_blob_sha": contract.get("profile_blob_sha"),
+            "middleware_ref": exact.get("middleware_ref"),
+            "middleware_commit": contract.get("middleware_commit"),
+            "source_api_family": contract.get("source_api_family"),
+            "storage_semantics": contract.get("storage_semantics"),
+            "apps_gate_semantics": contract.get("apps_gate_semantics"),
+        }
+        if not all(isinstance(v, str) and v for v in profile_identity.values()):
+            raise TargetProfileError(f"target {version} profile identity is incomplete")
+        profile_identity_sha256 = canonical_sha256(profile_identity)
+        profile_contract_match = not missing_profile_methods
+        registry_apply_qualified = bool(exact.get("apply_qualified", False))
+        effective_apply_qualified = registry_apply_qualified and profile_contract_match
         result = {
             "schema_version": 1,
-            "status": "EXACT_PROFILE" if exact.get("profile") else "EXACT_TARGET_PROFILE_PENDING",
+            "status": (
+                "EXACT_PROFILE"
+                if exact.get("profile") and profile_contract_match
+                else "EXACT_PROFILE_CAPABILITY_MISMATCH"
+                if exact.get("profile")
+                else "EXACT_TARGET_PROFILE_PENDING"
+            ),
             "observed_version": version,
             "channel": exact.get("channel"),
             "profile": exact.get("profile"),
@@ -72,9 +100,15 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
             "source_qualification": exact.get("source_qualification"),
             "runtime_qualification": exact.get("runtime_qualification"),
             "accepted_runtime_rung": exact.get("accepted_runtime_rung"),
-            "apply_qualified": bool(exact.get("apply_qualified", False)),
+            "registry_apply_qualified": registry_apply_qualified,
+            "apply_qualified": effective_apply_qualified,
             "exact_version_match": True,
-            "qualification_only": not bool(exact.get("apply_qualified", False)),
+            "profile_contract_match": profile_contract_match,
+            "missing_profile_methods": missing_profile_methods,
+            "profile_identity": profile_identity,
+            "profile_identity_sha256": profile_identity_sha256,
+            "observation_sha256": canonical_sha256(observation),
+            "qualification_only": not effective_apply_qualified,
         }
         result["discovery_sha256"] = canonical_sha256(result)
         return result
@@ -145,6 +179,11 @@ def plan(observation: dict[str, Any], desired: dict[str, Any], registry: dict[st
         blockers.append("exact target version/profile is not known")
     if not d.get("profile"):
         blockers.append("exact source/runtime compatibility profile is not materialized")
+    if not d.get("profile_contract_match", False):
+        blockers.append(
+            "observed target capabilities do not satisfy exact profile: "
+            + ", ".join(d.get("missing_profile_methods", []))
+        )
     if not d["apply_qualified"]:
         blockers.append("target profile is not apply-qualified")
     if missing_methods:
@@ -180,10 +219,16 @@ def plan(observation: dict[str, Any], desired: dict[str, Any], registry: dict[st
         "target": d,
         "app_name": desired.get("app_name"),
         "materialization_identity": desired_identity or None,
+        "observation_sha256": d.get("observation_sha256"),
+        "profile_identity_sha256": d.get("profile_identity_sha256"),
+        "discovery_sha256": d.get("discovery_sha256"),
         "missing_methods": missing_methods,
         "blockers": blockers,
         "preconditions": {
             "reobserve_exact_version_before_apply": True,
+            "reobserve_profile_contract_before_apply": True,
+            "require_observation_sha256_match_before_apply": True,
+            "require_profile_identity_sha256_match_before_apply": True,
             "reobserve_ownership_before_apply": True,
             "reobserve_required_methods_before_apply": True,
             "foreign_state_adoption_allowed": False,
@@ -202,6 +247,8 @@ def verify(observation: dict[str, Any], desired: dict[str, Any], registry: dict[
     failures: list[str] = []
     if not d["exact_version_match"]:
         failures.append("target version no longer matches an exact profile")
+    if not d.get("profile_contract_match", False):
+        failures.append("target capability fingerprint no longer satisfies the exact profile")
     if str(ownership.get("state", "")) != "owned":
         failures.append("target app is not observed as Foundry-owned")
     if not bool(app.get("present", False)):
@@ -220,6 +267,9 @@ def verify(observation: dict[str, Any], desired: dict[str, Any], registry: dict[
         "status": "VERIFIED" if not failures else "VERIFY_FAILED",
         "target": d,
         "app_name": desired.get("app_name"),
+        "observation_sha256": d.get("observation_sha256"),
+        "profile_identity_sha256": d.get("profile_identity_sha256"),
+        "discovery_sha256": d.get("discovery_sha256"),
         "failures": failures,
     }
     result["verification_sha256"] = canonical_sha256(result)
