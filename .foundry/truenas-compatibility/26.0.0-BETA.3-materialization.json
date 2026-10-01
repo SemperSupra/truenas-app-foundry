@@ -119,6 +119,15 @@
         "app.upgrade_impl",
         "if app['upgrade_available'] is False:"
       ]
+    },
+    {
+      "path": "src/middlewared/middlewared/service/core_service.py",
+      "blob_sha": "2a0ed5d4476ed9b40df332bfd01300c3167bc1dd",
+      "contains": [
+        "@api_method(CoreGetMethodsArgs, CoreGetMethodsResult, authorization_required=False, pass_app=True)",
+        "def get_methods(self, app, service, target):",
+        "Return methods metadata of every available service."
+      ]
     }
   ],
   "platform_features": {
@@ -222,7 +231,8 @@
       "exact 26.0.0-BETA.3 Custom App compose contract",
       "exact 26.0.0-BETA.3 certificate and ixVolume normalization/action identities",
       "exact 26.0.0-BETA.3 app state and Docker status schemas",
-      "exact 26.0.0-BETA.3 native catalog upgrade source contract"
+      "exact 26.0.0-BETA.3 native catalog upgrade source contract",
+      "exact 26.0.0-BETA.3 capability bootstrap versus discovered-public-method boundary"
     ],
     "does_not_qualify": [
       "T4/T5 live runtime behavior until Agent Dispatch evidence is accepted",
@@ -282,6 +292,7 @@
     },
     "apply_preconditions": [
       "reobserve exact system.version",
+      "reobserve core.get_methods bootstrap call succeeds",
       "reobserve required methods",
       "reobserve ownership/provenance",
       "require plan target/profile identity unchanged"
@@ -309,6 +320,12 @@
       "job_backed": true,
       "adapter": "official-catalog",
       "applicability": "observed custom_app=false and upgrade_available=true"
+    },
+    "capability_probe_semantics": {
+      "bootstrap_method": "core.get_methods",
+      "success_condition": "call succeeds and returns a method mapping",
+      "self_listing_required": false,
+      "returned_map_role": "validate discovered public adapter methods only"
     }
   }
 }
