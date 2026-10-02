@@ -17,12 +17,16 @@ REGISTRY = MOD.load(HERE.parent / ".foundry" / "truenas-target-tracks.json", "re
 
 
 class OfficialCatalogControlTests(unittest.TestCase):
-    def test_current_manifest_is_valid_but_runtime_pending(self):
+    def test_current_manifest_is_valid_with_one_runtime_row_accepted(self):
         result = MOD.validate(copy.deepcopy(MANIFEST), copy.deepcopy(REGISTRY))
         self.assertEqual(result["status"], "PASS")
         ntfy = next(x for x in result["controls"] if x["id"] == "ntfy")
         self.assertFalse(ntfy["universal_qualified"])
-        self.assertEqual(set(ntfy["pending_targets"]), set(result["required_targets"]))
+        self.assertEqual(ntfy["runtime_qualified_targets"], ["25.04.1"])
+        self.assertEqual(
+            set(ntfy["pending_targets"]),
+            set(result["required_targets"]) - {"25.04.1"},
+        )
 
     def test_universal_candidate_requires_runtime_fixture_identity_and_values(self):
         manifest = copy.deepcopy(MANIFEST)
