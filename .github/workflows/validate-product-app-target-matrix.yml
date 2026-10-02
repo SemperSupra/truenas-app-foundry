@@ -1,0 +1,33 @@
+name: Validate Foundry product target matrix
+
+on:
+  pull_request:
+    paths:
+      - ".foundry/product-app-target-matrix.json"
+      - ".foundry/truenas-target-tracks.json"
+      - "candidates/**/candidate.json"
+      - "tools/validate_product_app_target_matrix.py"
+      - "tools/test_validate_product_app_target_matrix.py"
+      - ".github/workflows/validate-product-app-target-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Unit tests
+        run: python3 -m unittest -v tools/test_validate_product_app_target_matrix.py
+      - name: Validate exact product x target coverage
+        run: |
+          python3 tools/validate_product_app_target_matrix.py --out /tmp/product-target-matrix-receipt.json
+          python3 -m json.tool /tmp/product-target-matrix-receipt.json
+      - name: Upload public-safe matrix receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-product-target-matrix
+          path: /tmp/product-target-matrix-receipt.json
+          retention-days: 7
