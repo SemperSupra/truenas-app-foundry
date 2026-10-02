@@ -22,10 +22,10 @@ class OfficialCatalogControlTests(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         ntfy = next(x for x in result["controls"] if x["id"] == "ntfy")
         self.assertFalse(ntfy["universal_qualified"])
-        self.assertEqual(ntfy["runtime_qualified_targets"], ["25.04.1"])
+        self.assertEqual(ntfy["runtime_qualified_targets"], ["25.04.1", "25.04.2.6"])
         self.assertEqual(
             set(ntfy["pending_targets"]),
-            set(result["required_targets"]) - {"25.04.1"},
+            set(result["required_targets"]) - {"25.04.1", "25.04.2.6"},
         )
 
     def test_universal_candidate_requires_runtime_fixture_identity_and_values(self):
