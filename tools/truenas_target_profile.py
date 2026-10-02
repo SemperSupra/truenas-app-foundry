@@ -68,6 +68,13 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
         ):
             raise TargetProfileError(f"target {version}.profile_contract.required_public_methods must be non-empty strings")
         missing_profile_methods = sorted(set(required_methods) - _methods(observation))
+        bootstrap_probe = contract.get("bootstrap_capability_probe")
+        if not isinstance(bootstrap_probe, str) or not bootstrap_probe:
+            raise TargetProfileError(
+                f"target {version}.profile_contract.bootstrap_capability_probe must be a non-empty string"
+            )
+        bootstrap_probe_satisfied = _bootstrap_probes(observation).get(bootstrap_probe) is True
+        missing_bootstrap_probes = [] if bootstrap_probe_satisfied else [bootstrap_probe]
         profile_identity = {
             "profile": exact.get("profile"),
             "profile_blob_sha": contract.get("profile_blob_sha"),
@@ -76,11 +83,12 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
             "source_api_family": contract.get("source_api_family"),
             "storage_semantics": contract.get("storage_semantics"),
             "apps_gate_semantics": contract.get("apps_gate_semantics"),
+            "bootstrap_capability_probe": bootstrap_probe,
         }
         if not all(isinstance(v, str) and v for v in profile_identity.values()):
             raise TargetProfileError(f"target {version} profile identity is incomplete")
         profile_identity_sha256 = canonical_sha256(profile_identity)
-        profile_contract_match = not missing_profile_methods
+        profile_contract_match = not missing_profile_methods and bootstrap_probe_satisfied
         registry_apply_qualified = bool(exact.get("apply_qualified", False))
         effective_apply_qualified = registry_apply_qualified and profile_contract_match
         result = {
@@ -105,6 +113,9 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
             "exact_version_match": True,
             "profile_contract_match": profile_contract_match,
             "missing_profile_methods": missing_profile_methods,
+            "bootstrap_capability_probe": bootstrap_probe,
+            "bootstrap_probe_satisfied": bootstrap_probe_satisfied,
+            "missing_bootstrap_probes": missing_bootstrap_probes,
             "profile_identity": profile_identity,
             "profile_identity_sha256": profile_identity_sha256,
             "observation_sha256": canonical_sha256(observation),
@@ -153,6 +164,18 @@ def discover(observation: dict[str, Any], registry: dict[str, Any]) -> dict[str,
     return result
 
 
+def _bootstrap_probes(observation: dict[str, Any]) -> dict[str, bool]:
+    caps = required_mapping(observation.get("capabilities", {}), "observation.capabilities")
+    probes = caps.get("bootstrap_probes", {})
+    if not isinstance(probes, dict) or not all(
+        isinstance(k, str) and k and isinstance(v, bool) for k, v in probes.items()
+    ):
+        raise TargetProfileError(
+            "observation.capabilities.bootstrap_probes must be an object of boolean results"
+        )
+    return probes
+
+
 def _methods(observation: dict[str, Any]) -> set[str]:
     caps = required_mapping(observation.get("capabilities", {}), "observation.capabilities")
     methods = caps.get("methods", [])
@@ -180,9 +203,18 @@ def plan(observation: dict[str, Any], desired: dict[str, Any], registry: dict[st
     if not d.get("profile"):
         blockers.append("exact source/runtime compatibility profile is not materialized")
     if not d.get("profile_contract_match", False):
+        capability_gaps = []
+        if d.get("missing_bootstrap_probes"):
+            capability_gaps.append(
+                "bootstrap probes=" + ", ".join(d["missing_bootstrap_probes"])
+            )
+        if d.get("missing_profile_methods"):
+            capability_gaps.append(
+                "public methods=" + ", ".join(d["missing_profile_methods"])
+            )
         blockers.append(
             "observed target capabilities do not satisfy exact profile: "
-            + ", ".join(d.get("missing_profile_methods", []))
+            + "; ".join(capability_gaps)
         )
     if not d["apply_qualified"]:
         blockers.append("target profile is not apply-qualified")
@@ -227,6 +259,7 @@ def plan(observation: dict[str, Any], desired: dict[str, Any], registry: dict[st
         "preconditions": {
             "reobserve_exact_version_before_apply": True,
             "reobserve_profile_contract_before_apply": True,
+            "reobserve_bootstrap_capability_probe_before_apply": True,
             "require_observation_sha256_match_before_apply": True,
             "require_profile_identity_sha256_match_before_apply": True,
             "reobserve_ownership_before_apply": True,

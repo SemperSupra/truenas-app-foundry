@@ -169,6 +169,24 @@
         "call('app.start', 'actual-budget', job=True)",
         "call('app.delete', 'actual-budget', {'remove_ix_volumes': True, 'remove_images': True}, job=True)"
       ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/upgrade.py",
+      "blob_sha": "b22da7e2d512161979adec60548b796ab56943e2",
+      "contains": [
+        "def upgrade(self, job, app_name, options):",
+        "if app['upgrade_available'] is False:",
+        "if app['custom_app']:"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/service/core_service.py",
+      "blob_sha": "1876ace7ab760e5daee8af99c372d19c7b426ecb",
+      "contains": [
+        "@private",
+        "def get_methods(self, app, service, target):",
+        "Return methods metadata of every available service."
+      ]
     }
   ],
   "platform_features": {
@@ -263,7 +281,9 @@
       "exact 25.04.1 source-level catalog versus Custom App pipeline boundary",
       "exact 25.04.1 middleware normalization/action identities",
       "exact 25.04.1 MVP feature classification contract",
-      "exact 25.04.1 Custom App lifecycle/read-back assumptions"
+      "exact 25.04.1 Custom App lifecycle/read-back assumptions",
+      "exact 25.04.1 native catalog upgrade source contract",
+      "exact 25.04.1 capability bootstrap versus discovered-public-method boundary"
     ],
     "does_not_qualify": [
       "live TrueNAS API transport or RBAC",
@@ -324,6 +344,7 @@
     },
     "apply_preconditions": [
       "reobserve exact system.version",
+      "reobserve core.get_methods bootstrap call succeeds",
       "reobserve required methods",
       "reobserve ownership/provenance",
       "require plan target/profile identity unchanged"
@@ -344,6 +365,19 @@
       "method": "app.start",
       "arguments": "app_name",
       "job_backed": true
+    },
+    "app_upgrade": {
+      "method": "app.upgrade",
+      "arguments": "app_name-plus-options",
+      "job_backed": true,
+      "adapter": "official-catalog",
+      "applicability": "observed custom_app=false and upgrade_available=true"
+    },
+    "capability_probe_semantics": {
+      "bootstrap_method": "core.get_methods",
+      "success_condition": "call succeeds and returns a method mapping",
+      "self_listing_required": false,
+      "returned_map_role": "validate discovered public adapter methods only"
     }
   }
 }
