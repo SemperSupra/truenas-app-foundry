@@ -32,7 +32,8 @@
         "26.0.0-BETA.3"
       ],
       "runtime_qualified_targets": [
-        "25.04.1"
+        "25.04.1",
+        "25.04.2.6"
       ],
       "universal_qualified": false,
       "selection_note": "Primary low-coupling native-catalog control: no host mounts and no external service dependency is declared by the catalog metadata.",
