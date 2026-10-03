@@ -1,0 +1,218 @@
+{
+  "schema": "truenas-foundry-product-target-matrix/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#282",
+  "parent_authority": "SemperSupra/truenas-app-foundry-private#274",
+  "target_registry": ".foundry/truenas-target-tracks.json",
+  "required_target_versions": [
+    "25.04.1",
+    "25.04.2.6",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "policy": {
+    "exact_target_cell_required": true,
+    "system_substrate_evidence_not_inherited": true,
+    "control_evidence_not_product_evidence": true,
+    "source_or_render_evidence_not_runtime_evidence": true,
+    "workflow_green_not_acceptance": true,
+    "matrix_growth_invalidates_stale_coverage": true
+  },
+  "entries": [
+    {
+      "id": "garm-controller-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/garm-controller-app/candidate.json"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36790011622,
+            "artifact_id": 11131414132,
+            "artifact_digest": "sha256:2db7bfb199e79a39814ab6f1c10445cb7269436fcfc3bf62bda60f3ce8b98542",
+            "source_identity": "Foundry control 7fd0d2474248b61cf8e290fc80f40b761cea5e98; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "scope": "G1a product-specific controller realization",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 controller realization with config/db persistence, HTTPS health, stop/start persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5/G1b matrix recipe."
+          },
+          "additional_partial_evidence": {
+            "g2_provider_run_id": 36812808256,
+            "g2_artifact_id": 11141155297,
+            "g2_artifact_digest": "sha256:7d984b6a02b4032968bd15e60f51f2e9660ebe51df7be47d970607b72b36bc77",
+            "scope": "provider transport/adoption only",
+            "note": "Accepted G2 provider WSS/API-key transport/adoption evidence is retained as adjacent product evidence; it does not replace G1b/F0-F5 App lifecycle qualification."
+          }
+        }
+      }
+    },
+    {
+      "id": "wow-sidecar-truenas-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/wow-sidecar-app/candidate.json",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#276"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36804168961,
+            "artifact_id": 11137183004,
+            "artifact_digest": "sha256:7c510524f72c2360416b115c3fc5c842c22219b4a7425dea722399e35d34cace",
+            "source_identity": "Foundry ref 9ac2eef97581caff5b0de740560c55a778fa3f1c",
+            "scope": "corrected product-specific T6",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 WOW realization with exact image/config readback, permissions/create-once seed behavior, worker RUNNING, restart persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5 matrix recipe."
+          }
+        }
+      }
+    },
+    {
+      "id": "litellm-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#262"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36746485575,
+            "artifact_id": 11113851964,
+            "artifact_digest": "sha256:a4031c69ed45b173f9196c231efaaf098a9d8442485e89265e4bb54c3bdc8ae0",
+            "note": "Accepted product-specific T6 evidence exists, but it predates the complete profile-driven F0-F5 recipe and therefore does not satisfy this matrix cell."
+          }
+        }
+      }
+    },
+    {
+      "id": "foliorelay-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#273",
+        "public_product_authority": "SemperSupra/folio-relay#29"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_failure_evidence": [
+            {
+              "run_id": 37139185156,
+              "artifact_id": 11280350346,
+              "artifact_digest": "sha256:9d08b14cf045c084f6e3fff58146248aab9c6a1e965a80aa89e77d66b9e8bd5b",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 001",
+              "note": "External UUID parser stripped the canonical urn:uuid prefix; retained as harness-oracle falsifier, not product support evidence."
+            },
+            {
+              "run_id": 37141238936,
+              "artifact_id": 11280818150,
+              "artifact_digest": "sha256:0e1095185a208e9154e75e736872c2a150175acc00572ef3f64296252b189be9",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 002",
+              "note": "UUID parser correction advanced to public-URI coherence; retained as causal failure evidence only. No product support claim."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "foundry-rdte-probe",
+      "classification": "qualification-control",
+      "required_for_all_products_claim": false,
+      "source": {
+        "kind": "foundry-born-control",
+        "public_pr": "SemperSupra/truenas-app-foundry#82",
+        "private_authority": "SemperSupra/truenas-app-foundry-private#274"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "all_required_product_cells_qualified": false,
+  "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied.",
+  "required_external_product_ids": [
+    "litellm-app",
+    "foliorelay-app"
+  ]
+}
