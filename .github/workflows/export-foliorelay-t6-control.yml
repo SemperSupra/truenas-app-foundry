@@ -1,0 +1,107 @@
+name: Export FolioRelay TrueNAS T6 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact Foundry commit; blank uses this workflow commit
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foliorelay-t6-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Resolve exact Foundry source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          if [[ -z "$ref" ]]; then ref="$GITHUB_SHA"; fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact Foundry source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Validate exporter contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tools/test_build_foliorelay_t6_control.py
+          python3 -m py_compile tools/build_foliorelay_t6_control.py
+
+      - name: Build exact BETA.3 FolioRelay control bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/foliorelay-t6-control
+          python3 tools/build_foliorelay_t6_control.py \
+            --publication-receipt .foundry/foliorelay/t6/beta3/publication-receipt.json \
+            --compose .foundry/foliorelay/t6/beta3/compose.json \
+            --values .foundry/foliorelay/t6/beta3/values.yaml \
+            --target-profile .foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json \
+            --output /tmp/foliorelay-t6-control \
+            --foundry-ref "${{ steps.source.outputs.ref }}" \
+            | tee /tmp/foliorelay-t6-export.json
+
+          jq -e '
+            .schema == "semper-supra.foliorelay-truenas-t6-control/1" and
+            .foundry_ref == "${{ steps.source.outputs.ref }}" and
+            .candidate.truenas_version == "26.0.0-BETA.3" and
+            .candidate.control_image == "ghcr.io/sempersupra/foliorelay-control@sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce" and
+            .candidate.cups_image == "ghcr.io/sempersupra/foliorelay-cups@sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f" and
+            .secrets_captured == false
+          ' /tmp/foliorelay-t6-control/control.json >/dev/null
+
+          test -s /tmp/foliorelay-t6-control/compose.json
+          test -s /tmp/foliorelay-t6-control/publication-receipt.json
+          ! grep -R -E -q 'BEGIN .*PRIVATE KEY|ghp_|github_pat_' /tmp/foliorelay-t6-control
+
+      - name: Upload exact FolioRelay T6 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foliorelay-t6-beta3-control
+          path: /tmp/foliorelay-t6-control/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record public-safe export evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### FolioRelay TrueNAS T6 control export"
+            echo
+            echo "Foundry source: ${{ steps.source.outputs.ref }}"
+            if [[ -f /tmp/foliorelay-t6-control/control.json ]]; then
+              echo "Control image: $(jq -r '.candidate.control_image' /tmp/foliorelay-t6-control/control.json)"
+              echo "CUPS image: $(jq -r '.candidate.cups_image' /tmp/foliorelay-t6-control/control.json)"
+              echo "Compose identity: $(jq -r '.artifacts.compose_canonical_sha256' /tmp/foliorelay-t6-control/control.json)"
+              echo "Secret values captured: $(jq -r '.secrets_captured' /tmp/foliorelay-t6-control/control.json)"
+            else
+              echo "Control bundle: not produced"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
