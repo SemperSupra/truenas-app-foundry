@@ -133,6 +133,53 @@
       }
     },
     {
+      "id": "foliorelay-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#273",
+        "public_product_authority": "SemperSupra/folio-relay#29"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_failure_evidence": [
+            {
+              "run_id": 37139185156,
+              "artifact_id": 11280350346,
+              "artifact_digest": "sha256:9d08b14cf045c084f6e3fff58146248aab9c6a1e965a80aa89e77d66b9e8bd5b",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 001",
+              "note": "External UUID parser stripped the canonical urn:uuid prefix; retained as harness-oracle falsifier, not product support evidence."
+            },
+            {
+              "run_id": 37141238936,
+              "artifact_id": 11280818150,
+              "artifact_digest": "sha256:0e1095185a208e9154e75e736872c2a150175acc00572ef3f64296252b189be9",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 002",
+              "note": "UUID parser correction advanced to public-URI coherence; retained as causal failure evidence only. No product support claim."
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "foundry-rdte-probe",
       "classification": "qualification-control",
       "required_for_all_products_claim": false,
@@ -165,6 +212,7 @@
   "all_required_product_cells_qualified": false,
   "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied.",
   "required_external_product_ids": [
-    "litellm-app"
+    "litellm-app",
+    "foliorelay-app"
   ]
 }
