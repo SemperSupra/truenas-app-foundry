@@ -1,0 +1,29 @@
+{
+  "schema": "semper-supra.foliorelay-rdte-publication/1",
+  "status": "PASS",
+  "source_revision": "bcbafe5bdbda69a1aabc32da42242fe1f8432cbd",
+  "product_head": "88fd70c8891eaf7b4c886aa928b96e232ca041c6",
+  "publication_head": "b07d25fc0d20f7da4ef0a6e4fc54853c137f1b5c",
+  "publication_run": 37125234117,
+  "publication_artifact_id": 11275036269,
+  "publication_artifact_digest": "sha256:60a249b787463fc051dc3113a168140e67902e25b2910c68add27673ecf0bc02",
+  "tag": "rdte-bcbafe5bdbda",
+  "control": {
+    "image": "ghcr.io/sempersupra/foliorelay-control",
+    "digest": "sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce",
+    "anonymous_pull": true,
+    "signed_keyless": true
+  },
+  "cups": {
+    "image": "ghcr.io/sempersupra/foliorelay-cups",
+    "digest": "sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f",
+    "anonymous_pull": true,
+    "signed_keyless": true
+  },
+  "sbom_attestation_requested": true,
+  "provenance_attestation_requested": true,
+  "release_published": false,
+  "moving_tag_published": false,
+  "secrets_captured": false,
+  "money_spent_usd": 0
+}
