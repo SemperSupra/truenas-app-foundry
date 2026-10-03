@@ -134,5 +134,15 @@ class MatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(MatrixError, "required external product"):
             validate(m, registry(), root)
 
+    def test_repository_matrix_requires_foliorelay_external_product(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        doc = json.loads((root / ".foundry/product-app-target-matrix.json").read_text(encoding="utf-8"))
+        self.assertIn("foliorelay-app", doc["required_external_product_ids"])
+        rows = {entry["id"]: entry for entry in doc["entries"]}
+        self.assertIn("foliorelay-app", rows)
+        self.assertEqual(rows["foliorelay-app"]["classification"], "product")
+        self.assertEqual(rows["foliorelay-app"]["source"]["kind"], "external-foundry-product-authority")
+        self.assertTrue(all(cell["status"] == "OPEN" for cell in rows["foliorelay-app"]["target_status"].values()))
+
 if __name__ == "__main__":
     unittest.main()
