@@ -20,3 +20,16 @@ a complete matrix PASS retroactively.
 
 The validator also discovers `candidates/*/candidate.json`; adding a candidate
 without adding a matrix row fails closed.
+
+
+## External products
+
+Products whose implementation lives outside the Foundry repository are still explicit
+matrix members. They are listed in `required_external_product_ids`, which makes omission
+fail closed without pretending they are Foundry candidates.
+
+The current external rows include LiteLLM and FolioRelay. FolioRelay is bound to
+`SemperSupra/truenas-app-foundry-private#273` and public product authority
+`SemperSupra/folio-relay#29`. Its current BETA.3 reps are retained only as causal
+failure evidence; all FolioRelay exact-target cells remain OPEN until a complete
+receipt earns PASS.
