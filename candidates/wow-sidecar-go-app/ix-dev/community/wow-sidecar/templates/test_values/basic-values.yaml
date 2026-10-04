@@ -1,0 +1,65 @@
+images:
+  image:
+    repository: ghcr.io/sempersupra/wow-sidecar@sha256
+    tag: "0000000000000000000000000000000000000000000000000000000000000000"
+  container_utils_image:
+    repository: ixsystems/container-utils@sha256
+    tag: 46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992
+
+consts:
+  worker_container_name: wow-sidecar
+  perms_container_name: permissions
+  runtime_uid: 10001
+  runtime_gid: 10001
+  state_path: /var/lib/wow-sidecar
+  github_app_secret_path: /run/secrets/github-app.pem
+  peer_credentials_secret_path: /run/secrets/wow-peer-credentials.json
+  listen_port: 8080
+
+wow:
+  node_id: test-node-1
+  github_app_id: "999999"
+  github_app_private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEfakekey...\n-----END RSA PRIVATE KEY-----"
+
+control:
+  repository: SemperSupra/wow-control
+  profile: test-profile
+  capability: system.identity
+  authority_record: github-issue-comment:ExampleOrg/authority#7:11
+  authority_revision: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  poll_seconds: 15
+
+rendezvous:
+  enabled: false
+  workset_ref: ""
+  delegation_id: ""
+  lease_seconds: 300
+
+peer:
+  urls: ""
+  poll_seconds: 30
+
+peer_rendezvous:
+  enabled: false
+  credentials_json: ""
+  max_skew_seconds: 30
+  replay_ttl_seconds: 60
+
+network:
+  web_port:
+    bind_mode: published
+    port_number: 18080
+    container_port: 8080
+    host_ips: []
+
+storage:
+  state:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: wow-sidecar-state
+      acl_enable: false
+
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
