@@ -159,6 +159,7 @@ class WowSidecarGoCandidateTests(unittest.TestCase):
 
         # Complete case
         values = copy.deepcopy(self.basic_values)
+        values["rendezvous"]["enabled"] = True
         values["rendezvous"]["workset_ref"] = "ws-1"
         values["rendezvous"]["delegation_id"] = "del-1"
         values["rendezvous"]["lease_seconds"] = 600
