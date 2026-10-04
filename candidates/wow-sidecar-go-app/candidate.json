@@ -1,0 +1,75 @@
+{
+  "schema_version": 2,
+  "candidate": "wow-sidecar-go-truenas-app",
+  "phase": "repo-prepared-exact-image-pending",
+  "wow_source": {
+    "repository": "https://github.com/SemperSupra/wow-sidecar.git",
+    "public_candidate_revision": "d31cc4ead43c2998c6f26d6665d5573315b135a5",
+    "hosted_qualification_runs": {
+      "conformance": 37225010071,
+      "container": 37225009982,
+      "native_architecture": 37225010138,
+      "peer_federation": 37225010105
+    },
+    "release_prep": {
+      "head": "27b710f58c67a171e1d56e480e3ea4eb32b8bc06",
+      "run": 37226374896,
+      "qualification": "PASS",
+      "publish": "SKIPPED",
+      "native_verify": "SKIPPED",
+      "receipt": "SKIPPED"
+    }
+  },
+  "container": {
+    "build_recipe": "scratch-plus-ca-certificates",
+    "registry_reference": "ghcr.io/sempersupra/wow-sidecar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "synthetic_digest_fixture": true,
+    "publication_state": "not-published",
+    "entrypoint": "/wow-sidecar",
+    "runtime_user": "10001:10001",
+    "github_cli_required": false,
+    "shell_required": false
+  },
+  "truenas_source": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+    "source_path": "candidates/wow-sidecar-go-app/ix-dev/community/wow-sidecar"
+  },
+  "permissions_helper": {
+    "candidate": "ixsystems/container-utils:1.0.2",
+    "reference": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
+  },
+  "truenas_contract": {
+    "deployment_kind": "custom-app",
+    "state_storage": "ix_volume",
+    "state_mount": "/var/lib/wow-sidecar",
+    "github_app_secret_mount": "/run/secrets/github-app.pem",
+    "peer_credentials_mount": "/run/secrets/wow-peer-credentials.json",
+    "root_filesystem_read_only": true,
+    "temporary_filesystem": "/tmp",
+    "runtime_uid": 10001,
+    "runtime_gid": 10001,
+    "supplemental_groups": [568],
+    "cap_drop_all_for_wow_containers": true,
+    "no_new_privileges": true,
+    "privileged": false,
+    "host_network": false,
+    "host_paths_allowed": false,
+    "container_runtime_socket_allowed": false,
+    "seed_helper_required": false,
+    "permissions_helper_scope": "ixVolume ownership only"
+  },
+  "gates": {
+    "runtime_hosted_qualified": true,
+    "runtime_independent_accepted": false,
+    "registry_image_published": false,
+    "public_app_render_qualified": false,
+    "private_truenas_hil_qualified": false,
+    "state_preserving_cutover_qualified": false,
+    "hil_eligible": false
+  },
+  "claim_boundary": "Parallel Go-native TrueNAS App is repo-prepared only. The zero digest is a synthetic non-deployable fixture. Runtime independent acceptance, exact image publication/rebind, public App render qualification, private HIL, cutover, and rollback qualification remain pending."
+}
