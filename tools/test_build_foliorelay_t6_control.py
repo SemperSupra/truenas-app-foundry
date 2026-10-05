@@ -83,8 +83,10 @@ class FolioRelayT6ControlTests(unittest.TestCase):
             "profile_id": "truenas-scale-25.04.1-materialization",
             "truenas_version": "25.04.1",
         }
-        facts = MOD.validate(publication(), compose(), target)
+        rendered = MOD.materialize_target_compose(compose(), target)
+        facts = MOD.validate(publication(), rendered, target)
         self.assertEqual(facts["truenas_version"], "25.04.1")
+        self.assertEqual(facts["discovery_backend"], "avahi")
         self.assertTrue(facts["control_image"].endswith(digest("1")))
         self.assertTrue(facts["cups_image"].endswith(digest("2")))
 
