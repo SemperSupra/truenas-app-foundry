@@ -183,34 +183,55 @@ def materialize_target_compose(compose: dict, target: dict) -> dict:
     return rendered
 
 
-def _validate_discovery_transport(discovery: dict, version: str) -> str:
-    volumes = discovery.get("volumes") or []
-    dbus_mounts = [
-        v for v in volumes
-        if isinstance(v, dict) and (
-            v.get("source") == DBUS_SOCKET or v.get("target") == DBUS_SOCKET
-        )
-    ]
-    command = discovery.get("command") or []
+def _validate_host_coupling(services: dict, version: str) -> None:
+    dbus_mounts = []
+    for service_name, service in services.items():
+        for mount in service.get("volumes") or []:
+            if not isinstance(mount, dict):
+                continue
+            source = mount.get("source")
+            target = mount.get("target")
+            paths = [value for value in (source, target) if isinstance(value, str)]
+            if any(
+                value == "/run/dbus"
+                or value.startswith("/run/dbus/")
+                or value == "/var/run/dbus"
+                or value.startswith("/var/run/dbus/")
+                for value in paths
+            ):
+                dbus_mounts.append((service_name, mount))
+
+    if version in DIRECT_TARGETS:
+        if dbus_mounts:
+            raise ControlError("direct discovery target must not couple to host D-Bus")
+        return
 
     if version in AVAHI_TARGETS:
         if len(dbus_mounts) != 1:
-            raise ControlError("25.x discovery requires exactly one Avahi system-bus mount")
-        mount = dbus_mounts[0]
+            raise ControlError("25.x target requires exactly one host D-Bus mount")
+        service_name, mount = dbus_mounts[0]
         if (
-            mount.get("type") != "bind"
+            service_name != "discovery"
+            or mount.get("type") != "bind"
             or mount.get("source") != DBUS_SOCKET
             or mount.get("target") != DBUS_SOCKET
             or mount.get("read_only") is not True
         ):
-            raise ControlError("25.x discovery Avahi system-bus mount drifted")
+            raise ControlError("25.x host D-Bus coupling must be the exact read-only Avahi socket mount")
+        return
+
+    raise ControlError(f"unsupported FolioRelay target version: {version!r}")
+
+
+def _validate_discovery_transport(discovery: dict, version: str) -> str:
+    command = discovery.get("command") or []
+
+    if version in AVAHI_TARGETS:
         if command != AVAHI_DISCOVERY_COMMAND:
             raise ControlError("25.x discovery must use the exact Avahi backend command")
         return "avahi"
 
     if version in DIRECT_TARGETS:
-        if dbus_mounts:
-            raise ControlError("direct discovery target must not mount the system bus")
         if "-backend" in command or "-dbus-address" in command:
             raise ControlError("direct discovery target must not select Avahi")
         return "direct"
@@ -231,6 +252,7 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     control = services["control"]
     cups = services["cups"]
     discovery = services["discovery"]
+    _validate_host_coupling(services, version)
 
     if control.get("image") != control_image:
         raise ControlError("control image does not match admitted digest")
@@ -276,18 +298,6 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     ):
         if forbidden in rendered:
             raise ControlError(f"forbidden rendered content: {forbidden}")
-    if version in DIRECT_TARGETS and "/run/dbus" in rendered:
-        raise ControlError("direct discovery target must not couple to host D-Bus")
-    if version in AVAHI_TARGETS:
-        allowed = json.dumps({DBUS_SOCKET: DBUS_SOCKET})
-        # Exact mount validation above is authoritative; this catches other D-Bus paths.
-        other_dbus = [
-            token for token in ("/run/dbus/", "/run/dbus")
-            if token in rendered and DBUS_SOCKET not in rendered
-        ]
-        if other_dbus:
-            raise ControlError("25.x discovery contains unexpected host D-Bus coupling")
-
     return {
         "control_image": control_image,
         "cups_image": cups_image,
