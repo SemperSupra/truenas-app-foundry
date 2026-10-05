@@ -1,0 +1,69 @@
+{
+  "services": {
+    "control": {
+      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "ports": [{"target": 18080, "published": "18080"}],
+      "volumes": [
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/control", "target": "/var/lib/foliorelay", "read_only": false},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/artifacts", "target": "/var/lib/foliorelay/artifacts", "read_only": false},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/secrets/control.token", "target": "/run/secrets/foliorelay.token", "read_only": true}
+      ],
+      "tmpfs": ["/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777"],
+      "command": [
+        "-listen", "0.0.0.0:18080",
+        "-journal", "/var/lib/foliorelay/state/journal.frj",
+        "-artifact-store", "/var/lib/foliorelay/artifacts",
+        "-token-file", "/run/secrets/foliorelay.token",
+        "-identity-file", "/var/lib/foliorelay/config/printer.json",
+        "-printer-uri", "ipp://foliorelay-t6.local:8634/printers/FolioRelay",
+        "-printer-name", "FolioRelay",
+        "-printer-location", "RDTE",
+        "-airprint"
+      ]
+    },
+    "cups": {
+      "image": "ghcr.io/sempersupra/foliorelay-cups@sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "depends_on": {"control": {"condition": "service_healthy"}},
+      "ports": [{"target": 8634, "published": "8634"}],
+      "environment": {
+        "FOLIORELAY_PUBLIC_HOST": "foliorelay-t6.local",
+        "FOLIORELAY_IDENTITY_FILE": "/var/lib/foliorelay-control/config/printer.json",
+        "FOLIORELAY_STATE_URL": "http://control:18080",
+        "FOLIORELAY_STATE_TOKEN_FILE": "/run/secrets/foliorelay.token",
+        "FOLIORELAY_INGRESS_STORE": "/var/lib/foliorelay-artifacts",
+        "FOLIORELAY_MAX_INGRESS_BYTES": "104857600"
+      },
+      "volumes": [
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/control", "target": "/var/lib/foliorelay-control", "read_only": true},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/artifacts", "target": "/var/lib/foliorelay-artifacts", "read_only": false},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/cups-state", "target": "/var/lib/cups", "read_only": false},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/cups-spool", "target": "/var/spool/cups", "read_only": false},
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/secrets/control.token", "target": "/run/secrets/foliorelay.token", "read_only": true}
+      ],
+      "tmpfs": [
+        "/etc/cups:rw,noexec,nosuid,nodev,size=4m,uid=10001,gid=10001,mode=0750",
+        "/var/cache/cups:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=0750",
+        "/var/log/cups:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=0750"
+      ]
+    },
+    "discovery": {
+      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "depends_on": {"control": {"condition": "service_healthy"}},
+      "network_mode": "host",
+      "volumes": [
+        {"type": "bind", "source": "/mnt/rdtepool/foliorelay-t6/control", "target": "/var/lib/foliorelay-control", "read_only": true}
+      ],
+      "entrypoint": ["/usr/local/bin/foliorelay-dnssd"],
+      "command": ["-identity-file", "/var/lib/foliorelay-control/config/printer.json"]
+    }
+  }
+}

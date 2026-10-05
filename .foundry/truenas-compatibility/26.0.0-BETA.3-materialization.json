@@ -1,64 +1,59 @@
 {
   "schema_version": 2,
-  "profile_id": "truenas-scale-25.04.2.6-materialization",
+  "profile_id": "truenas-scale-26.0.0-beta.3-materialization",
   "runtime_target": "truenas-scale-apps",
-  "truenas_version": "25.04.2.6",
+  "truenas_version": "26.0.0-BETA.3",
   "middleware": {
     "repository": "https://github.com/truenas/middleware.git",
-    "release_ref": "release/25.04.2.6",
-    "commit": "244b717370fe35fb9eefc3096acfbc25f12b57b6"
+    "release_ref": "TS-26.0.0-BETA.3",
+    "commit": "81e1265a86083888ba94a2bdfc02ff5c9c5ef6a3"
   },
   "source_contract": [
     {
-      "path": "src/middlewared/middlewared/api/v25_04_0/app.py",
-      "blob_sha": "952c43db525d5739731fa98bb359ca3c80f1b4e4",
+      "path": "src/middlewared/middlewared/api/v26_0_0/app.py",
+      "blob_sha": "aaa5ff7e70830f08b018333e09b9460ffcedbb97",
       "contains": [
         "@single_argument_args('app_create')",
         "class AppCreateArgs(BaseModel):",
-        "custom_compose_config: Secret[dict]",
+        "custom_compose_config",
         "class AppUpdateArgs(BaseModel):",
-        "app_name: NonEmptyString",
-        "update: AppUpdate = AppUpdate()",
         "state: Literal['CRASHED', 'DEPLOYING', 'RUNNING', 'STOPPED', 'STOPPING']"
       ]
     },
     {
-      "path": "src/middlewared/middlewared/plugins/apps/crud.py",
-      "blob_sha": "f3c4f79201c0d2340a8bc2cfbe4757448a6851ba",
+      "path": "src/middlewared/middlewared/api/v26_0_0/docker.py",
+      "blob_sha": "8e96fdad66a2abab217b9ff5f1877a97c69477b9",
       "contains": [
-        "if data['custom_app']:",
-        "app.schema.normalize_and_validate_values",
-        "add_context_to_values",
-        "update_app_config(app_name, version, new_values)",
+        "@single_argument_args('docker_update')",
+        "class DockerUpdateArgs",
+        "class DockerStatusResult",
+        "'MIGRATING', 'MIGRATION_FAILED'"
+      ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/apps/crud.py",
+      "blob_sha": "8e456bbec3a5ab24249e1ac564b4c8067f7a156a",
+      "contains": [
+        "def do_create(self, job, data):",
+        "def do_update(self, job, app_name, data):",
+        "def do_delete(self, job, app_name, options):",
         "remove_volumes=True",
         "options['remove_ix_volumes']"
       ]
     },
     {
       "path": "src/middlewared/middlewared/plugins/apps/custom_app.py",
-      "blob_sha": "2bd57f59ea0c2ab76c7a4779f52a7a4d8e6457f3",
+      "blob_sha": "5946fc1e2e1052052ea6bd531f0bf22eafa39b25",
       "contains": [
-        "compose_config = validate_payload(data, 'app_create')",
-        "update_app_config(app_name, version, compose_config, custom_app=True)",
+        "'custom_compose_config': rendered_config",
         "compose_action(app_name, version, 'up', force_recreate=True, remove_orphans=True)"
       ]
     },
     {
-      "path": "src/middlewared/middlewared/plugins/apps/custom_app_utils.py",
-      "blob_sha": "a81666e2195fa9ef99883ffff4d1b106a74685c0",
-      "contains": [
-        "custom_compose_config",
-        "custom_compose_config_string",
-        "yaml.safe_load"
-      ]
-    },
-    {
       "path": "src/middlewared/middlewared/plugins/apps/schema_normalization.py",
-      "blob_sha": "c1a8a2cbf6b11d039f1711d864f53af6c0032e12",
+      "blob_sha": "e358e0004f36a0d7a013c8e54fc477789f464fc4",
       "contains": [
         "'definitions/certificate': 'certificate'",
-        "'definitions/certificate_authority': 'certificate_authorities'",
-        "'definitions/gpu_configuration': 'gpu_configuration'",
         "'normalize/acl': 'acl'",
         "'normalize/ix_volume': 'ix_volume'",
         "complete_config['ix_certificates'][value]",
@@ -68,74 +63,20 @@
     },
     {
       "path": "src/middlewared/middlewared/plugins/apps/schema_action_context.py",
-      "blob_sha": "9f1a0531cbf3565a9680e24f3ba895bd0e494ebe",
+      "blob_sha": "ae4422837b5a5c67fd6ed74d8f304f7afe5fbcc1",
       "contains": [
         "async def update_volumes",
-        "zfs.dataset.create",
-        "zfs.dataset.mount",
+        "self.s.zfs.resource.query_impl",
+        "'pool.dataset.create_impl'",
+        "self.s.zfs.resource.mount",
         "async def apply_acls",
-        "filesystem.add_to_acl"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/schema_utils.py",
-      "blob_sha": "ea21c2c08be54e982e72f0a66019dd6ad8f4b4e9",
-      "contains": [
-        "('ix_certificates', dict)",
-        "('ix_certificate_authorities', dict)",
-        "('ix_volumes', dict)",
-        "CONTEXT_KEY_NAME"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/cert_attachments.py",
-      "blob_sha": "f5fe4676999413e9fa2301e084eca349666372e9",
-      "contains": [
-        "cert_id in app_config.get('ix_certificates', {})",
-        "core.bulk', 'app.redeploy'",
-        "get_apps_consuming_outdated_certs"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/lifecycle.py",
-      "blob_sha": "f439322fda9c3fa38fa1ff2367c1e002ab4c2f70",
-      "contains": [
-        "if custom_app:",
-        "write_if_changed(compose_file_path",
-        "render_compose_templates"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/setup.py",
-      "blob_sha": "489755e30c5038aca7e300054af2a730d5875642",
-      "contains": [
-        "if custom_app:",
-        "shutil.copytree(app_version_details['location'], destination)"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/metadata.py",
-      "blob_sha": "64ee57edbff8ce9a985fc63e8205da19a0a74f18",
-      "contains": [
-        "custom_app",
-        "get_collective_config",
-        "get_portals_and_app_notes"
-      ]
-    },
-    {
-      "path": "src/middlewared/middlewared/plugins/apps/ix_apps/path.py",
-      "blob_sha": "08b83a387aa07f83953d200ee574203f4facd270",
-      "contains": [
-        "user_config.yaml",
-        "templates/rendered",
-        "docker-compose.yaml"
+        "'filesystem.add_to_acl'"
       ]
     },
     {
       "path": "src/middlewared/middlewared/plugins/apps/ix_apps/query.py",
-      "blob_sha": "bfbd96d2bd5bdd9853f753d485300911588636c1",
+      "blob_sha": "51d8f8bc791d7c0b08b39ac6db14f832ee04b265",
       "contains": [
-        "retrieve_config",
         "'active_workloads': active_workloads",
         "'container_details': []",
         "'volumes': []",
@@ -144,30 +85,30 @@
     },
     {
       "path": "src/middlewared/middlewared/plugins/apps/compose_utils.py",
-      "blob_sha": "84029578bedfc89e5495e21107aaf6f75a6d42c1",
+      "blob_sha": "b2493a69fa636bf153f871e76a164e60859dd38f",
       "contains": [
         "docker', '--config', '/etc/docker', 'compose'",
         "timeout=1200"
       ]
     },
     {
-      "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
-      "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8",
+      "path": "src/middlewared/middlewared/plugins/docker/update.py",
+      "blob_sha": "caabb16add43ec5455a840958bb0986132a1e7e9",
       "contains": [
-        "get_normalized_questions_context",
-        "app.certificate_choices",
-        "app.certificate_authority_choices",
-        "app.ip_choices",
-        "app.gpu_choices_internal"
+        "async def license_active(self):",
+        "system.is_ha_capable",
+        "system.feature_enabled",
+        "'APPS'",
+        "async def do_update(self, job, data):",
+        "async def status(self):"
       ]
     },
     {
       "path": "tests/api2/test_apps.py",
-      "blob_sha": "654a8f47727e0288313dc8aad91401d486f5b1c1",
+      "blob_sha": "4c854e5820c538cc8e678fc36b7573b34c2fb134",
       "contains": [
-        "call('app.stop', 'actual-budget', job=True)",
-        "call('app.start', 'actual-budget', job=True)",
-        "call('app.delete', 'actual-budget', {'remove_ix_volumes': True, 'remove_images': True}, job=True)"
+        "call(\"app.stop\", \"actual-budget\", job=True)",
+        "call(\"app.start\", \"actual-budget\", job=True)"
       ]
     }
   ],
@@ -194,9 +135,9 @@
       "reserved_target": "ix_volumes",
       "action": "ensure-ix-volume",
       "native_methods": [
-        "zfs.dataset.query",
-        "zfs.dataset.create",
-        "zfs.dataset.mount"
+        "zfs.resource.query_impl",
+        "pool.dataset.create_impl",
+        "zfs.resource.mount"
       ]
     },
     "normalize/acl": {
@@ -205,14 +146,14 @@
         "pre-render-action"
       ],
       "native_method": "filesystem.add_to_acl",
-      "policy": "empty/disabled ACL is accepted; an active ACL request fails closed until HIL-qualified"
+      "policy": "empty/disabled ACL is accepted; an active ACL request fails closed until runtime-qualified"
     },
     "definitions/node_bind_ip": {
       "mvp_status": "conditional-deferred",
       "parity_class": [
         "schema-context-validation"
       ],
-      "policy": "empty selection is accepted; active values fail closed until normalized question-context validation is implemented"
+      "policy": "empty selection is accepted; active values fail closed until release-specific normalized question-context validation is qualified"
     },
     "definitions/certificate_authority": {
       "mvp_status": "deferred",
@@ -220,14 +161,15 @@
         "pre-render-resolution"
       ],
       "resolver_method": "certificateauthority.get_instance",
-      "reserved_target": "ix_certificate_authorities"
+      "reserved_target": "ix_certificate_authorities",
+      "policy": "not present in this release's app schema REF_MAPPING; fail closed when active"
     },
     "definitions/gpu_configuration": {
       "mvp_status": "deferred",
       "parity_class": [
         "pre-render-resolution"
       ],
-      "policy": "fail closed when active"
+      "policy": "fail closed when active until release-specific runtime qualification"
     }
   },
   "provider_assumptions": {
@@ -235,7 +177,8 @@
       "CRASHED",
       "DEPLOYING",
       "RUNNING",
-      "STOPPED"
+      "STOPPED",
+      "STOPPING"
     ],
     "active_workload_fields": [
       "containers",
@@ -250,27 +193,32 @@
       "compose_volumes_removed": true,
       "ix_volumes_removed_only_when_requested": true
     },
-    "custom_app_create_uses_compose_up": true
+    "custom_app_create_uses_compose_up": true,
+    "apps_license_gate": {
+      "method": "docker.license_active",
+      "non_ha": "allowed",
+      "ha": "system.feature_enabled(APPS)"
+    }
   },
   "policies": {
     "unknown_active_ref": "fail-closed",
     "desired_state_authority": "foundry",
     "read_back_role": "verification-and-reconciliation",
-    "private_material_in_public_evidence": "prohibited"
+    "private_material_in_public_evidence": "prohibited",
+    "mutation_requires_exact_observed_version": true
   },
   "scope": {
     "qualifies": [
-      "source-level catalog versus Custom App pipeline boundary",
-      "release-pinned middleware normalization/action identities",
-      "MVP feature classification contract",
-      "source-level Custom App lifecycle/read-back assumptions"
+      "exact 26.0.0-BETA.3 source-level Apps create/update/delete/query contract",
+      "exact 26.0.0-BETA.3 Custom App compose contract",
+      "exact 26.0.0-BETA.3 certificate and ixVolume normalization/action identities",
+      "exact 26.0.0-BETA.3 app state and Docker status schemas"
     ],
     "does_not_qualify": [
-      "live TrueNAS API transport or RBAC",
+      "T4/T5 live runtime behavior until Agent Dispatch evidence is accepted",
       "site certificate/volume resolution",
-      "runtime certificate renewal behavior",
-      "hardware-in-loop parity",
-      "unsupported/deferred platform features"
+      "physical hardware behavior",
+      "generic compatibility with RC/nightly or later 26 builds"
     ]
   },
   "runtime_api": {
@@ -334,7 +282,7 @@
       "RUNNING state when desired",
       "active workload/container evidence when desired"
     ],
-    "source_api_family": "v25_04_0",
+    "source_api_family": "v26_0_0",
     "app_stop": {
       "method": "app.stop",
       "arguments": "app_name",
