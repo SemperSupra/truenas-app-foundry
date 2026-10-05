@@ -12,14 +12,30 @@
       "peer_federation": 37228478901
     },
     "release_prep": {
-      "head": "27b710f58c67a171e1d56e480e3ea4eb32b8bc06",
-      "run": 37226374896,
+      "head": "2c236d83705c811099fd9d60959692e5003edaef",
+      "run": 37278888142,
       "qualification": "PASS",
-      "evidence_scope": "mechanism-only; source head superseded by repaired G6.11e",
-      "superseded_source_revision": "d31cc4ead43c2998c6f26d6665d5573315b135a5",
+      "evidence_scope": "repaired-head qualify-only release mechanics",
       "publish": "SKIPPED",
       "native_verify": "SKIPPED",
-      "receipt": "SKIPPED"
+      "receipt": "SKIPPED",
+      "receipt_schema_prepared": "wow-sidecar.go-publication-receipt.v2",
+      "receipt_required_fields": [
+        "source_sha",
+        "immutable_tag",
+        "manifest_digest",
+        "platform_digests.linux/amd64",
+        "platform_digests.linux/arm64",
+        "publication.run_id",
+        "publication.run_attempt",
+        "publication.workflow_sha",
+        "build_recipe.dockerfile",
+        "build_recipe.workflow",
+        "build_recipe.go_toolchain",
+        "build_recipe.buildkit_image",
+        "build_recipe.provenance",
+        "build_recipe.sbom"
+      ]
     }
   },
   "container": {
@@ -54,7 +70,9 @@
     "temporary_filesystem": "/tmp",
     "runtime_uid": 10001,
     "runtime_gid": 10001,
-    "supplemental_groups": [568],
+    "supplemental_groups": [
+      568
+    ],
     "cap_drop_all_for_wow_containers": true,
     "no_new_privileges": true,
     "privileged": false,
@@ -73,5 +91,5 @@
     "state_preserving_cutover_qualified": false,
     "hil_eligible": false
   },
-  "claim_boundary": "Parallel Go-native TrueNAS App is repo-prepared only. The zero digest is a synthetic non-deployable fixture. Runtime independent acceptance (#96/#89), repaired-head release requalification, exact image publication/rebind, public App render qualification, private HIL, cutover, and rollback qualification remain pending."
+  "claim_boundary": "Parallel Go-native TrueNAS App is repo-prepared only. The zero digest is a synthetic non-deployable fixture. Runtime independent acceptance (#96/#89), exact image publication with v2 receipt, exact-image rebind, public App render qualification, private HIL, cutover, and rollback qualification remain pending."
 }
