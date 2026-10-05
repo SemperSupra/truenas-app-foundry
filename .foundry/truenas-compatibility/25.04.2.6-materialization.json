@@ -251,7 +251,12 @@
       "compose_volumes_removed": true,
       "ix_volumes_removed_only_when_requested": true
     },
-    "custom_app_create_uses_compose_up": true
+    "custom_app_create_uses_compose_up": true,
+    "apps_license_gate": {
+      "method": "docker.license_active",
+      "non_ha": "allowed",
+      "ha": "system.license must contain JAILS feature"
+    }
   },
   "policies": {
     "unknown_active_ref": "fail-closed",
