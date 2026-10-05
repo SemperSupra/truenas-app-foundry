@@ -88,6 +88,38 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         self.assertTrue(facts["control_image"].endswith(digest("1")))
         self.assertTrue(facts["cups_image"].endswith(digest("2")))
 
+    def test_build_is_product_invariant_across_admitted_targets(self):
+        repo = HERE.parent
+        versions = ("25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3")
+        baseline = None
+        observed = set()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pub = root / "publication.json"
+            comp = root / "compose.json"
+            values = root / "values.yaml"
+            pub.write_text(json.dumps(publication()), encoding="utf-8")
+            comp.write_text(json.dumps(compose()), encoding="utf-8")
+            values.write_text("printer_name: FolioRelay\n", encoding="utf-8")
+            for version in versions:
+                target = repo / ".foundry" / "truenas-compatibility" / f"{version}-materialization.json"
+                out = root / version
+                control = MOD.build(pub, comp, values, target, out, "f" * 40)
+                self.assertEqual(control["candidate"]["truenas_version"], version)
+                observed.add(version)
+                invariant = {
+                    "control_image": control["candidate"]["control_image"],
+                    "cups_image": control["candidate"]["cups_image"],
+                    "compose_sha256": control["artifacts"]["compose_canonical_sha256"],
+                    "required_oracles": tuple(control["required_oracles"]),
+                    "secrets_captured": control["secrets_captured"],
+                }
+                if baseline is None:
+                    baseline = invariant
+                else:
+                    self.assertEqual(invariant, baseline)
+        self.assertEqual(observed, set(versions))
+
     def test_rejects_moving_image(self):
         value = compose()
         value["services"]["cups"]["image"] = "ghcr.io/sempersupra/foliorelay-cups:latest"
