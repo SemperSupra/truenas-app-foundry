@@ -52,6 +52,28 @@ class TargetProfileTests(unittest.TestCase):
         self.assertTrue(got["exact_version_match"])
         self.assertFalse(got["apply_qualified"])
 
+    def test_2504_registry_retains_exact_accepted_t5_receipts(self):
+        expected = {
+            "25.04.1": {
+                "run_id": 36878595744,
+                "artifact_id": 11172380329,
+                "artifact_digest": "sha256:4423adb5246cb56719602cec3b7771c3ea719f0decf7064697202b28b3e73ab3",
+            },
+            "25.04.2.6": {
+                "run_id": 36882850660,
+                "artifact_id": 11174282172,
+                "artifact_digest": "sha256:37bb1dfbf4797ceebdefcbcd01206dd920fbb20604e9203cc493e7279498a29e",
+            },
+        }
+        for version, evidence in expected.items():
+            target = next(t for t in REGISTRY["targets"] if t["version"] == version)
+            self.assertEqual(target["runtime_qualification"], "public-gha-rdte-t5-accepted")
+            self.assertEqual(target["accepted_runtime_rung"], "T5")
+            self.assertEqual(target["runtime_evidence"]["classification"], "SUPPORTED")
+            self.assertTrue(target["runtime_evidence"]["oracle_satisfied"])
+            for key, value in evidence.items():
+                self.assertEqual(target["runtime_evidence"][key], value)
+
     def test_current_stable_resolves_exact_profile_but_is_not_apply_qualified(self):
         got = mod.discover(observation("TrueNAS-25.10.7"), REGISTRY)
         self.assertEqual(got["status"], "EXACT_PROFILE")
