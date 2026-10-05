@@ -10,9 +10,9 @@ This candidate is repo-prepared only:
 
 - public G6.11e source candidate: `cd2d073f7d4366fa4165b8875e19d286da4e8784`;
 - repaired-head release mechanics are qualify-only PASS at public PR #76 head
-  `2c236d83705c811099fd9d60959692e5003edaef`, run `37278888142`;
+  `dfd19a9b60329fcbe6e2ce50aa1ab7064825abb2`, run `37284087557`;
 - publication/native verification/receipt were SKIPPED;
-- publication receipt v2 is prepared to carry the multi-arch manifest digest,
+- publication receipt v2 structure is synthetically qualified in the no-publication PR path and is prepared to carry the multi-arch manifest digest,
   exact amd64/arm64 platform digests, run identity, workflow SHA, and build
   recipe/toolchain/BuildKit provenance;
 - exact image publication has **not** occurred;
