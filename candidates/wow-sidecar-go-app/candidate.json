@@ -4,17 +4,19 @@
   "phase": "repo-prepared-exact-image-pending",
   "wow_source": {
     "repository": "https://github.com/SemperSupra/wow-sidecar.git",
-    "public_candidate_revision": "d31cc4ead43c2998c6f26d6665d5573315b135a5",
+    "public_candidate_revision": "cd2d073f7d4366fa4165b8875e19d286da4e8784",
     "hosted_qualification_runs": {
-      "conformance": 37225010071,
-      "container": 37225009982,
-      "native_architecture": 37225010138,
-      "peer_federation": 37225010105
+      "conformance": 37228478935,
+      "container": 37228479040,
+      "native_architecture": 37228478859,
+      "peer_federation": 37228478901
     },
     "release_prep": {
       "head": "27b710f58c67a171e1d56e480e3ea4eb32b8bc06",
       "run": 37226374896,
       "qualification": "PASS",
+      "evidence_scope": "mechanism-only; source head superseded by repaired G6.11e",
+      "superseded_source_revision": "d31cc4ead43c2998c6f26d6665d5573315b135a5",
       "publish": "SKIPPED",
       "native_verify": "SKIPPED",
       "receipt": "SKIPPED"
@@ -71,5 +73,5 @@
     "state_preserving_cutover_qualified": false,
     "hil_eligible": false
   },
-  "claim_boundary": "Parallel Go-native TrueNAS App is repo-prepared only. The zero digest is a synthetic non-deployable fixture. Runtime independent acceptance, exact image publication/rebind, public App render qualification, private HIL, cutover, and rollback qualification remain pending."
+  "claim_boundary": "Parallel Go-native TrueNAS App is repo-prepared only. The zero digest is a synthetic non-deployable fixture. Runtime independent acceptance (#96/#89), repaired-head release requalification, exact image publication/rebind, public App render qualification, private HIL, cutover, and rollback qualification remain pending."
 }
