@@ -235,7 +235,8 @@
       "CRASHED",
       "DEPLOYING",
       "RUNNING",
-      "STOPPED"
+      "STOPPED",
+      "STOPPING"
     ],
     "active_workload_fields": [
       "containers",
