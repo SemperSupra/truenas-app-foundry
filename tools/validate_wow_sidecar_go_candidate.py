@@ -20,7 +20,7 @@ DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 IMAGE_RE = re.compile(r"^ghcr\.io/sempersupra/wow-sidecar@sha256:[0-9a-f]{64}$")
 HELPER_RE = re.compile(r"^ixsystems/container-utils@sha256:[0-9a-f]{64}$")
 ZERO_IMAGE = "ghcr.io/sempersupra/wow-sidecar@sha256:" + ("0" * 64)
-PUBLIC_RUNTIME_REVISION = "d31cc4ead43c2998c6f26d6665d5573315b135a5"
+PUBLIC_RUNTIME_REVISION = "cd2d073f7d4366fa4165b8875e19d286da4e8784"
 PRIVATE_REPO_RE = re.compile(r"(?:https://github[.]com/)?(?:SemperSupra/)?[A-Za-z0-9_.-]+-private(?![A-Za-z0-9_.-])", re.IGNORECASE)
 
 
@@ -219,6 +219,8 @@ def validate(value: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     release_prep = source.get("release_prep")
     require(isinstance(release_prep, dict), "release_prep missing")
     require(release_prep.get("qualification") == "PASS", "release-prep qualification missing")
+    require(release_prep.get("evidence_scope") == "mechanism-only; source head superseded by repaired G6.11e", "release-prep evidence scope drift")
+    require(release_prep.get("superseded_source_revision") == "d31cc4ead43c2998c6f26d6665d5573315b135a5", "superseded release-prep source drift")
     require(release_prep.get("publish") == "SKIPPED", "repo-prepared candidate must not claim publication")
 
     container = value.get("container")
@@ -263,7 +265,7 @@ def validate(value: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     gates = value.get("gates")
     require(isinstance(gates, dict), "gates missing")
     require(gates.get("runtime_hosted_qualified") is True, "hosted runtime qualification must be recorded")
-    require(gates.get("runtime_independent_accepted") is False, "independent runtime acceptance must remain false until #92/#89 acceptance")
+    require(gates.get("runtime_independent_accepted") is False, "independent runtime acceptance must remain false until #96/#89 acceptance")
     require(gates.get("registry_image_published") is False, "synthetic fixture cannot claim image publication")
     require(gates.get("public_app_render_qualified") is False, "repo-prepared App cannot claim public render qualification")
     require(gates.get("private_truenas_hil_qualified") is False, "repo-prepared App cannot claim private HIL")
