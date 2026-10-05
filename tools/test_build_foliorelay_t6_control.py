@@ -90,11 +90,12 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         self.assertTrue(facts["control_image"].endswith(digest("1")))
         self.assertTrue(facts["cups_image"].endswith(digest("2")))
 
-    def test_build_is_product_invariant_across_admitted_targets(self):
+    def test_build_keeps_product_invariants_but_materializes_discovery_per_target(self):
         repo = HERE.parent
         versions = ("25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3")
         baseline = None
-        observed = set()
+        compose_ids = {}
+        backends = {}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             pub = root / "publication.json"
@@ -102,17 +103,16 @@ class FolioRelayT6ControlTests(unittest.TestCase):
             values = root / "values.yaml"
             pub.write_text(json.dumps(publication()), encoding="utf-8")
             comp.write_text(json.dumps(compose()), encoding="utf-8")
-            values.write_text("printer_name: FolioRelay\n", encoding="utf-8")
+            values.write_text("printer_name: FolioRelay\\n", encoding="utf-8")
             for version in versions:
                 target = repo / ".foundry" / "truenas-compatibility" / f"{version}-materialization.json"
                 out = root / version
                 control = MOD.build(pub, comp, values, target, out, "f" * 40)
+                rendered = json.loads((out / "compose.json").read_text(encoding="utf-8"))
                 self.assertEqual(control["candidate"]["truenas_version"], version)
-                observed.add(version)
                 invariant = {
                     "control_image": control["candidate"]["control_image"],
                     "cups_image": control["candidate"]["cups_image"],
-                    "compose_sha256": control["artifacts"]["compose_canonical_sha256"],
                     "required_oracles": tuple(control["required_oracles"]),
                     "secrets_captured": control["secrets_captured"],
                 }
@@ -120,7 +120,33 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                     baseline = invariant
                 else:
                     self.assertEqual(invariant, baseline)
-        self.assertEqual(observed, set(versions))
+                compose_ids[version] = control["artifacts"]["compose_canonical_sha256"]
+                backends[version] = control["candidate"]["discovery_backend"]
+
+                discovery = rendered["services"]["discovery"]
+                if version in MOD.AVAHI_TARGETS:
+                    self.assertEqual(discovery["command"], MOD.AVAHI_DISCOVERY_COMMAND)
+                    bus = [
+                        item for item in discovery["volumes"]
+                        if item.get("target") == MOD.DBUS_SOCKET
+                    ]
+                    self.assertEqual(bus, [{
+                        "type": "bind",
+                        "source": MOD.DBUS_SOCKET,
+                        "target": MOD.DBUS_SOCKET,
+                        "read_only": True,
+                    }])
+                else:
+                    self.assertNotIn(MOD.DBUS_SOCKET, json.dumps(discovery, sort_keys=True))
+                    self.assertNotIn("-backend", discovery["command"])
+
+        self.assertEqual(
+            {version: backends[version] for version in MOD.AVAHI_TARGETS},
+            {version: "avahi" for version in MOD.AVAHI_TARGETS},
+        )
+        self.assertEqual(backends["26.0.0-BETA.3"], "direct")
+        self.assertEqual(len({compose_ids[version] for version in MOD.AVAHI_TARGETS}), 1)
+        self.assertNotEqual(compose_ids["26.0.0-BETA.3"], compose_ids["25.10.7"])
 
     def test_rejects_moving_image(self):
         value = compose()
