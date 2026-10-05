@@ -38,6 +38,7 @@ def compose():
                 "image": control_image,
                 "read_only": True,
                 "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
                 "ports": [{"target": 18080, "published": "18080"}],
                 "volumes": [
                     mount(MOD.CONTROL_ROOT, MOD.CONTROL_TARGET),
@@ -49,6 +50,7 @@ def compose():
                 "image": cups_image,
                 "read_only": True,
                 "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
                 "ports": [{"target": 8634, "published": "8634"}],
                 "tmpfs": [
                     "/etc/cups:rw,size=4m",
@@ -67,6 +69,7 @@ def compose():
                 "image": control_image,
                 "read_only": True,
                 "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
                 "network_mode": "host",
                 "volumes": [
                     mount(MOD.CONTROL_ROOT, MOD.CUPS_CONTROL_TARGET, True),
@@ -159,6 +162,18 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         value["services"]["cups"]["tmpfs"] = ["/var/cache/cups", "/var/log/cups"]
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
+
+    def test_rejects_capability_readdition_or_missing_no_new_privileges(self):
+        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}
+        value = MOD.materialize_target_compose(compose(), target)
+        value["services"]["discovery"]["cap_add"] = ["NET_ADMIN"]
+        with self.assertRaises(MOD.ControlError):
+            MOD.validate(publication(), value, target)
+
+        value = MOD.materialize_target_compose(compose(), target)
+        value["services"]["discovery"]["security_opt"] = []
+        with self.assertRaises(MOD.ControlError):
+            MOD.validate(publication(), value, target)
 
     def test_rejects_discovery_without_host_network(self):
         value = compose()
