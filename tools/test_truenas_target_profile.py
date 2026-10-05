@@ -98,6 +98,21 @@ class TargetProfileTests(unittest.TestCase):
                 app_contract["contains"],
             )
 
+            self.assertEqual(
+                profile["provider_assumptions"]["apps_license_gate"],
+                {
+                    "method": "docker.license_active",
+                    "non_ha": "allowed",
+                    "ha": "system.license must contain JAILS feature",
+                },
+            )
+            docker_contract = next(
+                item for item in profile["source_contract"]
+                if item["path"].endswith("/plugins/docker/update.py")
+            )
+            for needle in ("async def license_active(self):", "system.is_ha_capable", "'JAILS' in license_['features']"):
+                self.assertIn(needle, docker_contract["contains"])
+
     def test_exact_nightly_is_never_promoted_from_family_match(self):
         got = mod.discover(
             observation("TrueNAS-26.0.0-MASTER+20260929-020101"), REGISTRY
