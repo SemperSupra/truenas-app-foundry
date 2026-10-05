@@ -30,6 +30,7 @@ fail closed without pretending they are Foundry candidates.
 
 The current external rows include LiteLLM and FolioRelay. FolioRelay is bound to
 `SemperSupra/truenas-app-foundry-private#273` and public product authority
-`SemperSupra/folio-relay#29`. Its current BETA.3 reps are retained only as causal
-failure evidence; all FolioRelay exact-target cells remain OPEN until a complete
-receipt earns PASS.
+`SemperSupra/folio-relay#29`. Its earlier BETA.3 failures remain causal provenance. Exact BETA.3 rep 013
+(run 37345529487) now earns the first FolioRelay PASS with a complete F0–F5
+receipt; 25.10.7, 25.04.2.6, and 25.04.1 remain OPEN until their own exact
+runtime receipts earn PASS.

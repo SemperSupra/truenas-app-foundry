@@ -156,8 +156,17 @@
           "evidence": null
         },
         "26.0.0-BETA.3": {
-          "status": "OPEN",
-          "evidence": null,
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37345529487,
+            "artifact_id": 11360599004,
+            "artifact_digest": "sha256:2514b27b8b2854ff23ad7f31b554b286ad8aecf78b185f582082c830b8861d82",
+            "profile_identity": "truenas-app-foundry@15cb445722aad3aa62fa8075df83240ff13b51df:.foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json#a8ebc533dc84172520eba2237ffeeb52b102dc24",
+            "source_identity": "agent-dispatch@fb92e0a0b275a28f9b3a0be4f3221f6df46a5568; Foundry control fb41afd3d112f361b8c490aeb5915a978b956b20; FolioRelay control sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce; cups sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
           "prior_failure_evidence": [
             {
               "run_id": 37139185156,

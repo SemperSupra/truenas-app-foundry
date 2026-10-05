@@ -142,7 +142,13 @@ class MatrixTests(unittest.TestCase):
         self.assertIn("foliorelay-app", rows)
         self.assertEqual(rows["foliorelay-app"]["classification"], "product")
         self.assertEqual(rows["foliorelay-app"]["source"]["kind"], "external-foundry-product-authority")
-        self.assertTrue(all(cell["status"] == "OPEN" for cell in rows["foliorelay-app"]["target_status"].values()))
+        folio_status = rows["foliorelay-app"]["target_status"]
+        self.assertEqual(folio_status["26.0.0-BETA.3"]["status"], "PASS")
+        self.assertTrue(folio_status["26.0.0-BETA.3"]["evidence"]["f0_f5_complete"])
+        self.assertTrue(folio_status["26.0.0-BETA.3"]["evidence"]["oracle_satisfied"])
+        for version in ("25.04.1", "25.04.2.6", "25.10.7"):
+            self.assertEqual(folio_status[version]["status"], "OPEN")
+            self.assertIsNone(folio_status[version]["evidence"])
 
 if __name__ == "__main__":
     unittest.main()
