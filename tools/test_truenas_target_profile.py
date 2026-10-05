@@ -83,6 +83,21 @@ class TargetProfileTests(unittest.TestCase):
             if profile:
                 self.assertTrue((HERE.parent / profile).is_file(), profile)
 
+    def test_2504_profiles_match_exact_app_state_source_contract(self):
+        expected = ["CRASHED", "DEPLOYING", "RUNNING", "STOPPED", "STOPPING"]
+        for version in ("25.04.1", "25.04.2.6"):
+            target = next(t for t in REGISTRY["targets"] if t["version"] == version)
+            profile = mod.load_json(HERE.parent / target["profile"])
+            self.assertEqual(profile["provider_assumptions"]["app_states"], expected)
+            app_contract = next(
+                item for item in profile["source_contract"]
+                if item["path"].endswith("/api/v25_04_0/app.py")
+            )
+            self.assertIn(
+                "state: Literal['CRASHED', 'DEPLOYING', 'RUNNING', 'STOPPED', 'STOPPING']",
+                app_contract["contains"],
+            )
+
     def test_exact_nightly_is_never_promoted_from_family_match(self):
         got = mod.discover(
             observation("TrueNAS-26.0.0-MASTER+20260929-020101"), REGISTRY
