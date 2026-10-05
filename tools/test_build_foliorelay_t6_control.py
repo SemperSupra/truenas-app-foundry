@@ -174,6 +174,16 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
 
+    def test_25x_rejects_any_dbus_mount_beyond_exact_discovery_socket(self):
+        target = {"profile_id": "p", "truenas_version": "25.10.7"}
+        value = MOD.materialize_target_compose(compose(), target)
+        value["services"]["control"]["volumes"].append(
+            mount("/run/dbus/other", "/run/dbus/other", True)
+        )
+        with self.assertRaises(MOD.ControlError):
+            MOD.validate(publication(), value, target)
+
+
     def test_build_emits_exact_control_receipt(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
