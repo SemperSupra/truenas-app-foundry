@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
@@ -25,6 +26,16 @@ CUPS_ARTIFACT_TARGET = "/var/lib/foliorelay-artifacts"
 TOKEN_TARGET = "/run/secrets/foliorelay.token"
 
 REQUIRED_CUPS_TMPFS = {"/etc/cups", "/var/cache/cups", "/var/log/cups"}
+
+DBUS_SOCKET = "/run/dbus/system_bus_socket"
+AVAHI_TARGETS = {"25.04.1", "25.04.2.6", "25.10.7"}
+DIRECT_TARGETS = {"26.0.0-BETA.3"}
+DISCOVERY_IDENTITY_FILE = "/var/lib/foliorelay-control/config/printer.json"
+AVAHI_DISCOVERY_COMMAND = [
+    "-identity-file", DISCOVERY_IDENTITY_FILE,
+    "-backend", "avahi",
+    "-dbus-address", "unix:path=/run/dbus/system_bus_socket",
+]
 
 
 class ControlError(RuntimeError):
@@ -144,7 +155,77 @@ def _publication(receipt: dict) -> tuple[str, str]:
     )
 
 
+def materialize_target_compose(compose: dict, target: dict) -> dict:
+    version = target.get("truenas_version")
+    if version not in AVAHI_TARGETS | DIRECT_TARGETS:
+        raise ControlError(f"unsupported FolioRelay target version: {version!r}")
+
+    rendered = copy.deepcopy(compose)
+    discovery = _services(rendered)["discovery"]
+    volumes = list(discovery.get("volumes") or [])
+
+    if version in AVAHI_TARGETS:
+        if any(isinstance(v, dict) and v.get("target") == DBUS_SOCKET for v in volumes):
+            raise ControlError("source Compose must not predeclare the Avahi system-bus mount")
+        volumes.append({
+            "type": "bind",
+            "source": DBUS_SOCKET,
+            "target": DBUS_SOCKET,
+            "read_only": True,
+        })
+        discovery["volumes"] = volumes
+        discovery["command"] = list(AVAHI_DISCOVERY_COMMAND)
+    else:
+        discovery["command"] = [
+            "-identity-file",
+            DISCOVERY_IDENTITY_FILE,
+        ]
+    return rendered
+
+
+def _validate_discovery_transport(discovery: dict, version: str) -> str:
+    volumes = discovery.get("volumes") or []
+    dbus_mounts = [
+        v for v in volumes
+        if isinstance(v, dict) and (
+            v.get("source") == DBUS_SOCKET or v.get("target") == DBUS_SOCKET
+        )
+    ]
+    command = discovery.get("command") or []
+
+    if version in AVAHI_TARGETS:
+        if len(dbus_mounts) != 1:
+            raise ControlError("25.x discovery requires exactly one Avahi system-bus mount")
+        mount = dbus_mounts[0]
+        if (
+            mount.get("type") != "bind"
+            or mount.get("source") != DBUS_SOCKET
+            or mount.get("target") != DBUS_SOCKET
+            or mount.get("read_only") is not True
+        ):
+            raise ControlError("25.x discovery Avahi system-bus mount drifted")
+        if command != AVAHI_DISCOVERY_COMMAND:
+            raise ControlError("25.x discovery must use the exact Avahi backend command")
+        return "avahi"
+
+    if version in DIRECT_TARGETS:
+        if dbus_mounts:
+            raise ControlError("direct discovery target must not mount the system bus")
+        if "-backend" in command or "-dbus-address" in command:
+            raise ControlError("direct discovery target must not select Avahi")
+        return "direct"
+
+    raise ControlError(f"unsupported FolioRelay target version: {version!r}")
+
+
 def validate(publication: dict, compose: dict, target: dict) -> dict:
+    version = target.get("truenas_version")
+    profile_id = target.get("profile_id")
+    if not isinstance(version, str) or not version:
+        raise ControlError("target profile missing truenas_version")
+    if not isinstance(profile_id, str) or not profile_id:
+        raise ControlError("target profile missing profile_id")
+
     control_image, cups_image = _publication(publication)
     services = _services(compose)
     control = services["control"]
@@ -172,6 +253,7 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     _require_mount(cups, TOKEN_TARGET, TOKEN_PATH, True)
 
     _require_mount(discovery, CUPS_CONTROL_TARGET, CONTROL_ROOT, True)
+    discovery_backend = _validate_discovery_transport(discovery, version)
 
     if not REQUIRED_CUPS_TMPFS.issubset(_tmpfs_targets(cups)):
         raise ControlError("CUPS ephemeral tmpfs contract drifted")
@@ -187,7 +269,6 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     for forbidden in (
         "/var/run/docker.sock",
         "/run/docker.sock",
-        "/run/dbus",
         "/var/run/dbus",
         "/etc/avahi",
         ":latest",
@@ -195,13 +276,17 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     ):
         if forbidden in rendered:
             raise ControlError(f"forbidden rendered content: {forbidden}")
-
-    version = target.get("truenas_version")
-    profile_id = target.get("profile_id")
-    if not isinstance(version, str) or not version:
-        raise ControlError("target profile missing truenas_version")
-    if not isinstance(profile_id, str) or not profile_id:
-        raise ControlError("target profile missing profile_id")
+    if version in DIRECT_TARGETS and "/run/dbus" in rendered:
+        raise ControlError("direct discovery target must not couple to host D-Bus")
+    if version in AVAHI_TARGETS:
+        allowed = json.dumps({DBUS_SOCKET: DBUS_SOCKET})
+        # Exact mount validation above is authoritative; this catches other D-Bus paths.
+        other_dbus = [
+            token for token in ("/run/dbus/", "/run/dbus")
+            if token in rendered and DBUS_SOCKET not in rendered
+        ]
+        if other_dbus:
+            raise ControlError("25.x discovery contains unexpected host D-Bus coupling")
 
     return {
         "control_image": control_image,
@@ -210,6 +295,7 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
         "truenas_version": version,
         "target_profile_id": profile_id,
         "target_profile_schema": target.get("schema_version"),
+        "discovery_backend": discovery_backend,
     }
 
 
@@ -219,13 +305,17 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
         raise ControlError("foundry_ref must be an exact 40-character commit SHA")
 
     publication = load_json(publication_path)
-    compose = load_json(compose_path)
+    source_compose = load_json(compose_path)
     target = load_json(target_path)
+    compose = materialize_target_compose(source_compose, target)
     facts = validate(publication, compose, target)
 
     output.mkdir(parents=True, exist_ok=False)
     shutil.copy2(publication_path, output / "publication-receipt.json")
-    shutil.copy2(compose_path, output / "compose.json")
+    (output / "compose.json").write_text(
+        json.dumps(compose, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     shutil.copy2(values_path, output / "values.yaml")
     shutil.copy2(target_path, output / "target-profile.json")
 
@@ -242,6 +332,7 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
             "management_port": 18080,
             "ipp_port": 8634,
             "discovery_network_mode": "host",
+            "discovery_backend": facts["discovery_backend"],
         },
         "candidate": facts,
         "artifacts": {
