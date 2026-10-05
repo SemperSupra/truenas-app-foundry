@@ -169,6 +169,16 @@
         "call('app.start', 'actual-budget', job=True)",
         "call('app.delete', 'actual-budget', {'remove_ix_volumes': True, 'remove_images': True}, job=True)"
       ]
+    },
+    {
+      "path": "src/middlewared/middlewared/plugins/docker/update.py",
+      "blob_sha": "974a3ae64f2671a880241193a187f1ed73f835e5",
+      "contains": [
+        "async def license_active(self):",
+        "system.is_ha_capable",
+        "'JAILS' in license_['features']",
+        "async def do_update(self, job, data):"
+      ]
     }
   ],
   "platform_features": {
@@ -235,7 +245,8 @@
       "CRASHED",
       "DEPLOYING",
       "RUNNING",
-      "STOPPED"
+      "STOPPED",
+      "STOPPING"
     ],
     "active_workload_fields": [
       "containers",
@@ -250,7 +261,12 @@
       "compose_volumes_removed": true,
       "ix_volumes_removed_only_when_requested": true
     },
-    "custom_app_create_uses_compose_up": true
+    "custom_app_create_uses_compose_up": true,
+    "apps_license_gate": {
+      "method": "docker.license_active",
+      "non_ha": "allowed",
+      "ha": "system.license must contain JAILS feature"
+    }
   },
   "policies": {
     "unknown_active_ref": "fail-closed",
