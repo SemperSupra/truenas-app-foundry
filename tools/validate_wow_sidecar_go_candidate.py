@@ -219,9 +219,31 @@ def validate(value: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     release_prep = source.get("release_prep")
     require(isinstance(release_prep, dict), "release_prep missing")
     require(release_prep.get("qualification") == "PASS", "release-prep qualification missing")
-    require(release_prep.get("evidence_scope") == "mechanism-only; source head superseded by repaired G6.11e", "release-prep evidence scope drift")
-    require(release_prep.get("superseded_source_revision") == "d31cc4ead43c2998c6f26d6665d5573315b135a5", "superseded release-prep source drift")
+    require(release_prep.get("head") == "2c236d83705c811099fd9d60959692e5003edaef", "repaired release-prep head drift")
+    require(release_prep.get("run") == 37278888142, "repaired release-prep run drift")
+    require(release_prep.get("evidence_scope") == "repaired-head qualify-only release mechanics", "release-prep evidence scope drift")
     require(release_prep.get("publish") == "SKIPPED", "repo-prepared candidate must not claim publication")
+    require(release_prep.get("native_verify") == "SKIPPED", "repo-prepared candidate must not claim native publication verification")
+    require(release_prep.get("receipt") == "SKIPPED", "repo-prepared candidate must not claim publication receipt")
+    require(release_prep.get("receipt_schema_prepared") == "wow-sidecar.go-publication-receipt.v2", "release receipt schema drift")
+    required_receipt_fields = release_prep.get("receipt_required_fields")
+    require(isinstance(required_receipt_fields, list), "release receipt required fields missing")
+    require(required_receipt_fields == [
+        "source_sha",
+        "immutable_tag",
+        "manifest_digest",
+        "platform_digests.linux/amd64",
+        "platform_digests.linux/arm64",
+        "publication.run_id",
+        "publication.run_attempt",
+        "publication.workflow_sha",
+        "build_recipe.dockerfile",
+        "build_recipe.workflow",
+        "build_recipe.go_toolchain",
+        "build_recipe.buildkit_image",
+        "build_recipe.provenance",
+        "build_recipe.sbom",
+    ], "release receipt required fields drift")
 
     container = value.get("container")
     require(isinstance(container, dict), "container missing")
