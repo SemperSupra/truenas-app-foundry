@@ -8,7 +8,7 @@ under `candidates/wow-sidecar-app`; that package remains the rollback baseline.
 
 This candidate is repo-prepared only:
 
-- public G6.11e source candidate: `d31cc4ead43c2998c6f26d6665d5573315b135a5`;
+- public G6.11e source candidate: `cd2d073f7d4366fa4165b8875e19d286da4e8784`;
 - exact image publication has **not** occurred;
 - the all-zero image digest is an intentional synthetic, non-deployable fixture;
 - public App render qualification, private TrueNAS HIL, cutover, and rollback
@@ -56,10 +56,11 @@ are not offered by this candidate.
 
 Before this candidate can become HIL-eligible:
 
-1. G6.11e runtime acceptance must be durable;
-2. an exact multi-arch Go image must be published and receipt-qualified;
-3. the zero digest must be replaced by that exact accepted digest;
-4. the public-safe App render must pass on the exact rebound candidate;
-5. only then may private/disposable TrueNAS qualification proceed.
+1. repaired G6.11e runtime acceptance (#96/#89) must be durable;
+2. release mechanics must be requalified on repaired public head `cd2d073f7d4366fa4165b8875e19d286da4e8784`;
+3. an exact multi-arch Go image must be published and receipt-qualified;
+4. the zero digest must be replaced by that exact accepted digest;
+5. the public-safe App render must pass on the exact rebound candidate;
+6. only then may private/disposable TrueNAS qualification proceed.
 
 No step here authorizes live TrueNAS mutation or state-preserving cutover.
