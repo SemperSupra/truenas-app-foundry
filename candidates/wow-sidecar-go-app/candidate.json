@@ -12,8 +12,8 @@
       "peer_federation": 37228478901
     },
     "release_prep": {
-      "head": "2c236d83705c811099fd9d60959692e5003edaef",
-      "run": 37278888142,
+      "head": "dfd19a9b60329fcbe6e2ce50aa1ab7064825abb2",
+      "run": 37284087557,
       "qualification": "PASS",
       "evidence_scope": "repaired-head qualify-only release mechanics",
       "publish": "SKIPPED",
@@ -35,7 +35,9 @@
         "build_recipe.buildkit_image",
         "build_recipe.provenance",
         "build_recipe.sbom"
-      ]
+      ],
+      "receipt_contract_qualified": true,
+      "receipt_contract_qualification": "PASS"
     }
   },
   "container": {
