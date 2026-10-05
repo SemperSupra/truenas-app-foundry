@@ -135,6 +135,11 @@ def _hardened(service: dict, name: str) -> None:
     caps = service.get("cap_drop") or []
     if "ALL" not in caps:
         raise ControlError(f"{name} must drop all capabilities")
+    if service.get("cap_add"):
+        raise ControlError(f"{name} must not add capabilities back")
+    security_opt = service.get("security_opt") or []
+    if "no-new-privileges:true" not in security_opt:
+        raise ControlError(f"{name} must enforce no-new-privileges")
 
 
 def _publication(receipt: dict) -> tuple[str, str]:
