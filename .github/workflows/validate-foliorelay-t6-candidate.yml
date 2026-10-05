@@ -3,6 +3,7 @@ name: FolioRelay T6 Candidate Contract
 on:
   pull_request:
     branches:
+      - main
       - feat/version-aware-truenas-target-reconcile
     paths:
       - ".foundry/foliorelay/**"
@@ -15,9 +16,13 @@ permissions:
   contents: read
 
 jobs:
-  beta3-candidate:
+  target-matrix:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3"]
     steps:
       - name: Checkout exact Foundry source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -25,28 +30,35 @@ jobs:
       - name: Unit test FolioRelay exporter
         run: python3 -m unittest tools/test_build_foliorelay_t6_control.py
 
-      - name: Build exact BETA.3 control bundle
+      - name: Build exact target control bundle
+        env:
+          TARGET_VERSION: ${{ matrix.version }}
         run: |
           set -euo pipefail
-          rm -rf /tmp/foliorelay-t6-beta3
+          out="/tmp/foliorelay-t6-${TARGET_VERSION}"
+          rm -rf "$out"
           python3 tools/build_foliorelay_t6_control.py \
             --publication-receipt .foundry/foliorelay/t6/beta3/publication-receipt.json \
             --compose .foundry/foliorelay/t6/beta3/compose.json \
             --values .foundry/foliorelay/t6/beta3/values.yaml \
-            --target-profile .foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json \
-            --output /tmp/foliorelay-t6-beta3 \
+            --target-profile ".foundry/truenas-compatibility/${TARGET_VERSION}-materialization.json" \
+            --output "$out" \
             --foundry-ref "${{ github.event.pull_request.head.sha }}"
 
       - name: Verify control receipt binds exact candidate
+        env:
+          TARGET_VERSION: ${{ matrix.version }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
           from pathlib import Path
-          root = Path("/tmp/foliorelay-t6-beta3")
+          import os
+          version = os.environ["TARGET_VERSION"]
+          root = Path(f"/tmp/foliorelay-t6-{version}")
           control = json.loads((root / "control.json").read_text())
           assert control["schema"] == "semper-supra.foliorelay-truenas-t6-control/1"
-          assert control["candidate"]["truenas_version"] == "26.0.0-BETA.3"
+          assert control["candidate"]["truenas_version"] == version
           assert control["candidate"]["control_image"].endswith("sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce")
           assert control["candidate"]["cups_image"].endswith("sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f")
           required = set(control["required_oracles"])
@@ -67,11 +79,11 @@ jobs:
           }, sort_keys=True))
           PY
 
-      - name: Upload exact BETA.3 control bundle
+      - name: Upload exact target control bundle
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: foliorelay-t6-beta3-control
-          path: /tmp/foliorelay-t6-beta3
+          name: foliorelay-t6-${{ matrix.version }}-control
+          path: /tmp/foliorelay-t6-${{ matrix.version }}
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
