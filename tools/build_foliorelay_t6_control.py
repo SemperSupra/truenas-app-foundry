@@ -18,6 +18,9 @@ ARTIFACT_ROOT = "/mnt/rdtepool/foliorelay-t6/artifacts"
 CUPS_STATE_ROOT = "/mnt/rdtepool/foliorelay-t6/cups-state"
 CUPS_SPOOL_ROOT = "/mnt/rdtepool/foliorelay-t6/cups-spool"
 TOKEN_PATH = "/mnt/rdtepool/foliorelay-t6/secrets/control.token"
+SECRETS_ROOT = "/mnt/rdtepool/foliorelay-t6/secrets"
+HOST_UID = 10001
+HOST_GID = 10001
 
 CONTROL_TARGET = "/var/lib/foliorelay"
 ARTIFACT_TARGET = "/var/lib/foliorelay/artifacts"
@@ -341,6 +344,16 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
     shutil.copy2(values_path, output / "values.yaml")
     shutil.copy2(target_path, output / "target-profile.json")
 
+    control_root_mode = "0710" if facts["discovery_backend"] == "avahi" else "0700"
+    host_path_requirements = [
+        {"path": CONTROL_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": control_root_mode},
+        {"path": ARTIFACT_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0700"},
+        {"path": CUPS_STATE_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0755"},
+        {"path": CUPS_SPOOL_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0755"},
+        {"path": SECRETS_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0700"},
+        {"path": TOKEN_PATH, "kind": "file", "uid": HOST_UID, "gid": HOST_GID, "mode": "0400"},
+    ]
+
     control = {
         "schema": SCHEMA,
         "foundry_ref": foundry_ref,
@@ -355,6 +368,7 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
             "ipp_port": 8634,
             "discovery_network_mode": "host",
             "discovery_backend": facts["discovery_backend"],
+            "host_path_requirements": host_path_requirements,
         },
         "candidate": facts,
         "artifacts": {

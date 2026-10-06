@@ -1,4 +1,5 @@
 import json
+import pathlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -190,6 +191,28 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         )
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
+
+    def test_host_path_contract_is_target_specific_and_least_privilege(self):
+        for version in ("25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3"):
+            with self.subTest(version=version):
+                target={"profile_id":"p","schema_version":2,"truenas_version":version}
+                with tempfile.TemporaryDirectory() as td:
+                    root=pathlib.Path(td)
+                    pub=root/"publication.json"; comp=root/"compose.json"; vals=root/"values.yaml"; prof=root/"profile.json"; out=root/"out"
+                    pub.write_text(json.dumps(publication()),encoding="utf-8")
+                    comp.write_text(json.dumps(compose()),encoding="utf-8")
+                    vals.write_text("printer: FolioRelay\n",encoding="utf-8")
+                    prof.write_text(json.dumps(target),encoding="utf-8")
+                    control=MOD.build(pub,comp,vals,prof,out,"a"*40)
+                reqs={x["path"]:x for x in control["runtime"]["host_path_requirements"]}
+                self.assertEqual(reqs[MOD.CONTROL_ROOT]["uid"],10001)
+                self.assertEqual(reqs[MOD.CONTROL_ROOT]["gid"],10001)
+                self.assertEqual(reqs[MOD.CONTROL_ROOT]["mode"],"0710" if version in MOD.AVAHI_TARGETS else "0700")
+                self.assertEqual(reqs[MOD.ARTIFACT_ROOT]["mode"],"0700")
+                self.assertEqual(reqs[MOD.CUPS_STATE_ROOT]["mode"],"0755")
+                self.assertEqual(reqs[MOD.CUPS_SPOOL_ROOT]["mode"],"0755")
+                self.assertEqual(reqs[MOD.SECRETS_ROOT]["mode"],"0700")
+                self.assertEqual(reqs[MOD.TOKEN_PATH]["mode"],"0400")
 
     def test_25x_rejects_wrong_discovery_user(self):
         target = {"profile_id": "p", "truenas_version": "25.10.7"}
