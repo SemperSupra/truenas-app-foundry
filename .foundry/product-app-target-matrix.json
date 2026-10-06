@@ -178,6 +178,14 @@
               "classification": "ORACLE_FAILURE",
               "scope": "cooperative-Avahi F0-F5 rep 004",
               "note": "Control and CUPS ran, but discovery uid 65534/gid 10001 could not traverse the experiment-owned control bind root provisioned mode 0700; product identity permissions were already group-readable. Cleanup reached zero residue."
+            },
+            {
+              "run_id": 37528565732,
+              "artifact_id": 11444211449,
+              "artifact_digest": "sha256:74f3680f0ff84f4e41f9d06770ab257215541cdeb7e63d003fcab846be31fdcd",
+              "classification": "ORACLE_FAILURE",
+              "scope": "cooperative-Avahi F0-F5 rep 005",
+              "note": "The 0710 control-root correction succeeded and control, CUPS, and discovery all reached RUNNING; the independent observer then failed because it attempted to bind UDP/5353 alongside host Avahi. Cleanup reached zero residue."
             }
           ]
         },
