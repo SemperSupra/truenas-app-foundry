@@ -129,6 +129,7 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                 discovery = rendered["services"]["discovery"]
                 if version in MOD.AVAHI_TARGETS:
                     self.assertEqual(discovery["command"], MOD.AVAHI_DISCOVERY_COMMAND)
+                    self.assertEqual(discovery["user"], MOD.AVAHI_DISCOVERY_USER)
                     bus = [
                         item for item in discovery["volumes"]
                         if item.get("target") == MOD.DBUS_SOCKET
@@ -142,6 +143,7 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                 else:
                     self.assertNotIn(MOD.DBUS_SOCKET, json.dumps(discovery, sort_keys=True))
                     self.assertNotIn("-backend", discovery["command"])
+                    self.assertNotIn("user", discovery)
 
         self.assertEqual(
             {version: backends[version] for version in MOD.AVAHI_TARGETS},
@@ -188,6 +190,13 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         )
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
+
+    def test_25x_rejects_wrong_discovery_user(self):
+        target = {"profile_id": "p", "truenas_version": "25.10.7"}
+        value = MOD.materialize_target_compose(compose(), target)
+        value["services"]["discovery"]["user"] = "10001:10001"
+        with self.assertRaises(MOD.ControlError):
+            MOD.validate(publication(), value, target)
 
     def test_25x_rejects_any_dbus_mount_beyond_exact_discovery_socket(self):
         target = {"profile_id": "p", "truenas_version": "25.10.7"}
