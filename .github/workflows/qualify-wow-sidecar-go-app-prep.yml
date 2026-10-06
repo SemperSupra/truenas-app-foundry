@@ -1,4 +1,4 @@
-name: Qualify WOW Go TrueNAS App prep
+name: Qualify WOW Go TrueNAS App
 
 on:
   pull_request:
@@ -31,7 +31,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check             'Jinja2==3.1.6'             'PyYAML==6.0.3'
           python3 -m pip check
 
-      - name: Enforce public-safe prep boundary
+      - name: Enforce public-safe exact-image boundary
         shell: bash
         run: |
           set -euo pipefail
@@ -40,10 +40,11 @@ jobs:
           import json
           p='candidates/wow-sidecar-go-app/candidate.json'
           d=json.load(open(p, encoding='utf-8'))
-          assert d['phase'] == 'repo-prepared-exact-image-pending'
-          assert d['container']['synthetic_digest_fixture'] is True
-          assert d['container']['publication_state'] == 'not-published'
-          assert d['gates']['registry_image_published'] is False
+          assert d['phase'] == 'exact-image-bound-public-render-pending'
+          assert d['container']['synthetic_digest_fixture'] is False
+          assert d['container']['publication_state'] == 'published-verified'
+          assert d['gates']['runtime_independent_accepted'] is True
+          assert d['gates']['registry_image_published'] is True
           assert d['gates']['public_app_render_qualified'] is False
           assert d['gates']['hil_eligible'] is False
           PY
@@ -60,13 +61,13 @@ jobs:
           python3 - <<'PY'
           import json
           d=json.load(open('candidates/wow-sidecar-go-app/candidate.json', encoding='utf-8'))
-          assert d['container']['registry_reference'].endswith('0'*64)
+          assert d['container']['registry_reference'] == 'ghcr.io/sempersupra/wow-sidecar@sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d'
+          assert d['gates']['registry_image_published'] is True
           assert not any((
-              d['gates']['registry_image_published'],
               d['gates']['public_app_render_qualified'],
               d['gates']['private_truenas_hil_qualified'],
               d['gates']['state_preserving_cutover_qualified'],
               d['gates']['hil_eligible'],
           ))
-          print('PREP-ONLY boundary PASS')
+          print('EXACT-IMAGE / NO-DEPLOYMENT boundary PASS')
           PY
