@@ -152,8 +152,51 @@
           "evidence": null
         },
         "25.10.7": {
-          "status": "OPEN",
-          "evidence": null
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37531471852,
+            "artifact_id": 11446110117,
+            "artifact_digest": "sha256:bb07082df88b2d46206aafec483838e1f965c997a2c438d14ade7eeb7e9782d4",
+            "profile_identity": "truenas-app-foundry@e44bc2271de4c2065c68a8f7db53034fff36b4c5:.foundry/truenas-compatibility/25.10.7-materialization.json#1320cc849a9cc1e7ff6bd78989fc0e4708397248",
+            "source_identity": "agent-dispatch@43d2910a0cf51d3bf7ccccbc004035e364d49c19; Foundry control e44bc2271de4c2065c68a8f7db53034fff36b4c5; FolioRelay product tree 042a43a983537cb42c78c4a7a7233672a717f561 (qualified head 22e83c0ab08884e5c7eb827383e6c2016b0a7784; authority merge 7cffca5b8f596f6321ba065ff955be37362a505c); publication run 37457117549 artifact 11410550658; control sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "prior_failure_evidence": [
+            {
+              "run_id": 37348626079,
+              "artifact_id": 11361973439,
+              "artifact_digest": "sha256:4f8e0b817665ab96ea673f5ec14d1a5e0f15ac0245c32e23438ac072867804ed",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 row 001",
+              "note": "Control and CUPS reached RUNNING but the direct discovery container crashed under the host Avahi UDP/5353 boundary; this falsified competing mDNS-stack ownership."
+            },
+            {
+              "run_id": 37357850252,
+              "artifact_id": 11365424219,
+              "artifact_digest": "sha256:6402c65cc5a4b0ed1be179cfbccb56d0fefd8a392141f6bcb441f2ff8c380096",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 diagnostic row 002",
+              "note": "Retained discovery stderr proved `bind UDP/5353 for mDNS: address already in use`, earning the cooperative-Avahi architecture pivot."
+            },
+            {
+              "run_id": 37525243099,
+              "artifact_id": 11442956191,
+              "artifact_digest": "sha256:1ea29dfe2e329d35f1e1dd6d89289784073a52f4153bdd97bc4a8e8f300757fe",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 cooperative-Avahi rep 004",
+              "note": "Cooperative-Avahi product reached the appliance but the provider-owned control bind root was 0700, preventing discovery uid 65534/gid 10001 from traversing to the canonical identity; cleanup remained zero-residue."
+            },
+            {
+              "run_id": 37528565732,
+              "artifact_id": 11444211449,
+              "artifact_digest": "sha256:74f3680f0ff84f4e41f9d06770ab257215541cdeb7e63d003fcab846be31fdcd",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 cooperative-Avahi rep 005",
+              "note": "0710 control-root correction brought control, CUPS, and discovery to RUNNING; the independent observer then failed binding UDP/5353, isolating the final harness boundary."
+            }
+          ]
         },
         "26.0.0-BETA.3": {
           "status": "PASS",
