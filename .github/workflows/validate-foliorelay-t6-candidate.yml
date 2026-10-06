@@ -57,10 +57,19 @@ jobs:
           version = os.environ["TARGET_VERSION"]
           root = Path(f"/tmp/foliorelay-t6-{version}")
           control = json.loads((root / "control.json").read_text())
+          publication = json.loads(Path(".foundry/foliorelay/t6/beta3/publication-receipt.json").read_text())
+          expected_control = publication["control"]["image"] + "@" + publication["control"]["digest"]
+          expected_cups = publication["cups"]["image"] + "@" + publication["cups"]["digest"]
+          assert publication["schema"] == "semper-supra.foliorelay-rdte-publication/1"
+          assert publication["status"] == "PASS"
+          assert publication["control"]["anonymous_pull"] is True
+          assert publication["cups"]["anonymous_pull"] is True
+          assert publication["control"]["signed_keyless"] is True
+          assert publication["cups"]["signed_keyless"] is True
           assert control["schema"] == "semper-supra.foliorelay-truenas-t6-control/1"
           assert control["candidate"]["truenas_version"] == version
-          assert control["candidate"]["control_image"].endswith("sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce")
-          assert control["candidate"]["cups_image"].endswith("sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f")
+          assert control["candidate"]["control_image"] == expected_control
+          assert control["candidate"]["cups_image"] == expected_cups
           required = set(control["required_oracles"])
           assert "control-cups-dnssd-uuid-coherence" in required
           assert "dnssd-universal-visible" in required
