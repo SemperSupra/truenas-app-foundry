@@ -42,13 +42,13 @@ jobs:
           import json
           p='candidates/wow-sidecar-go-app/candidate.json'
           d=json.load(open(p, encoding='utf-8'))
-          assert d['phase'] == 'exact-image-bound-public-render-pending'
+          assert d['phase'] == 'public-render-qualified-private-hil-ready'
           assert d['container']['synthetic_digest_fixture'] is False
           assert d['container']['publication_state'] == 'published-verified'
           assert d['gates']['runtime_independent_accepted'] is True
           assert d['gates']['registry_image_published'] is True
-          assert d['gates']['public_app_render_qualified'] is False
-          assert d['gates']['hil_eligible'] is False
+          assert d['gates']['public_app_render_qualified'] is True
+          assert d['gates']['hil_eligible'] is True
           PY
 
       - name: Validate candidate and deterministic render contract
@@ -65,13 +65,13 @@ jobs:
           d=json.load(open('candidates/wow-sidecar-go-app/candidate.json', encoding='utf-8'))
           assert d['container']['registry_reference'] == 'ghcr.io/sempersupra/wow-sidecar@sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d'
           assert d['gates']['registry_image_published'] is True
-          assert not any((
-              d['gates']['public_app_render_qualified'],
-              d['gates']['private_truenas_hil_qualified'],
-              d['gates']['state_preserving_cutover_qualified'],
-              d['gates']['hil_eligible'],
-          ))
-          print('EXACT-IMAGE / NO-DEPLOYMENT boundary PASS')
+          assert d['gates']['public_app_render_qualified'] is True
+          assert d['gates']['hil_eligible'] is True
+          assert d['gates']['private_truenas_hil_qualified'] is False
+          assert d['gates']['state_preserving_cutover_qualified'] is False
+          assert d['public_render_evidence']['run'] == 37458833914
+          assert d['public_render_evidence']['compose_sha256'] == 'c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926'
+          print('PUBLIC-RENDER-QUALIFIED / PRIVATE-HIL-READY / NO-LIVE-DEPLOYMENT boundary PASS')
           PY
 
       - name: Pull exact published WOW image and permissions helper
