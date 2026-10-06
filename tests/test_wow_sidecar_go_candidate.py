@@ -44,7 +44,7 @@ class WowSidecarGoCandidateTests(unittest.TestCase):
         self.assertFalse(result["seed_helper_required"])
         self.assertEqual(result["runtime_user"], "10001:10001")
         self.assertFalse(result["deployable"])
-        self.assertEqual(result["phase"], "repo-prepared-exact-image-pending")
+        self.assertEqual(result["phase"], "exact-image-bound-public-render-pending")
 
     def test_go_candidate_image_contract_requires_exact_ghcr_digest(self):
         value = copy.deepcopy(self.value)
@@ -180,11 +180,12 @@ class WowSidecarGoCandidateTests(unittest.TestCase):
         self.assertEqual(published["port_number"], 18080)
         self.assertEqual(published["container_port"], 8080)
 
-    def test_candidate_fixture_is_mechanically_non_deployable(self):
-        self.assertEqual(self.value["phase"], "repo-prepared-exact-image-pending")
-        self.assertTrue(self.value["container"]["synthetic_digest_fixture"])
-        self.assertEqual(self.value["container"]["publication_state"], "not-published")
-        self.assertFalse(self.value["gates"]["registry_image_published"])
+    def test_published_candidate_still_not_hil_eligible_before_public_render(self):
+        self.assertEqual(self.value["phase"], "exact-image-bound-public-render-pending")
+        self.assertFalse(self.value["container"]["synthetic_digest_fixture"])
+        self.assertEqual(self.value["container"]["publication_state"], "published-verified")
+        self.assertTrue(self.value["gates"]["registry_image_published"])
+        self.assertTrue(self.value["gates"]["runtime_independent_accepted"])
         self.assertFalse(self.value["gates"]["public_app_render_qualified"])
         self.assertFalse(self.value["gates"]["hil_eligible"])
 
