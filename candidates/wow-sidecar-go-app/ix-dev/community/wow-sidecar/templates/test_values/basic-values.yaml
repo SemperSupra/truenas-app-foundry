@@ -1,7 +1,7 @@
 images:
   image:
     repository: ghcr.io/sempersupra/wow-sidecar@sha256
-    tag: "0000000000000000000000000000000000000000000000000000000000000000"
+    tag: "2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d"
   container_utils_image:
     repository: ixsystems/container-utils@sha256
     tag: 46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992
