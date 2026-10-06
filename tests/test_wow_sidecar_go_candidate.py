@@ -44,7 +44,7 @@ class WowSidecarGoCandidateTests(unittest.TestCase):
         self.assertFalse(result["seed_helper_required"])
         self.assertEqual(result["runtime_user"], "10001:10001")
         self.assertFalse(result["deployable"])
-        self.assertEqual(result["phase"], "exact-image-bound-public-render-pending")
+        self.assertEqual(result["phase"], "public-render-qualified-private-hil-ready")
 
     def test_go_candidate_image_contract_requires_exact_ghcr_digest(self):
         value = copy.deepcopy(self.value)
@@ -180,14 +180,21 @@ class WowSidecarGoCandidateTests(unittest.TestCase):
         self.assertEqual(published["port_number"], 18080)
         self.assertEqual(published["container_port"], 8080)
 
-    def test_published_candidate_still_not_hil_eligible_before_public_render(self):
-        self.assertEqual(self.value["phase"], "exact-image-bound-public-render-pending")
+    def test_public_render_qualified_candidate_is_private_hil_ready(self):
+        self.assertEqual(self.value["phase"], "public-render-qualified-private-hil-ready")
         self.assertFalse(self.value["container"]["synthetic_digest_fixture"])
         self.assertEqual(self.value["container"]["publication_state"], "published-verified")
         self.assertTrue(self.value["gates"]["registry_image_published"])
         self.assertTrue(self.value["gates"]["runtime_independent_accepted"])
-        self.assertFalse(self.value["gates"]["public_app_render_qualified"])
-        self.assertFalse(self.value["gates"]["hil_eligible"])
+        self.assertTrue(self.value["gates"]["public_app_render_qualified"])
+        self.assertTrue(self.value["gates"]["hil_eligible"])
+        self.assertFalse(self.value["gates"]["private_truenas_hil_qualified"])
+        self.assertFalse(self.value["gates"]["state_preserving_cutover_qualified"])
+        self.assertEqual(self.value["public_render_evidence"]["run"], 37458833914)
+        self.assertEqual(
+            self.value["public_render_evidence"]["compose_sha256"],
+            "c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926",
+        )
 
     def test_no_public_endpoint_advertised_by_default(self):
         rendered = MODULE.render_template(self.template_path, self.basic_values)
