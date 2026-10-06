@@ -36,6 +36,7 @@ AVAHI_DISCOVERY_COMMAND = [
     "-backend", "avahi",
     "-dbus-address", "unix:path=/run/dbus/system_bus_socket",
 ]
+AVAHI_DISCOVERY_USER = "65534:10001"
 
 
 class ControlError(RuntimeError):
@@ -179,8 +180,10 @@ def materialize_target_compose(compose: dict, target: dict) -> dict:
             "read_only": True,
         })
         discovery["volumes"] = volumes
+        discovery["user"] = AVAHI_DISCOVERY_USER
         discovery["command"] = list(AVAHI_DISCOVERY_COMMAND)
     else:
+        discovery.pop("user", None)
         discovery["command"] = [
             "-identity-file",
             DISCOVERY_IDENTITY_FILE,
@@ -234,9 +237,13 @@ def _validate_discovery_transport(discovery: dict, version: str) -> str:
     if version in AVAHI_TARGETS:
         if command != AVAHI_DISCOVERY_COMMAND:
             raise ControlError("25.x discovery must use the exact Avahi backend command")
+        if discovery.get("user") != AVAHI_DISCOVERY_USER:
+            raise ControlError("25.x discovery must use the exact unprivileged Avahi user")
         return "avahi"
 
     if version in DIRECT_TARGETS:
+        if "user" in discovery:
+            raise ControlError("direct discovery target must preserve image user")
         if "-backend" in command or "-dbus-address" in command:
             raise ControlError("direct discovery target must not select Avahi")
         return "direct"
