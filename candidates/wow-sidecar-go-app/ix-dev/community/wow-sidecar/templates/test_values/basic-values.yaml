@@ -59,6 +59,9 @@ storage:
       dataset_name: wow-sidecar-state
       acl_enable: false
 
+ix_volumes:
+  wow-sidecar-state: /opt/tests/mnt/wow-sidecar/state
+
 resources:
   limits:
     cpus: 1.0
