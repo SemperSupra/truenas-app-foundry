@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   qualify:
@@ -71,3 +72,47 @@ jobs:
           ))
           print('EXACT-IMAGE / NO-DEPLOYMENT boundary PASS')
           PY
+
+      - name: Pull exact published WOW image and permissions helper
+        id: pull
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          wow='ghcr.io/sempersupra/wow-sidecar@sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d'
+          helper='ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992'
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          if docker pull "$wow"; then
+            echo 'public_pull=true' >> "$GITHUB_OUTPUT"
+          else
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$wow"
+            echo 'public_pull=false' >> "$GITHUB_OUTPUT"
+          fi
+          docker pull "$helper"
+
+      - name: Qualify pinned official TrueNAS materializer render
+        shell: bash
+        env:
+          PUBLIC_PULL: ${{ steps.pull.outputs.public_pull }}
+        run: |
+          set -euo pipefail
+          sudo -n python3 tools/validate_wow_sidecar_go_app.py \
+            --public-pull "$PUBLIC_PULL" \
+            --evidence wow-sidecar-go-app-evidence.json
+
+      - name: Record public-safe official render evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### WOW Go TrueNAS official render qualification'
+            if [[ -f wow-sidecar-go-app-evidence.json ]]; then
+              echo '~~~json'
+              cat wow-sidecar-go-app-evidence.json
+              echo '~~~'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed qualification step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
