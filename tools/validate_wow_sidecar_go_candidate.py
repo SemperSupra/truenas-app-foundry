@@ -213,7 +213,7 @@ def load_candidate(path: Path) -> dict[str, Any]:
 def validate(value: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     require(value.get("schema_version") == 2, "unsupported schema")
     require(value.get("candidate") == "wow-sidecar-go-truenas-app", "unexpected candidate")
-    require(value.get("phase") == "exact-image-bound-public-render-pending", "unexpected candidate phase")
+    require(value.get("phase") == "public-render-qualified-private-hil-ready", "unexpected candidate phase")
 
     source = value.get("wow_source")
     require(isinstance(source, dict), "wow_source missing")
@@ -295,10 +295,17 @@ def validate(value: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     require(gates.get("runtime_hosted_qualified") is True, "hosted runtime qualification must be recorded")
     require(gates.get("runtime_independent_accepted") is True, "independent runtime acceptance must be recorded")
     require(gates.get("registry_image_published") is True, "published registry image must be recorded")
-    require(gates.get("public_app_render_qualified") is False, "repo-prepared App cannot claim public render qualification")
+    require(gates.get("public_app_render_qualified") is True, "public official-render qualification must be recorded")
     require(gates.get("private_truenas_hil_qualified") is False, "repo-prepared App cannot claim private HIL")
     require(gates.get("state_preserving_cutover_qualified") is False, "repo-prepared App cannot claim cutover qualification")
-    require(gates.get("hil_eligible") is False, "public render pending candidate cannot be HIL eligible")
+
+    public_render_evidence = value.get("public_render_evidence")
+    require(isinstance(public_render_evidence, dict), "public render evidence missing")
+    require(public_render_evidence.get("run") == 37458833914, "public render run drift")
+    require(public_render_evidence.get("qualification_head") == "bcb20a3915e2d01f47f31b9a5fc8f0fe1b61b637", "public render qualification head drift")
+    require(public_render_evidence.get("compose_sha256") == "c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926", "public render compose digest drift")
+    require(public_render_evidence.get("result") == "PASS", "public render evidence is not PASS")
+    require(gates.get("hil_eligible") is True, "public-render-qualified candidate must be HIL eligible")
 
     rendered_text = json.dumps(value, sort_keys=True)
     require(PRIVATE_REPO_RE.search(rendered_text) is None, "private repository identity leaked into public candidate")
