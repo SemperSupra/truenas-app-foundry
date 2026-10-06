@@ -88,7 +88,12 @@ def validate(value: dict[str, Any]) -> dict[str, Any]:
         "config_mount_read_only_for_worker": True,
         "state_storage": "ix_volume",
         "state_mount": "/var/lib/wow-sidecar",
-        "root_filesystem_read_only": True,
+        "worker_root_filesystem_read_only": True,
+        "seed_root_filesystem_writable_for_inline_configs": True,
+        "seed_rootfs_exception_scope": "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only",
+        "seed_inline_config_mode": "0444",
+        "persisted_managed_config_mode": "0400",
+        "seed_inline_config_scope": "ephemeral one-shot network-disabled seed inputs only",
         "temporary_filesystem": "/tmp",
         "runtime_uid": 10001,
         "runtime_gid": 10001,
@@ -115,15 +120,35 @@ def validate(value: dict[str, Any]) -> dict[str, Any]:
         require(value.get("phase") != "image-published-render-unqualified", "render-qualified gate/phase mismatch")
         evidence = value.get("public_render_evidence")
         require(isinstance(evidence, dict), "render qualification requires durable evidence")
+        require(evidence.get("schema") == "wow-sidecar-public-app-qualification/v2", "render qualification evidence schema drift")
         require(evidence.get("result") == "PASS", "render qualification evidence is not PASS")
-        require(evidence.get("run") == 36550143870, "render qualification run drift")
-        require(evidence.get("qualified_head") == "c5aa14ac85482cc093c1e1283b7c8e969d805f0e", "render qualification head drift")
-        require(evidence.get("compose_sha256") == "46ed8d0a3fdd543b5ad359cd73e2b5bf06b69a65ab4f6312fd5c523d2445ab1a", "rendered Compose digest drift")
+        require(isinstance(evidence.get("run"), int) and evidence["run"] > 0, "render qualification run missing")
+        require(
+            isinstance(evidence.get("qualified_head"), str)
+            and SHA_RE.fullmatch(evidence["qualified_head"]) is not None,
+            "render qualification head invalid",
+        )
+        compose_sha = evidence.get("compose_sha256")
+        require(
+            isinstance(compose_sha, str)
+            and len(compose_sha) == 64
+            and all(ch in "0123456789abcdef" for ch in compose_sha),
+            "rendered Compose digest invalid",
+        )
         require(evidence.get("ghcr_anonymous_pull") is True, "render qualification did not prove anonymous GHCR pull")
         require(evidence.get("seed_behavior") == "PASS:create-once/preserve/fail-partial", "seed qualification drift")
+        require(evidence.get("full_compose_behavior") == "PASS:permissions/seed/worker", "full Compose qualification missing")
         require(evidence.get("materializer_commit") == tn.get("commit"), "render materializer drift")
         require(evidence.get("wow_image") == container.get("registry_reference"), "render WOW image drift")
         require(evidence.get("permissions_helper") == helper_ref, "render permissions-helper drift")
+        require(evidence.get("worker_rootfs_read_only") is True, "qualified worker rootfs invariant missing")
+        require(evidence.get("seed_rootfs_read_only") is False, "qualified seed rootfs exception missing")
+        require(evidence.get("seed_inline_config_mode") == "0444", "qualified seed inline config mode drift")
+        require(evidence.get("persisted_managed_config_mode") == "0400", "qualified persistent config mode drift")
+        require(
+            evidence.get("corrects_falsifier_runs") == [36791533322, 36792356264],
+            "qualification is not linked to both full-Compose falsifiers",
+        )
 
     computed_hil_eligible = bool(gates.get("public_source_qualified") is True and gates.get("registry_image_published") is True and render_qualified)
     require(gates.get("hil_eligible") is computed_hil_eligible, "hil_eligible does not match pre-HIL gates")
