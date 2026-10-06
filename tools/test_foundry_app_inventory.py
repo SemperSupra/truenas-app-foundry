@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 
 
@@ -21,7 +22,7 @@ def sample_entry(app_id="probe-app", version="1.0.0", targets=None):
         "source": {
             "kind": "foundry-repository",
             "repository": "https://github.com/example/probe-app.git",
-            "ref": "0123456789abcdef",
+            "ref": "0123456789abcdef0123456789abcdef01234567",
             "path": "truenas",
         },
         "catalog_train": "test",
@@ -117,6 +118,48 @@ class InventoryTests(unittest.TestCase):
             )
         with self.assertRaises(MOD.InventoryError):
             MOD.resolve_entry(entries, targets, "probe-app", "1.0.0", "27.0.0")
+
+
+    def test_source_ref_must_be_exact_commit(self):
+        entry = sample_entry()
+        entry["source"]["ref"] = "main"
+        with self.assertRaisesRegex(MOD.InventoryError, "exact 40-hex commit"):
+            MOD.validate_inventory(
+                {"schema": "truenas-foundry-app-inventory/v1", "apps": [entry]}
+            )
+
+    def test_bootstrap_validates_exact_source_without_mutation(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            app = root / "candidate"
+            (app / "templates").mkdir(parents=True)
+            (app / "app.yaml").write_text(
+                "name: probe-app\n"
+                "version: 1.0.0\n"
+                "app_version: v1.0.0-test\n"
+                "train: test\n",
+                encoding="utf-8",
+            )
+            (app / "questions.yaml").write_text("groups: []\n", encoding="utf-8")
+            (app / "templates" / "docker-compose.yaml").write_text(
+                "services:\n  probe:\n    image: example.invalid/probe@sha256:" + "a" * 64 + "\n",
+                encoding="utf-8",
+            )
+            entry = sample_entry("probe-app", "1.0.0")
+            entry["source"]["path"] = "candidate"
+            result = MOD.bootstrap_entry(entry, root)
+            self.assertEqual(result["status"], "PASS")
+            self.assertFalse(result["mutation_performed"])
+            self.assertEqual(result["source_validation"]["app_yaml"]["name"], "probe-app")
+            self.assertEqual(result["source_validation"]["app_yaml"]["version"], "1.0.0")
+            self.assertEqual(result["source_validation"]["file_count"], 3)
+            self.assertEqual(len(result["source_validation"]["tree_sha256"]), 64)
+
+            bad = dict(entry)
+            bad["version"] = "2.0.0"
+            with self.assertRaisesRegex(MOD.InventoryError, "version mismatch"):
+                MOD.bootstrap_entry(bad, root)
+
 
 
 if __name__ == "__main__":
