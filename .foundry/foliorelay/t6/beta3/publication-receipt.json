@@ -1,22 +1,22 @@
 {
   "schema": "semper-supra.foliorelay-rdte-publication/1",
   "status": "PASS",
-  "source_revision": "bcbafe5bdbda69a1aabc32da42242fe1f8432cbd",
-  "product_head": "88fd70c8891eaf7b4c886aa928b96e232ca041c6",
-  "publication_head": "b07d25fc0d20f7da4ef0a6e4fc54853c137f1b5c",
-  "publication_run": 37125234117,
-  "publication_artifact_id": 11275036269,
-  "publication_artifact_digest": "sha256:60a249b787463fc051dc3113a168140e67902e25b2910c68add27673ecf0bc02",
-  "tag": "rdte-bcbafe5bdbda",
+  "source_revision": "075e319c34ab9c3a54f7ce1391b7b416c4c30037",
+  "product_head": "22e83c0ab08884e5c7eb827383e6c2016b0a7784",
+  "publication_head": "62c70cd727ef669a6e2962b42d682a4b6d54f5ba",
+  "publication_run": 37457117549,
+  "publication_artifact_id": 11410550658,
+  "publication_artifact_digest": "sha256:3ac45b9c7efc319d88736b83db7a0a42a504dcd9a6e74554f0d6d5ef24f26b53",
+  "tag": "rdte-075e319c34ab",
   "control": {
     "image": "ghcr.io/sempersupra/foliorelay-control",
-    "digest": "sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce",
+    "digest": "sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d",
     "anonymous_pull": true,
     "signed_keyless": true
   },
   "cups": {
     "image": "ghcr.io/sempersupra/foliorelay-cups",
-    "digest": "sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f",
+    "digest": "sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
     "anonymous_pull": true,
     "signed_keyless": true
   },
