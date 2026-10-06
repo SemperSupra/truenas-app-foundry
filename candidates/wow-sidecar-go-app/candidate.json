@@ -37,7 +37,23 @@
         "sbom": true
       },
       "receipt_contract_qualified": true,
-      "receipt_contract_qualification": "PASS"
+      "receipt_contract_qualification": "PASS",
+      "receipt_required_fields": [
+        "source_sha",
+        "immutable_tag",
+        "manifest_digest",
+        "platform_digests.linux/amd64",
+        "platform_digests.linux/arm64",
+        "publication.run_id",
+        "publication.run_attempt",
+        "publication.workflow_sha",
+        "build_recipe.dockerfile",
+        "build_recipe.workflow",
+        "build_recipe.go_toolchain",
+        "build_recipe.buildkit_image",
+        "build_recipe.provenance",
+        "build_recipe.sbom"
+      ]
     },
     "accepted_runtime_revision": "cd2d073f7d4366fa4165b8875e19d286da4e8784"
   },
