@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "candidate": "wow-sidecar-go-truenas-app",
-  "phase": "exact-image-bound-public-render-pending",
+  "phase": "public-render-qualified-private-hil-ready",
   "wow_source": {
     "repository": "https://github.com/SemperSupra/wow-sidecar.git",
     "public_candidate_revision": "86891777c37116393760d844dad0dc1ca8e835bb",
@@ -105,10 +105,17 @@
     "runtime_hosted_qualified": true,
     "runtime_independent_accepted": true,
     "registry_image_published": true,
-    "public_app_render_qualified": false,
+    "public_app_render_qualified": true,
     "private_truenas_hil_qualified": false,
     "state_preserving_cutover_qualified": false,
-    "hil_eligible": false
+    "hil_eligible": true
   },
-  "claim_boundary": "Go-native TrueNAS App is bound to the authorized published repaired G6.11e image and durable v2 receipt. Public official-materializer render qualification remains pending; private HIL, cutover, rollback, credentials, and live TrueNAS mutation remain unauthorized."
+  "claim_boundary": "Published exact-image TrueNAS App has PASSed public official-materializer qualification and is eligible for private read-only/HIL qualification. No physical TrueNAS mutation, production credential use, state migration, cutover, or rollback qualification has occurred.",
+  "public_render_evidence": {
+    "run": 37458833914,
+    "qualification_head": "bcb20a3915e2d01f47f31b9a5fc8f0fe1b61b637",
+    "compose_sha256": "c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926",
+    "evidence_file": "candidates/wow-sidecar-go-app/evidence/public-render-qualification-37458833914.json",
+    "result": "PASS"
+  }
 }
