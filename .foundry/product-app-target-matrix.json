@@ -153,7 +153,33 @@
         },
         "25.10.7": {
           "status": "OPEN",
-          "evidence": null
+          "evidence": null,
+          "prior_failure_evidence": [
+            {
+              "run_id": 37348626079,
+              "artifact_id": 11361973439,
+              "artifact_digest": "sha256:4f8e0b817665ab96ea673f5ec14d1a5e0f15ac0245c32e23438ac072867804ed",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 row 001",
+              "note": "Control and CUPS reached RUNNING but discovery CRASHED before the external DNS-SD observer; cleanup reached zero residue."
+            },
+            {
+              "run_id": 37357850252,
+              "artifact_id": 11365424219,
+              "artifact_digest": "sha256:6402c65cc5a4b0ed1be179cfbccb56d0fefd8a392141f6bcb441f2ff8c380096",
+              "classification": "ORACLE_FAILURE",
+              "scope": "discovery diagnostic row 002",
+              "note": "Retained discovery stderr localized the direct backend failure to UDP/5353 already in use on the TrueNAS 25.x Avahi host, motivating cooperative Avahi D-Bus publication."
+            },
+            {
+              "run_id": 37525243099,
+              "artifact_id": 11442956191,
+              "artifact_digest": "sha256:1ea29dfe2e329d35f1e1dd6d89289784073a52f4153bdd97bc4a8e8f300757fe",
+              "classification": "ORACLE_FAILURE",
+              "scope": "cooperative-Avahi F0-F5 rep 004",
+              "note": "Control and CUPS ran, but discovery uid 65534/gid 10001 could not traverse the experiment-owned control bind root provisioned mode 0700; product identity permissions were already group-readable. Cleanup reached zero residue."
+            }
+          ]
         },
         "26.0.0-BETA.3": {
           "status": "PASS",
