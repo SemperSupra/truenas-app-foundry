@@ -12,6 +12,8 @@ import sys
 import tempfile
 from typing import Any
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_PATH = REPO_ROOT / "candidates" / "wow-sidecar-go-app" / "candidate.json"
 SOURCE = REPO_ROOT / "candidates" / "wow-sidecar-go-app" / "ix-dev" / "community" / "wow-sidecar"
@@ -56,6 +58,23 @@ def install_candidate(checkout: Path, candidate: dict[str, Any]) -> Path:
     if app_dir.exists():
         shutil.rmtree(app_dir)
     shutil.copytree(SOURCE, app_dir)
+
+    # The upstream materializer overlays ix_values.yaml after the named test
+    # values file. Keep shipped defaults secret-free, but inject a public
+    # synthetic key into this disposable checkout so the file-backed config
+    # path is actually rendered and validated.
+    ix_values_path = app_dir / "ix_values.yaml"
+    ix_values = yaml.safe_load(ix_values_path.read_text(encoding="utf-8"))
+    ix_values["wow"]["github_app_private_key"] = (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "PUBLIC-QUALIFICATION-FIXTURE\n"
+        "-----END PRIVATE KEY-----\n"
+    )
+    ix_values_path.write_text(
+        yaml.safe_dump(ix_values, sort_keys=False),
+        encoding="utf-8",
+    )
+
     lib_name = f"base_v{str(candidate['truenas_source']['lib_version']).replace('.', '_')}"
     lib_src = checkout / "ix-dev" / "community" / "ntfy" / "templates" / "library" / lib_name
     lib_dst = app_dir / "templates" / "library" / lib_name
