@@ -5,6 +5,7 @@ on:
     paths:
       - 'candidates/wow-sidecar-go-app/**'
       - 'tools/validate_wow_sidecar_go_candidate.py'
+      - 'tools/validate_wow_sidecar_go_app_v2.py'
       - 'tests/test_wow_sidecar_go_candidate.py'
       - '.github/workflows/qualify-wow-sidecar-go-app-prep.yml'
   workflow_dispatch:
@@ -98,7 +99,7 @@ jobs:
           PUBLIC_PULL: ${{ steps.pull.outputs.public_pull }}
         run: |
           set -euo pipefail
-          sudo -n python3 tools/validate_wow_sidecar_go_app.py \
+          sudo -n python3 tools/validate_wow_sidecar_go_app_v2.py \
             --public-pull "$PUBLIC_PULL" \
             --evidence wow-sidecar-go-app-evidence.json
 
