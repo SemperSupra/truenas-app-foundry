@@ -2,7 +2,9 @@ app_name: rdte-t6-foliorelay
 printer_name: FolioRelay
 printer_location: RDTE
 public_host: foliorelay-t6.local
-management_port: 18080
+management_port: 18443
+management_scheme: https
+management_internal_port: 18080
 ipp_port: 8634
 data_root: /mnt/rdtepool/foliorelay-t6
 token_file: /mnt/rdtepool/foliorelay-t6/secrets/control.token
