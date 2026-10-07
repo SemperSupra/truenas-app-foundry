@@ -21,6 +21,13 @@ a complete matrix PASS retroactively.
 The validator also discovers `candidates/*/candidate.json`; adding a candidate
 without adding a matrix row fails closed.
 
+GARM controller generic qualification has now earned an exact BETA.3 F0–F5 PASS
+from Agent Dispatch run `37587664305` (artifact `11467413455`,
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue). The
+25.10.7, 25.04.2.6, and 25.04.1 GARM controller cells remain OPEN until their
+own exact runtime receipts earn PASS; the earlier G1a evidence remains retained
+as partial provenance rather than being substituted for the generic recipe.
+
 
 ## External products
 
