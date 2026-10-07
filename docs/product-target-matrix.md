@@ -29,6 +29,12 @@ own exact runtime receipts earn PASS; the earlier G1a evidence remains retained
 as partial provenance rather than being substituted for the generic recipe.
 
 
+The next exact GARM controller row, TrueNAS 25.10.7, also earned a full generic
+F0–F5 PASS from Agent Dispatch run `37599994362` (artifact `11473008105`,
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue). The
+25.04.2.6 and 25.04.1 controller cells remain OPEN until their own exact runtime
+receipts earn PASS.
+
 ## External products
 
 Products whose implementation lives outside the Foundry repository are still explicit
