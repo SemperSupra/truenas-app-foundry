@@ -24,6 +24,12 @@
         },
         {
           "type": "bind",
+          "source": "/mnt/rdtepool/foliorelay-t6/tls",
+          "target": "/var/lib/foliorelay-tls",
+          "read_only": false
+        },
+        {
+          "type": "bind",
           "source": "/mnt/rdtepool/foliorelay-t6/artifacts",
           "target": "/var/lib/foliorelay/artifacts",
           "read_only": false
@@ -44,7 +50,7 @@
         "-https-listen",
         "0.0.0.0:18443",
         "-tls-state-dir",
-        "/var/lib/foliorelay/tls",
+        "/var/lib/foliorelay-tls",
         "-journal",
         "/var/lib/foliorelay/state/journal.frj",
         "-artifact-store",
