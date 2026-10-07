@@ -144,8 +144,17 @@
       "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
       "target_status": {
         "25.04.1": {
-          "status": "OPEN",
-          "evidence": null
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37572795630,
+            "artifact_id": 11461469097,
+            "artifact_digest": "sha256:5142c17cbe96fd3b80cccb09e15754a16346144e3fdac4ddb20e3050dae35b3e",
+            "profile_identity": "truenas-app-foundry@6494dbd336260b549772ffa5c398d7a104fabf15:.foundry/truenas-compatibility/25.04.1-materialization.json#800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
+            "source_identity": "agent-dispatch@413c853e7f6b93d32cd3cf79c39a1fd9d4130049; Foundry control 6494dbd336260b549772ffa5c398d7a104fabf15; FolioRelay product tree 042a43a983537cb42c78c4a7a7233672a717f561 (qualified head 22e83c0ab08884e5c7eb827383e6c2016b0a7784; authority merge 7cffca5b8f596f6321ba065ff955be37362a505c); publication run 37457117549 artifact 11410550658; control sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
         },
         "25.04.2.6": {
           "status": "PASS",
