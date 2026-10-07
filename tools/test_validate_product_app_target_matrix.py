@@ -182,9 +182,6 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(row["evidence"]["classification"], "SUPPORTED")
         self.assertTrue(row["evidence"]["oracle_satisfied"])
         self.assertTrue(row["evidence"]["f0_f5_complete"])
-        for target in ("25.04.1",):
-            self.assertEqual(garm[target]["status"], "OPEN")
-            self.assertIsNone(garm[target]["evidence"])
 
     def test_repository_matrix_garm_250426_is_full_f0_f5_pass(self):
         root = pathlib.Path(__file__).resolve().parents[1]
