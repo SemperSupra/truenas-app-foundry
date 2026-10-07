@@ -169,7 +169,7 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(beta["evidence"]["classification"], "SUPPORTED")
         self.assertTrue(beta["evidence"]["oracle_satisfied"])
         self.assertTrue(beta["evidence"]["f0_f5_complete"])
-        for target in ("25.04.2.6", "25.04.1"):
+        for target in ("25.04.1",):
             self.assertEqual(garm[target]["status"], "OPEN")
             self.assertIsNone(garm[target]["evidence"])
 
@@ -185,9 +185,24 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(row["evidence"]["classification"], "SUPPORTED")
         self.assertTrue(row["evidence"]["oracle_satisfied"])
         self.assertTrue(row["evidence"]["f0_f5_complete"])
-        for target in ("25.04.2.6", "25.04.1"):
+        for target in ("25.04.1",):
             self.assertEqual(garm[target]["status"], "OPEN")
             self.assertIsNone(garm[target]["evidence"])
+
+    def test_repository_matrix_garm_250426_is_full_f0_f5_pass(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        doc = json.loads((root / ".foundry/product-app-target-matrix.json").read_text(encoding="utf-8"))
+        rows = {entry["id"]: entry for entry in doc["entries"]}
+        garm = rows["garm-controller-app"]["target_status"]
+        row = garm["25.04.2.6"]
+        self.assertEqual(row["status"], "PASS")
+        self.assertEqual(row["evidence"]["run_id"], 37604815062)
+        self.assertEqual(row["evidence"]["artifact_id"], 11474852889)
+        self.assertEqual(row["evidence"]["classification"], "SUPPORTED")
+        self.assertTrue(row["evidence"]["oracle_satisfied"])
+        self.assertTrue(row["evidence"]["f0_f5_complete"])
+        self.assertEqual(garm["25.04.1"]["status"], "OPEN")
+        self.assertIsNone(garm["25.04.1"]["evidence"])
 
 if __name__ == "__main__":
     unittest.main()
