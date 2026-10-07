@@ -14,6 +14,7 @@ PUBLICATION_SCHEMA = "semper-supra.foliorelay-rdte-publication/1"
 APP_NAME = "rdte-t6-foliorelay"
 
 CONTROL_ROOT = "/mnt/rdtepool/foliorelay-t6/control"
+TLS_ROOT = "/mnt/rdtepool/foliorelay-t6/tls"
 ARTIFACT_ROOT = "/mnt/rdtepool/foliorelay-t6/artifacts"
 CUPS_STATE_ROOT = "/mnt/rdtepool/foliorelay-t6/cups-state"
 CUPS_SPOOL_ROOT = "/mnt/rdtepool/foliorelay-t6/cups-spool"
@@ -24,7 +25,7 @@ HOST_GID = 10001
 MANAGEMENT_INTERNAL_PORT = 18080
 MANAGEMENT_HTTPS_PORT = 18443
 MANAGEMENT_SCHEME = "https"
-TLS_STATE_TARGET = "/var/lib/foliorelay/tls"
+TLS_STATE_TARGET = "/var/lib/foliorelay-tls"
 
 CONTROL_TARGET = "/var/lib/foliorelay"
 ARTIFACT_TARGET = "/var/lib/foliorelay/artifacts"
@@ -309,6 +310,7 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
         _hardened(service, name)
 
     _require_mount(control, CONTROL_TARGET, CONTROL_ROOT, False)
+    _require_mount(control, TLS_STATE_TARGET, TLS_ROOT, False)
     _require_mount(control, ARTIFACT_TARGET, ARTIFACT_ROOT, False)
     _require_mount(control, TOKEN_TARGET, TOKEN_PATH, True)
 
@@ -319,6 +321,12 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     _require_mount(cups, TOKEN_TARGET, TOKEN_PATH, True)
 
     _require_mount(discovery, CUPS_CONTROL_TARGET, CONTROL_ROOT, True)
+    for service_name, service in (("cups", cups), ("discovery", discovery)):
+        for volume in service.get("volumes") or []:
+            if not isinstance(volume, dict):
+                continue
+            if volume.get("source") == TLS_ROOT or volume.get("target") == TLS_STATE_TARGET:
+                raise ControlError(f"{service_name} must not receive management TLS state")
     discovery_backend = _validate_discovery_transport(discovery, version)
 
     if not REQUIRED_CUPS_TMPFS.issubset(_tmpfs_targets(cups)):
@@ -384,6 +392,7 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
     control_root_mode = "0710" if facts["discovery_backend"] == "avahi" else "0700"
     host_path_requirements = [
         {"path": CONTROL_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": control_root_mode},
+        {"path": TLS_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0700"},
         {"path": ARTIFACT_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0700"},
         {"path": CUPS_STATE_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0755"},
         {"path": CUPS_SPOOL_ROOT, "kind": "directory", "uid": HOST_UID, "gid": HOST_GID, "mode": "0755"},
@@ -397,6 +406,7 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
         "runtime": {
             "app_name": APP_NAME,
             "control_root": CONTROL_ROOT,
+            "management_tls_root": TLS_ROOT,
             "artifact_root": ARTIFACT_ROOT,
             "cups_state_root": CUPS_STATE_ROOT,
             "cups_spool_root": CUPS_SPOOL_ROOT,
