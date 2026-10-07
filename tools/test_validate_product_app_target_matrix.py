@@ -157,5 +157,21 @@ class MatrixTests(unittest.TestCase):
         self.assertTrue(folio_status["25.04.1"]["evidence"]["f0_f5_complete"])
         self.assertTrue(folio_status["25.04.1"]["evidence"]["oracle_satisfied"])
 
+    def test_repository_matrix_garm_beta3_is_full_f0_f5_pass(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        doc = json.loads((root / ".foundry/product-app-target-matrix.json").read_text(encoding="utf-8"))
+        rows = {entry["id"]: entry for entry in doc["entries"]}
+        garm = rows["garm-controller-app"]["target_status"]
+        beta = garm["26.0.0-BETA.3"]
+        self.assertEqual(beta["status"], "PASS")
+        self.assertEqual(beta["evidence"]["run_id"], 37587664305)
+        self.assertEqual(beta["evidence"]["artifact_id"], 11467413455)
+        self.assertEqual(beta["evidence"]["classification"], "SUPPORTED")
+        self.assertTrue(beta["evidence"]["oracle_satisfied"])
+        self.assertTrue(beta["evidence"]["f0_f5_complete"])
+        for target in ("25.10.7", "25.04.2.6", "25.04.1"):
+            self.assertEqual(garm[target]["status"], "OPEN")
+            self.assertIsNone(garm[target]["evidence"])
+
 if __name__ == "__main__":
     unittest.main()
