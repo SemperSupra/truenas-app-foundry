@@ -32,8 +32,9 @@ The current external rows include LiteLLM and FolioRelay. FolioRelay is bound to
 `SemperSupra/truenas-app-foundry-private#273` and public product authority
 `SemperSupra/folio-relay#29`. Its earlier failures remain causal provenance. Exact BETA.3 rep 013
 (run 37345529487) and exact 25.10.7 cooperative-Avahi rep 006
-(run 37531471852) and exact 25.04.2.6 rep 001 (run 37541235642) now carry
-complete F0–F5 PASS receipts. The 25.10.7 cell retains the direct-mDNS,
-bind-root traversal, and independent-observer failures that earned the final
-architecture. 25.04.1 remains OPEN until its own exact runtime receipt earns
-PASS.
+(run 37531471852), exact 25.04.2.6 rep 001 (run 37541235642), and
+exact 25.04.1 rep 001 (run 37572795630) now carry complete F0–F5 PASS
+receipts. The 25.10.7 cell retains the direct-mDNS, bind-root traversal, and
+independent-observer failures that earned the final architecture. FolioRelay
+is therefore independently qualified across every currently required exact
+TrueNAS target; this does not change the OPEN status of other product rows.

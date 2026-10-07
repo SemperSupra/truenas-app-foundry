@@ -153,8 +153,9 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(folio_status["25.04.2.6"]["status"], "PASS")
         self.assertTrue(folio_status["25.04.2.6"]["evidence"]["f0_f5_complete"])
         self.assertTrue(folio_status["25.04.2.6"]["evidence"]["oracle_satisfied"])
-        self.assertEqual(folio_status["25.04.1"]["status"], "OPEN")
-        self.assertIsNone(folio_status["25.04.1"]["evidence"])
+        self.assertEqual(folio_status["25.04.1"]["status"], "PASS")
+        self.assertTrue(folio_status["25.04.1"]["evidence"]["f0_f5_complete"])
+        self.assertTrue(folio_status["25.04.1"]["evidence"]["oracle_satisfied"])
 
 if __name__ == "__main__":
     unittest.main()
