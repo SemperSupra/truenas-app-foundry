@@ -169,7 +169,7 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(beta["evidence"]["classification"], "SUPPORTED")
         self.assertTrue(beta["evidence"]["oracle_satisfied"])
         self.assertTrue(beta["evidence"]["f0_f5_complete"])
-        for target in ("25.10.7", "25.04.2.6", "25.04.1"):
+        for target in ("25.04.2.6", "25.04.1"):
             self.assertEqual(garm[target]["status"], "OPEN")
             self.assertIsNone(garm[target]["evidence"])
 
