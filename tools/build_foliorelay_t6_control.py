@@ -21,6 +21,10 @@ TOKEN_PATH = "/mnt/rdtepool/foliorelay-t6/secrets/control.token"
 SECRETS_ROOT = "/mnt/rdtepool/foliorelay-t6/secrets"
 HOST_UID = 10001
 HOST_GID = 10001
+MANAGEMENT_INTERNAL_PORT = 18080
+MANAGEMENT_HTTPS_PORT = 18443
+MANAGEMENT_SCHEME = "https"
+TLS_STATE_TARGET = "/var/lib/foliorelay/tls"
 
 CONTROL_TARGET = "/var/lib/foliorelay"
 ARTIFACT_TARGET = "/var/lib/foliorelay/artifacts"
@@ -114,6 +118,31 @@ def _port(service: dict, target: int, published: int) -> bool:
         except (TypeError, ValueError):
             continue
     return False
+
+
+def _published_target(service: dict, target: int) -> bool:
+    for p in service.get("ports") or []:
+        if not isinstance(p, dict):
+            continue
+        try:
+            if int(p.get("target", -1)) == target:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def _command_flag_value(service: dict, flag: str) -> str | None:
+    command = service.get("command") or []
+    if not isinstance(command, list):
+        return None
+    matches = [i for i, item in enumerate(command) if item == flag]
+    if len(matches) != 1:
+        return None
+    index = matches[0]
+    if index + 1 >= len(command) or not isinstance(command[index + 1], str):
+        return None
+    return command[index + 1]
 
 
 def _tmpfs_targets(service: dict) -> set[str]:
@@ -295,8 +324,16 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     if not REQUIRED_CUPS_TMPFS.issubset(_tmpfs_targets(cups)):
         raise ControlError("CUPS ephemeral tmpfs contract drifted")
 
-    if not _port(control, 18080, 18080):
-        raise ControlError("control portal/API port mapping drifted")
+    if not _port(control, MANAGEMENT_HTTPS_PORT, MANAGEMENT_HTTPS_PORT):
+        raise ControlError("control HTTPS portal/API port mapping drifted")
+    if _published_target(control, MANAGEMENT_INTERNAL_PORT):
+        raise ControlError("private control HTTP port must not be host-published")
+    if _command_flag_value(control, "-listen") != f"0.0.0.0:{MANAGEMENT_INTERNAL_PORT}":
+        raise ControlError("private control HTTP listen contract drifted")
+    if _command_flag_value(control, "-https-listen") != f"0.0.0.0:{MANAGEMENT_HTTPS_PORT}":
+        raise ControlError("control HTTPS listen contract drifted")
+    if _command_flag_value(control, "-tls-state-dir") != TLS_STATE_TARGET:
+        raise ControlError("control TLS state path drifted")
     if not _port(cups, 8634, 8634):
         raise ControlError("CUPS IPP port mapping drifted")
     if discovery.get("network_mode") != "host":
@@ -364,7 +401,10 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
             "cups_state_root": CUPS_STATE_ROOT,
             "cups_spool_root": CUPS_SPOOL_ROOT,
             "token_path": TOKEN_PATH,
-            "management_port": 18080,
+            "management_scheme": MANAGEMENT_SCHEME,
+            "management_port": MANAGEMENT_HTTPS_PORT,
+            "management_internal_port": MANAGEMENT_INTERNAL_PORT,
+            "management_tls_state": TLS_STATE_TARGET,
             "ipp_port": 8634,
             "discovery_network_mode": "host",
             "discovery_backend": facts["discovery_backend"],
@@ -381,6 +421,8 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
             "app-create-running",
             "config-readback-exact-compose",
             "portal-ready",
+            "management-tls-ready",
+            "management-tls-identity-persistent",
             "ipp-get-printer-attributes",
             "canonical-uri-coherence",
             "control-cups-dnssd-uuid-coherence",
