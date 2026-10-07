@@ -35,8 +35,13 @@ F0–F5 PASS from Agent Dispatch run `37599994362` (artifact `11473008105`,
 
 TrueNAS 25.04.2.6 independently earned the same complete generic F0–F5 claim
 from Agent Dispatch run `37604815062` (artifact `11474852889`,
-`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue). Only the
-25.04.1 GARM controller cell remains OPEN.
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue).
+
+TrueNAS 25.04.1 completed the final exact row in Agent Dispatch run
+`37611502673` (artifact `11479660363`, `SUPPORTED`,
+`oracleSatisfied=true`, complete F0–F5, zero residue). The GARM controller App
+is therefore independently qualified across every currently required exact
+TrueNAS target; this does not promote any Container or VM runtime backend.
 
 ## External products
 
