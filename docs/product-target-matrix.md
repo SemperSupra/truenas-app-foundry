@@ -31,9 +31,12 @@ as partial provenance rather than being substituted for the generic recipe.
 
 The next exact GARM controller row, TrueNAS 25.10.7, also earned a full generic
 F0–F5 PASS from Agent Dispatch run `37599994362` (artifact `11473008105`,
-`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue). The
-25.04.2.6 and 25.04.1 controller cells remain OPEN until their own exact runtime
-receipts earn PASS.
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue).
+
+TrueNAS 25.04.2.6 independently earned the same complete generic F0–F5 claim
+from Agent Dispatch run `37604815062` (artifact `11474852889`,
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, zero residue). Only the
+25.04.1 GARM controller cell remains OPEN.
 
 ## External products
 
