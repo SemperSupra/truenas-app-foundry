@@ -140,22 +140,24 @@ class MatrixTests(unittest.TestCase):
         self.assertIn("foliorelay-app", doc["required_external_product_ids"])
         rows = {entry["id"]: entry for entry in doc["entries"]}
         self.assertIn("foliorelay-app", rows)
-        self.assertEqual(rows["foliorelay-app"]["classification"], "product")
-        self.assertEqual(rows["foliorelay-app"]["source"]["kind"], "external-foundry-product-authority")
-        folio_status = rows["foliorelay-app"]["target_status"]
-        self.assertEqual(folio_status["26.0.0-BETA.3"]["status"], "PASS")
-        self.assertTrue(folio_status["26.0.0-BETA.3"]["evidence"]["f0_f5_complete"])
-        self.assertTrue(folio_status["26.0.0-BETA.3"]["evidence"]["oracle_satisfied"])
-        self.assertEqual(folio_status["25.10.7"]["status"], "PASS")
-        self.assertTrue(folio_status["25.10.7"]["evidence"]["f0_f5_complete"])
-        self.assertTrue(folio_status["25.10.7"]["evidence"]["oracle_satisfied"])
+        folio = rows["foliorelay-app"]
+        self.assertEqual(folio["classification"], "product")
+        self.assertEqual(folio["source"]["kind"], "external-foundry-product-authority")
+        self.assertEqual(folio["current_candidate"]["foundry_ref"], "25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e")
+        self.assertEqual(
+            folio["current_candidate"]["control_image"],
+            "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
+        )
+        folio_status = folio["target_status"]
+        for version in VERSIONS:
+            self.assertEqual(folio_status[version]["status"], "OPEN")
+            self.assertNotIn("evidence", folio_status[version])
+            self.assertTrue(folio_status[version]["invalidation_reason"])
+            historical = folio_status[version]["historical_acceptance_evidence"]
+            self.assertEqual(historical["classification"], "SUPPORTED")
+            self.assertTrue(historical["f0_f5_complete"])
+            self.assertTrue(historical["oracle_satisfied"])
         self.assertGreaterEqual(len(folio_status["25.10.7"]["prior_failure_evidence"]), 4)
-        self.assertEqual(folio_status["25.04.2.6"]["status"], "PASS")
-        self.assertTrue(folio_status["25.04.2.6"]["evidence"]["f0_f5_complete"])
-        self.assertTrue(folio_status["25.04.2.6"]["evidence"]["oracle_satisfied"])
-        self.assertEqual(folio_status["25.04.1"]["status"], "PASS")
-        self.assertTrue(folio_status["25.04.1"]["evidence"]["f0_f5_complete"])
-        self.assertTrue(folio_status["25.04.1"]["evidence"]["oracle_satisfied"])
 
     def test_repository_matrix_garm_beta3_is_full_f0_f5_pass(self):
         root = pathlib.Path(__file__).resolve().parents[1]
