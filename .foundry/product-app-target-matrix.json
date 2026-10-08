@@ -191,7 +191,7 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under Foundry 25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e."
+          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
         },
         "25.04.2.6": {
           "status": "OPEN",
@@ -205,7 +205,7 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under Foundry 25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e."
+          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
         },
         "25.10.7": {
           "status": "OPEN",
@@ -253,7 +253,7 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under Foundry 25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e."
+          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
         },
         "26.0.0-BETA.3": {
           "status": "OPEN",
@@ -273,6 +273,22 @@
               "classification": "ORACLE_FAILURE",
               "scope": "nested T6 rep 002",
               "note": "UUID parser correction advanced to public-URI coherence; retained as causal failure evidence only. No product support claim."
+            },
+            {
+              "run_id": 37713944837,
+              "artifact_id": 11522564752,
+              "artifact_digest": "sha256:1a1d0207a3bd93c931e7ad34a6dc1180db90069e168c9208c92eac42a20d1dcd",
+              "classification": "ORACLE_FAILURE",
+              "scope": "post-WebUI/HTTPS BETA.3 rep 014",
+              "note": "Control and CUPS reached running but discovery inherited the control-image HTTP healthcheck while running foliorelay-dnssd, so the App never reached RUNNING; cleanup was zero-residue. Foundry #112 disabled that inapplicable inherited healthcheck."
+            },
+            {
+              "run_id": 37728706076,
+              "artifact_id": 11532640048,
+              "artifact_digest": "sha256:2ee846a9d97ecf833d09cc98daeaa84ad1f8548e7869e0107abd12a401f31767",
+              "classification": "ORACLE_FAILURE",
+              "scope": "post-WebUI/HTTPS BETA.3 rep 015",
+              "note": "All three exact product containers reached RUNNING and Compose readback passed; the external HTTPS readyz probe failed because Agent Dispatch QEMU still forwarded management traffic to private guest port 18080 instead of published HTTPS 18443. Cleanup was zero-residue. Agent Dispatch #362 corrected only that host-forward edge."
             }
           ],
           "historical_acceptance_evidence": {
@@ -285,7 +301,7 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under Foundry 25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e."
+          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
         }
       },
       "current_candidate": {
@@ -294,7 +310,7 @@
         "publication_artifact_id": 11513650340,
         "control_image": "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
         "cups_image": "sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
-        "foundry_ref": "25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e",
+        "foundry_ref": "81deb97185760975fd8d3162df42056c77b3c0fd",
         "qualification_state": "OPEN"
       }
     },
