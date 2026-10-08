@@ -25,6 +25,9 @@ HOST_GID = 10001
 MANAGEMENT_INTERNAL_PORT = 18080
 MANAGEMENT_HTTPS_PORT = 18443
 MANAGEMENT_SCHEME = "https"
+MANAGEMENT_PORTAL_NAME = "Web UI"
+MANAGEMENT_PORTAL_HOST = "foliorelay-t6.local"
+MANAGEMENT_PORTAL_PATH = "/"
 TLS_STATE_TARGET = "/var/lib/foliorelay-tls"
 
 CONTROL_TARGET = "/var/lib/foliorelay"
@@ -332,6 +335,15 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
     if not REQUIRED_CUPS_TMPFS.issubset(_tmpfs_targets(cups)):
         raise ControlError("CUPS ephemeral tmpfs contract drifted")
 
+    expected_portals = [{
+        "name": MANAGEMENT_PORTAL_NAME,
+        "scheme": MANAGEMENT_SCHEME,
+        "host": MANAGEMENT_PORTAL_HOST,
+        "port": MANAGEMENT_HTTPS_PORT,
+        "path": MANAGEMENT_PORTAL_PATH,
+    }]
+    if compose.get("x-portals") != expected_portals:
+        raise ControlError("TrueNAS Web UI portal declaration drifted")
     if not _port(control, MANAGEMENT_HTTPS_PORT, MANAGEMENT_HTTPS_PORT):
         raise ControlError("control HTTPS portal/API port mapping drifted")
     if _published_target(control, MANAGEMENT_INTERNAL_PORT):
@@ -415,6 +427,13 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
             "management_port": MANAGEMENT_HTTPS_PORT,
             "management_internal_port": MANAGEMENT_INTERNAL_PORT,
             "management_tls_state": TLS_STATE_TARGET,
+            "management_portal": {
+                "name": MANAGEMENT_PORTAL_NAME,
+                "scheme": MANAGEMENT_SCHEME,
+                "host": MANAGEMENT_PORTAL_HOST,
+                "port": MANAGEMENT_HTTPS_PORT,
+                "path": MANAGEMENT_PORTAL_PATH,
+            },
             "ipp_port": 8634,
             "discovery_network_mode": "host",
             "discovery_backend": facts["discovery_backend"],
@@ -430,7 +449,8 @@ def build(publication_path: Path, compose_path: Path, values_path: Path,
         "required_oracles": [
             "app-create-running",
             "config-readback-exact-compose",
-            "portal-ready",
+            "management-endpoint-ready",
+            "truenas-webui-portal-advertised",
             "management-tls-ready",
             "management-tls-identity-persistent",
             "ipp-get-printer-attributes",
