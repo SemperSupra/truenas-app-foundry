@@ -142,6 +142,17 @@ def validate(matrix: dict[str, Any], registry: dict[str, Any], repo_root: pathli
                 pass_flags.append(False)
 
         all_targets = all(pass_flags)
+        current_candidate = entry.get("current_candidate")
+        if current_candidate is not None:
+            if not isinstance(current_candidate, dict):
+                raise MatrixError(f"{entry_id}: current_candidate must be an object")
+            observed_state = current_candidate.get("qualification_state")
+            expected_state = "PASS" if all_targets else "OPEN"
+            if observed_state != expected_state:
+                raise MatrixError(
+                    f"{entry_id}: current_candidate qualification_state must be "
+                    f"{expected_state} when all_targets_qualified={all_targets}"
+                )
         if classification == "product" and entry.get("required_for_all_products_claim") is True:
             required_product_passes.append(all_targets)
 
