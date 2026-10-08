@@ -40,9 +40,15 @@ def compose():
                 "read_only": True,
                 "cap_drop": ["ALL"],
                 "security_opt": ["no-new-privileges:true"],
-                "ports": [{"target": 18080, "published": "18080"}],
+                "ports": [{"target": MOD.MANAGEMENT_HTTPS_PORT, "published": str(MOD.MANAGEMENT_HTTPS_PORT)}],
+                "command": [
+                    "-listen", f"0.0.0.0:{MOD.MANAGEMENT_INTERNAL_PORT}",
+                    "-https-listen", f"0.0.0.0:{MOD.MANAGEMENT_HTTPS_PORT}",
+                    "-tls-state-dir", MOD.TLS_STATE_TARGET,
+                ],
                 "volumes": [
                     mount(MOD.CONTROL_ROOT, MOD.CONTROL_TARGET),
+                    mount(MOD.TLS_ROOT, MOD.TLS_STATE_TARGET),
                     mount(MOD.ARTIFACT_ROOT, MOD.ARTIFACT_TARGET),
                     mount(MOD.TOKEN_PATH, MOD.TOKEN_TARGET, True),
                 ],
@@ -184,6 +190,36 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
 
+    def test_rejects_tls_state_exposure_to_print_facing_services(self):
+        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}
+        for service_name in ("cups", "discovery"):
+            with self.subTest(service=service_name):
+                value = compose()
+                value["services"][service_name]["volumes"].append(
+                    mount(MOD.TLS_ROOT, MOD.TLS_STATE_TARGET, True)
+                )
+                with self.assertRaises(MOD.ControlError):
+                    MOD.validate(publication(), value, target)
+
+    def test_rejects_host_published_private_management_http(self):
+        value = compose()
+        value["services"]["control"]["ports"].append({
+            "target": MOD.MANAGEMENT_INTERNAL_PORT,
+            "published": str(MOD.MANAGEMENT_INTERNAL_PORT),
+        })
+        with self.assertRaises(MOD.ControlError):
+            MOD.validate(publication(), value, {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"})
+
+    def test_rejects_management_tls_command_drift(self):
+        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}
+        for flag in ("-listen", "-https-listen", "-tls-state-dir"):
+            with self.subTest(flag=flag):
+                value = compose()
+                command = value["services"]["control"]["command"]
+                command[command.index(flag) + 1] = "drifted"
+                with self.assertRaises(MOD.ControlError):
+                    MOD.validate(publication(), value, target)
+
     def test_rejects_host_service_coupling(self):
         value = compose()
         value["services"]["discovery"]["volumes"].append(
@@ -208,6 +244,7 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                 self.assertEqual(reqs[MOD.CONTROL_ROOT]["uid"],10001)
                 self.assertEqual(reqs[MOD.CONTROL_ROOT]["gid"],10001)
                 self.assertEqual(reqs[MOD.CONTROL_ROOT]["mode"],"0710" if version in MOD.AVAHI_TARGETS else "0700")
+                self.assertEqual(reqs[MOD.TLS_ROOT]["mode"],"0700")
                 self.assertEqual(reqs[MOD.ARTIFACT_ROOT]["mode"],"0700")
                 self.assertEqual(reqs[MOD.CUPS_STATE_ROOT]["mode"],"0755")
                 self.assertEqual(reqs[MOD.CUPS_SPOOL_ROOT]["mode"],"0755")
@@ -249,7 +286,14 @@ class FolioRelayT6ControlTests(unittest.TestCase):
             }), encoding="utf-8")
             control = MOD.build(pub, comp, values, target, out, "f" * 40)
             self.assertEqual(control["schema"], MOD.SCHEMA)
+            self.assertEqual(control["runtime"]["management_scheme"], "https")
+            self.assertEqual(control["runtime"]["management_tls_root"], MOD.TLS_ROOT)
+            self.assertEqual(control["runtime"]["management_port"], MOD.MANAGEMENT_HTTPS_PORT)
+            self.assertEqual(control["runtime"]["management_internal_port"], MOD.MANAGEMENT_INTERNAL_PORT)
+            self.assertEqual(control["runtime"]["management_tls_state"], MOD.TLS_STATE_TARGET)
             self.assertIn("dnssd-universal-visible", control["required_oracles"])
+            self.assertIn("management-tls-ready", control["required_oracles"])
+            self.assertIn("management-tls-identity-persistent", control["required_oracles"])
             self.assertTrue((out / "control.json").exists())
 
 
