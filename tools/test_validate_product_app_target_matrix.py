@@ -149,7 +149,7 @@ class MatrixTests(unittest.TestCase):
             "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
         )
         folio_status = folio["target_status"]
-        for version in ("25.04.1", "25.04.2.6", "25.10.7"):
+        for version in ("25.04.1", "25.04.2.6"):
             self.assertEqual(folio_status[version]["status"], "OPEN")
             self.assertNotIn("evidence", folio_status[version])
             self.assertTrue(folio_status[version]["invalidation_reason"])
@@ -157,6 +157,16 @@ class MatrixTests(unittest.TestCase):
             self.assertEqual(historical["classification"], "SUPPORTED")
             self.assertTrue(historical["f0_f5_complete"])
             self.assertTrue(historical["oracle_satisfied"])
+        row_25107 = folio_status["25.10.7"]
+        self.assertEqual(row_25107["status"], "PASS")
+        self.assertEqual(row_25107["evidence"]["run_id"], 37786363218)
+        self.assertEqual(row_25107["evidence"]["artifact_id"], 11560897748)
+        self.assertEqual(row_25107["evidence"]["classification"], "SUPPORTED")
+        self.assertTrue(row_25107["evidence"]["oracle_satisfied"])
+        self.assertTrue(row_25107["evidence"]["f0_f5_complete"])
+        self.assertNotIn("invalidation_reason", row_25107)
+        historical_25107 = row_25107["historical_acceptance_evidence"]
+        self.assertEqual(historical_25107["classification"], "SUPPORTED")
         beta = folio_status["26.0.0-BETA.3"]
         self.assertEqual(beta["status"], "PASS")
         self.assertEqual(beta["evidence"]["run_id"], 37738679873)
