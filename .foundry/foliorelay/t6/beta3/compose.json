@@ -170,7 +170,7 @@
     {
       "name": "Web UI",
       "scheme": "https",
-      "host": "0.0.0.0",
+      "host": "foliorelay-t6.local",
       "port": 18443,
       "path": "/"
     }
