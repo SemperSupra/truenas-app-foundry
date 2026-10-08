@@ -331,6 +331,8 @@ def validate(publication: dict, compose: dict, target: dict) -> dict:
             if volume.get("source") == TLS_ROOT or volume.get("target") == TLS_STATE_TARGET:
                 raise ControlError(f"{service_name} must not receive management TLS state")
     discovery_backend = _validate_discovery_transport(discovery, version)
+    if discovery.get("healthcheck") != {"disable": True}:
+        raise ControlError("discovery must disable the control-plane image healthcheck")
 
     if not REQUIRED_CUPS_TMPFS.issubset(_tmpfs_targets(cups)):
         raise ControlError("CUPS ephemeral tmpfs contract drifted")
