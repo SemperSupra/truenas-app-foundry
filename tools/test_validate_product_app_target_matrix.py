@@ -166,16 +166,20 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(folio["classification"], "product")
         self.assertEqual(folio["source"]["kind"], "external-foundry-product-authority")
         self.assertEqual(folio["current_candidate"]["foundry_ref"], "81deb97185760975fd8d3162df42056c77b3c0fd")
-        self.assertEqual(folio["current_candidate"]["qualification_state"], "OPEN")
+        self.assertEqual(folio["current_candidate"]["qualification_state"], "PASS")
         self.assertEqual(
             folio["current_candidate"]["control_image"],
             "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
         )
         folio_status = folio["target_status"]
         version = "25.04.1"
-        self.assertEqual(folio_status[version]["status"], "OPEN")
-        self.assertNotIn("evidence", folio_status[version])
-        self.assertTrue(folio_status[version]["invalidation_reason"])
+        self.assertEqual(folio_status[version]["status"], "PASS")
+        self.assertEqual(folio_status[version]["evidence"]["run_id"], 37815256028)
+        self.assertEqual(folio_status[version]["evidence"]["artifact_id"], 11567681986)
+        self.assertEqual(folio_status[version]["evidence"]["classification"], "SUPPORTED")
+        self.assertTrue(folio_status[version]["evidence"]["oracle_satisfied"])
+        self.assertTrue(folio_status[version]["evidence"]["f0_f5_complete"])
+        self.assertNotIn("invalidation_reason", folio_status[version])
         historical = folio_status[version]["historical_acceptance_evidence"]
         self.assertEqual(historical["classification"], "SUPPORTED")
         self.assertTrue(historical["f0_f5_complete"])
@@ -214,6 +218,13 @@ class MatrixTests(unittest.TestCase):
         self.assertIn(37728706076, beta_failures)
         self.assertEqual(beta_failures[37713944837]["classification"], "ORACLE_FAILURE")
         self.assertEqual(beta_failures[37728706076]["classification"], "ORACLE_FAILURE")
+        self.assertTrue(all(folio_status[v]["status"] == "PASS" for v in VERSIONS))
+        for v in VERSIONS:
+            evidence = folio_status[v]["evidence"]
+            self.assertEqual(evidence["classification"], "SUPPORTED")
+            self.assertTrue(evidence["oracle_satisfied"])
+            self.assertTrue(evidence["f0_f5_complete"])
+        self.assertIn("requested_shape image pair source-bound", folio_status["25.04.1"]["evidence"]["source_identity"])
 
     def test_repository_matrix_garm_beta3_is_full_f0_f5_pass(self):
         root = pathlib.Path(__file__).resolve().parents[1]
