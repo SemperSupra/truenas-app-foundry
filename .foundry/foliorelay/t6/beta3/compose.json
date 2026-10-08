@@ -163,7 +163,10 @@
       "command": [
         "-identity-file",
         "/var/lib/foliorelay-control/config/printer.json"
-      ]
+      ],
+      "healthcheck": {
+        "disable": true
+      }
     }
   },
   "x-portals": [
