@@ -43,14 +43,15 @@ TrueNAS 25.04.1 completed the final exact row in Agent Dispatch run
 is therefore independently qualified across every currently required exact
 TrueNAS target; this does not promote any Container or VM runtime backend.
 
-Refreshed FolioRelay WebUI/HTTPS qualification has now independently re-earned
+Refreshed FolioRelay WebUI/HTTPS qualification has independently re-earned
 the exact TrueNAS 26.0.0-BETA.3 cell in Agent Dispatch run `37738679873`
-(artifact `11535248795`, `SUPPORTED`, `oracleSatisfied=true`, complete
-F0–F5, HTTPS Web UI portal persistence, TLS identity persistence, and zero
-residue). The 25.10.7, 25.04.2.6, and 25.04.1 cells remain OPEN for this
-`d0ba6d1e…` control candidate until their own exact runtime receipts pass.
-The post-WebUI BETA.3 rep 014 and rep 015 failures remain retained as causal
-provenance.
+(artifact `11535248795`) and the exact TrueNAS 25.10.7 cell in run
+`37786363218` (artifact `11560897748`). Both retained receipts are
+`SUPPORTED`, `oracleSatisfied=true`, complete F0–F5, prove HTTPS Web UI
+portal and TLS identity persistence, and finish with zero residue. The
+25.04.2.6 and 25.04.1 cells remain OPEN for this `d0ba6d1e…` control
+candidate until their own exact runtime receipts pass. Earlier post-WebUI
+failures remain retained as causal provenance.
 
 ## External products
 
