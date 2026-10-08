@@ -1,0 +1,99 @@
+name: Export official-catalog TrueNAS T6 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+      control_id:
+        description: Universal official-catalog control id
+        required: false
+        default: ntfy
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact Foundry commit; blank uses this workflow commit
+        required: false
+        type: string
+      control_id:
+        description: Universal official-catalog control id
+        required: false
+        default: ntfy
+        type: string
+  pull_request:
+    paths:
+      - ".foundry/official-catalog-controls.json"
+      - "tools/official_catalog_controls.py"
+      - "tools/build_official_catalog_t6_control.py"
+      - "tools/test_build_official_catalog_t6_control.py"
+      - ".github/workflows/export-official-catalog-t6-control.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Resolve exact Foundry source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          if [[ -z "$ref" ]]; then ref="$GITHUB_SHA"; fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact public Foundry source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Verify builder contract
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tools/test_official_catalog_controls.py tools/test_build_official_catalog_t6_control.py
+
+      - name: Fetch exact pinned TrueNAS catalog source
+        run: |
+          set -euo pipefail
+          commit="$(python3 -c 'import json; print(json.load(open(".foundry/official-catalog-controls.json"))["catalog_source"]["commit"])')"
+          git init external/truenas-apps
+          git -C external/truenas-apps remote add origin https://github.com/truenas/apps.git
+          git -C external/truenas-apps fetch --depth=1 origin "$commit"
+          git -C external/truenas-apps checkout --detach FETCH_HEAD
+          python3 tools/official_catalog_controls.py --catalog-dir external/truenas-apps >/tmp/source-receipt.json
+
+      - name: Build exact native-catalog T6 control
+        shell: bash
+        env:
+          CONTROL_ID: ${{ inputs.control_id }}
+        run: |
+          set -euo pipefail
+          control="${CONTROL_ID:-ntfy}"
+          python3 tools/build_official_catalog_t6_control.py             --foundry-ref "${{ steps.source.outputs.ref }}"             --control-id "$control"             --output /tmp/official-catalog-t6-control
+          jq -e '
+            .schema == "semper-supra.official-catalog-truenas-t6-control/1" and
+            .runtime.create_payload.custom_app == false and
+            .runtime.upgrade.not_applicable_requires_receipt == true and
+            .secrets_captured == false and
+            .universal_qualified == false
+          ' /tmp/official-catalog-t6-control/control.json >/dev/null
+
+      - name: Upload exact Foundry-produced native-catalog T6 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-catalog-truenas-t6-control
+          path: /tmp/official-catalog-t6-control/
+          if-no-files-found: error
+          retention-days: 7

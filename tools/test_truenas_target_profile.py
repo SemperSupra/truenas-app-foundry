@@ -25,9 +25,9 @@ def observation(
         "schema_version": 1,
         "system": {"version": version, "platform": "linux-amd64"},
         "capabilities": {
+            "bootstrap_probes": {"core.get_methods": True},
             "methods": [
                 "system.version",
-                "core.get_methods",
                 "app.query",
                 "app.config",
                 "app.create",
@@ -111,8 +111,46 @@ class TargetProfileTests(unittest.TestCase):
             self.assertTrue(contract["source_api_family"])
             self.assertTrue(contract["storage_semantics"])
             self.assertTrue(contract["apps_gate_semantics"])
+            self.assertEqual(contract["bootstrap_capability_probe"], "core.get_methods")
+            self.assertNotIn("core.get_methods", contract["required_public_methods"])
             self.assertIn("app.create", contract["required_public_methods"])
             self.assertIn("app.delete", contract["required_public_methods"])
+
+    def test_profiles_bind_native_catalog_upgrade_as_adapter_specific_contract(self):
+        expected = {
+            "25.04.1": "b22da7e2d512161979adec60548b796ab56943e2",
+            "25.04.2.6": "b22da7e2d512161979adec60548b796ab56943e2",
+            "25.10.7": "0363f8e3ad87628147ea3eff57fe1c512de24aab",
+            "26.0.0-BETA.3": "8812e396537f9d6675cb1e6fce48ca0d22091460",
+        }
+        for target in REGISTRY["targets"]:
+            profile = mod.load_json(HERE.parent / target["profile"])
+            runtime = profile["runtime_api"]["app_upgrade"]
+            self.assertEqual(runtime["method"], "app.upgrade", target["version"])
+            self.assertEqual(runtime["arguments"], "app_name-plus-options", target["version"])
+            self.assertTrue(runtime["job_backed"], target["version"])
+            self.assertEqual(runtime["adapter"], "official-catalog", target["version"])
+            source = next(
+                item
+                for item in profile["source_contract"]
+                if item["path"] == "src/middlewared/middlewared/plugins/apps/upgrade.py"
+            )
+            self.assertEqual(source["blob_sha"], expected[target["version"]])
+
+    def test_bootstrap_probe_is_proven_directly_not_by_self_listing(self):
+        obs = observation()
+        self.assertNotIn("core.get_methods", obs["capabilities"]["methods"])
+        got = mod.discover(obs, REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE")
+        self.assertTrue(got["bootstrap_probe_satisfied"])
+        self.assertEqual(got["missing_bootstrap_probes"], [])
+
+        failed = observation()
+        failed["capabilities"]["bootstrap_probes"]["core.get_methods"] = False
+        got = mod.discover(failed, REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE_CAPABILITY_MISMATCH")
+        self.assertFalse(got["bootstrap_probe_satisfied"])
+        self.assertEqual(got["missing_bootstrap_probes"], ["core.get_methods"])
 
     def test_exact_version_alone_does_not_satisfy_profile(self):
         obs = observation("TrueNAS-25.10.7")

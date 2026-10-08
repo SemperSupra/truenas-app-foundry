@@ -17,7 +17,6 @@ REGISTRY = TARGET.load_registry(HERE.parent / ".foundry" / "truenas-target-track
 
 PROFILE_METHODS = [
     "system.version",
-    "core.get_methods",
     "app.query",
     "app.config",
     "app.create",
@@ -56,7 +55,10 @@ def observation(
     return {
         "schema_version": 1,
         "system": {"version": "TrueNAS-25.04.1", "platform": "linux-amd64"},
-        "capabilities": {"methods": PROFILE_METHODS + ["app.upgrade"]},
+        "capabilities": {
+            "bootstrap_probes": {"core.get_methods": True},
+            "methods": PROFILE_METHODS + ["app.upgrade"],
+        },
         "ownership": {"state": ownership},
         "app": app,
         "operation": {
@@ -106,6 +108,21 @@ class LifecycleV2Tests(unittest.TestCase):
         )
         self.assertEqual(got["status"], "BLOCKED")
         self.assertIn("target profile is not apply-qualified", got["blockers"])
+
+    def test_failed_bootstrap_probe_blocks_lifecycle(self):
+        registry = qualified_registry()
+        obs = observation()
+        obs["capabilities"]["bootstrap_probes"]["core.get_methods"] = False
+        got = MOD.plan(obs, intent("ENSURE_RUNNING"), registry)
+        self.assertEqual((got["status"], got["action"]), ("BLOCKED", "BLOCKED"))
+        self.assertIn(
+            "observed target capabilities do not satisfy the exact profile",
+            got["blockers"],
+        )
+        self.assertEqual(
+            got["target"]["missing_bootstrap_probes"],
+            ["core.get_methods"],
+        )
 
     def test_running_and_stopped_desired_state_converge_to_noop(self):
         registry = qualified_registry()
