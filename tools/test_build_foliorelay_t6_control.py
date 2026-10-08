@@ -34,6 +34,13 @@ def compose():
     control_image = "ghcr.io/sempersupra/foliorelay-control@" + digest("1")
     cups_image = "ghcr.io/sempersupra/foliorelay-cups@" + digest("2")
     return {
+        "x-portals": [{
+            "name": MOD.MANAGEMENT_PORTAL_NAME,
+            "scheme": MOD.MANAGEMENT_SCHEME,
+            "host": MOD.MANAGEMENT_PORTAL_HOST,
+            "port": MOD.MANAGEMENT_HTTPS_PORT,
+            "path": MOD.MANAGEMENT_PORTAL_PATH,
+        }],
         "services": {
             "control": {
                 "image": control_image,
@@ -201,7 +208,21 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                 with self.assertRaises(MOD.ControlError):
                     MOD.validate(publication(), value, target)
 
-    def test_rejects_true_nas_portal_drift(self):\n        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}\n        for field, value in (("scheme", "http"), ("port", 18080), ("host", "127.0.0.1"), ("path", "/admin")):\n            with self.subTest(field=field):\n                candidate = compose()\n                candidate["x-portals"][0][field] = value\n                with self.assertRaises(MOD.ControlError):\n                    MOD.validate(publication(), candidate, target)\n\n    def test_rejects_host_published_private_management_http(self):
+    def test_rejects_true_nas_portal_drift(self):
+        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}
+        for field, value in (
+            ("scheme", "http"),
+            ("port", 18080),
+            ("host", "127.0.0.1"),
+            ("path", "/admin"),
+        ):
+            with self.subTest(field=field):
+                candidate = compose()
+                candidate["x-portals"][0][field] = value
+                with self.assertRaises(MOD.ControlError):
+                    MOD.validate(publication(), candidate, target)
+
+    def test_rejects_host_published_private_management_http(self):
         value = compose()
         value["services"]["control"]["ports"].append({
             "target": MOD.MANAGEMENT_INTERNAL_PORT,
@@ -291,6 +312,16 @@ class FolioRelayT6ControlTests(unittest.TestCase):
             self.assertEqual(control["runtime"]["management_port"], MOD.MANAGEMENT_HTTPS_PORT)
             self.assertEqual(control["runtime"]["management_internal_port"], MOD.MANAGEMENT_INTERNAL_PORT)
             self.assertEqual(control["runtime"]["management_tls_state"], MOD.TLS_STATE_TARGET)
+            self.assertEqual(control["runtime"]["management_portal"], {
+                "name": MOD.MANAGEMENT_PORTAL_NAME,
+                "scheme": MOD.MANAGEMENT_SCHEME,
+                "host": MOD.MANAGEMENT_PORTAL_HOST,
+                "port": MOD.MANAGEMENT_HTTPS_PORT,
+                "path": MOD.MANAGEMENT_PORTAL_PATH,
+            })
+            self.assertIn("management-endpoint-ready", control["required_oracles"])
+            self.assertIn("truenas-webui-portal-advertised", control["required_oracles"])
+            self.assertNotIn("portal-ready", control["required_oracles"])
             self.assertIn("dnssd-universal-visible", control["required_oracles"])
             self.assertIn("management-tls-ready", control["required_oracles"])
             self.assertIn("management-tls-identity-persistent", control["required_oracles"])
