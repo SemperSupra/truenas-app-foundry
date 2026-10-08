@@ -1,7 +1,7 @@
 {
   "services": {
     "control": {
-      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d",
+      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
       "read_only": true,
       "cap_drop": [
         "ALL"
@@ -135,7 +135,7 @@
       ]
     },
     "discovery": {
-      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d",
+      "image": "ghcr.io/sempersupra/foliorelay-control@sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
       "read_only": true,
       "cap_drop": [
         "ALL"
