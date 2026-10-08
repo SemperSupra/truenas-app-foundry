@@ -81,6 +81,7 @@ def compose():
             },
             "discovery": {
                 "image": control_image,
+                "healthcheck": {"disable": True},
                 "read_only": True,
                 "cap_drop": ["ALL"],
                 "security_opt": ["no-new-privileges:true"],
@@ -190,6 +191,18 @@ class FolioRelayT6ControlTests(unittest.TestCase):
         value["services"]["discovery"]["security_opt"] = []
         with self.assertRaises(MOD.ControlError):
             MOD.validate(publication(), value, target)
+
+    def test_rejects_discovery_with_inherited_control_healthcheck(self):
+        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}
+        for healthcheck in (None, {"disable": False}):
+            with self.subTest(healthcheck=healthcheck):
+                value = compose()
+                if healthcheck is None:
+                    value["services"]["discovery"].pop("healthcheck", None)
+                else:
+                    value["services"]["discovery"]["healthcheck"] = healthcheck
+                with self.assertRaises(MOD.ControlError):
+                    MOD.validate(publication(), value, target)
 
     def test_rejects_discovery_without_host_network(self):
         value = compose()
