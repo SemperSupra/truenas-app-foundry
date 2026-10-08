@@ -165,5 +165,14 @@
         "/var/lib/foliorelay-control/config/printer.json"
       ]
     }
-  }
+  },
+  "x-portals": [
+    {
+      "name": "Web UI",
+      "scheme": "https",
+      "host": "0.0.0.0",
+      "port": 18443,
+      "path": "/"
+    }
+  ]
 }
