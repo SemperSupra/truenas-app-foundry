@@ -201,7 +201,7 @@ class FolioRelayT6ControlTests(unittest.TestCase):
                 with self.assertRaises(MOD.ControlError):
                     MOD.validate(publication(), value, target)
 
-    def test_rejects_host_published_private_management_http(self):
+    def test_rejects_true_nas_portal_drift(self):\n        target = {"profile_id": "p", "truenas_version": "26.0.0-BETA.3"}\n        for field, value in (("scheme", "http"), ("port", 18080), ("host", "127.0.0.1"), ("path", "/admin")):\n            with self.subTest(field=field):\n                candidate = compose()\n                candidate["x-portals"][0][field] = value\n                with self.assertRaises(MOD.ControlError):\n                    MOD.validate(publication(), candidate, target)\n\n    def test_rejects_host_published_private_management_http(self):
         value = compose()
         value["services"]["control"]["ports"].append({
             "target": MOD.MANAGEMENT_INTERNAL_PORT,
