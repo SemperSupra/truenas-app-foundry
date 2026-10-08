@@ -256,7 +256,7 @@
           "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
         },
         "26.0.0-BETA.3": {
-          "status": "OPEN",
+          "status": "PASS",
           "prior_failure_evidence": [
             {
               "run_id": 37139185156,
@@ -301,7 +301,16 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
+          "evidence": {
+            "run_id": 37738679873,
+            "artifact_id": 11535248795,
+            "artifact_digest": "sha256:3714603f431362c4c06aacf58074aa9dd4698a6c26e4203ac949ed98fe45dc25",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json#a8ebc533dc84172520eba2237ffeeb52b102dc24",
+            "source_identity": "agent-dispatch@3b5bb1942e43ef12904c38c5ebf665b57154eb44; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11532747949 sha256:a4921231ee6f00a218c0c687ccbb56f1ba57d12b08d040463aacdf475c9d359a; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
         }
       },
       "current_candidate": {
