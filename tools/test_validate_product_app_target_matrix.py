@@ -143,7 +143,7 @@ class MatrixTests(unittest.TestCase):
         folio = rows["foliorelay-app"]
         self.assertEqual(folio["classification"], "product")
         self.assertEqual(folio["source"]["kind"], "external-foundry-product-authority")
-        self.assertEqual(folio["current_candidate"]["foundry_ref"], "25801ed41ff15f4f68c2878dac8b32c2ee2a2e0e")
+        self.assertEqual(folio["current_candidate"]["foundry_ref"], "81deb97185760975fd8d3162df42056c77b3c0fd")
         self.assertEqual(
             folio["current_candidate"]["control_image"],
             "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
@@ -158,6 +158,11 @@ class MatrixTests(unittest.TestCase):
             self.assertTrue(historical["f0_f5_complete"])
             self.assertTrue(historical["oracle_satisfied"])
         self.assertGreaterEqual(len(folio_status["25.10.7"]["prior_failure_evidence"]), 4)
+        beta_failures = {item["run_id"]: item for item in folio_status["26.0.0-BETA.3"]["prior_failure_evidence"]}
+        self.assertIn(37713944837, beta_failures)
+        self.assertIn(37728706076, beta_failures)
+        self.assertEqual(beta_failures[37713944837]["classification"], "ORACLE_FAILURE")
+        self.assertEqual(beta_failures[37728706076]["classification"], "ORACLE_FAILURE")
 
     def test_repository_matrix_garm_beta3_is_full_f0_f5_pass(self):
         root = pathlib.Path(__file__).resolve().parents[1]
