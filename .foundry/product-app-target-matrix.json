@@ -180,7 +180,7 @@
       "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
       "target_status": {
         "25.04.1": {
-          "status": "OPEN",
+          "status": "PASS",
           "historical_acceptance_evidence": {
             "run_id": 37572795630,
             "artifact_id": 11461469097,
@@ -191,7 +191,16 @@
             "oracle_satisfied": true,
             "f0_f5_complete": true
           },
-          "invalidation_reason": "FolioRelay control image changed for qualified WebUI + product-native HTTPS + TLS-key isolation; exact runtime support must be re-earned for control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5 under current Foundry 81deb97185760975fd8d3162df42056c77b3c0fd."
+          "evidence": {
+            "run_id": 37815256028,
+            "artifact_id": 11567681986,
+            "artifact_digest": "sha256:575a43e596f4890766901e56871013f2ce21011a7fc62a29f0bc4fc3b83ea2b0",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/25.04.1-materialization.json#800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
+            "source_identity": "agent-dispatch@a2b0a5ba8516d85efd18dc08dd6a49c2a55ee26b; evidence-envelope repair c96defde83ee2c0220b1cd549b8f9e7ef5bbf73a; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11567041802 sha256:4644e5bbd10cbc67239c04329aa3e3eaa2f4819dbf384927529d8e7a1a10175d; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814; requested_shape image pair source-bound to admitted control bundle",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
         },
         "25.04.2.6": {
           "status": "PASS",
@@ -338,7 +347,7 @@
         "control_image": "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
         "cups_image": "sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
         "foundry_ref": "81deb97185760975fd8d3162df42056c77b3c0fd",
-        "qualification_state": "OPEN"
+        "qualification_state": "PASS"
       }
     },
     {
