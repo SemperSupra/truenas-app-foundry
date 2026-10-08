@@ -105,6 +105,28 @@ class MatrixTests(unittest.TestCase):
         result = validate(m, registry(), root)
         self.assertTrue(result["all_required_product_cells_qualified"])
 
+    def test_current_candidate_state_fails_closed_against_cell_coverage(self):
+        td, root = self.repo()
+        self.addCleanup(td.cleanup)
+        m = matrix()
+        m["entries"][0]["current_candidate"] = {"qualification_state": "PASS"}
+        with self.assertRaisesRegex(MatrixError, "qualification_state must be OPEN"):
+            validate(m, registry(), root)
+
+        for version in VERSIONS:
+            m["entries"][0]["target_status"][version] = {
+                "status": "PASS",
+                "evidence": pass_evidence(),
+            }
+        m["all_required_product_cells_qualified"] = True
+        m["entries"][0]["current_candidate"]["qualification_state"] = "OPEN"
+        with self.assertRaisesRegex(MatrixError, "qualification_state must be PASS"):
+            validate(m, registry(), root)
+
+        m["entries"][0]["current_candidate"]["qualification_state"] = "PASS"
+        result = validate(m, registry(), root)
+        self.assertTrue(result["entries"][0]["all_targets_qualified"])
+
     def test_required_external_product_cannot_be_omitted(self):
         td, root = self.repo()
         self.addCleanup(td.cleanup)
@@ -144,6 +166,7 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(folio["classification"], "product")
         self.assertEqual(folio["source"]["kind"], "external-foundry-product-authority")
         self.assertEqual(folio["current_candidate"]["foundry_ref"], "81deb97185760975fd8d3162df42056c77b3c0fd")
+        self.assertEqual(folio["current_candidate"]["qualification_state"], "OPEN")
         self.assertEqual(
             folio["current_candidate"]["control_image"],
             "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
