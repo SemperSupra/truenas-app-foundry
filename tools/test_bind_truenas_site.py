@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import copy, importlib.util, pathlib, tempfile, unittest, json
+import copy, importlib.util, pathlib, tempfile, unittest, json, sys
 HERE=pathlib.Path(__file__).resolve().parent
+sys.path.insert(0,str(HERE))
 SPEC=importlib.util.spec_from_file_location("bind",HERE/"bind_truenas_site.py")
 MOD=importlib.util.module_from_spec(SPEC); assert SPEC.loader; SPEC.loader.exec_module(MOD)
 
