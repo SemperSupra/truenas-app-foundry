@@ -25,6 +25,12 @@ The sanitized observation envelope supplied to public logic includes:
 - target App presence/state and a Foundry materialization identity when owned;
 - an explicit ownership state: `absent`, `owned`, or `foreign`.
 
+Exact version text is necessary but is not a sufficient runtime fingerprint. Each admitted
+target also binds an exact compatibility-profile Git blob, middleware source commit/API
+family, release-specific storage semantics, Apps-gate semantics, and a minimum public
+method set. Discovery rejects mutation readiness when the observed public method set no
+longer satisfies that exact profile.
+
 ## Discover
 
 `tools/truenas_target_profile.py discover` matches the exact observed version against
@@ -33,6 +39,11 @@ The sanitized observation envelope supplied to public logic includes:
 Exact release identity is mandatory for mutation. A train/family match is useful for
 qualification routing only. Unknown releases, anticipated RCs, and nightly builds are
 never promoted from a floating selector into an apply claim.
+
+For an exact target, discovery emits a content-bound profile identity and hashes both
+the sanitized observation and selected profile identity. Planning carries those hashes
+forward. Apply must re-observe immediately before mutation and refuse the operation if
+the target/profile fingerprint changed.
 
 The initial matrix tracks:
 
