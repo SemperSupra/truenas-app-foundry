@@ -94,6 +94,8 @@ def validate_resource(item:Any)->dict[str,Any]:
         if not isinstance(policy,dict): raise BindingError("file requires content_policy")
         ptype=policy.get("kind")
         if ptype=="generated-random-base64":
+            if set(policy)!={"kind","bytes"}:
+                raise BindingError("generated-random-base64 content policy has extra keys")
             count=policy.get("bytes")
             if not isinstance(count,int) or count<16 or count>4096:
                 raise BindingError("generated secret byte count outside 16..4096")
