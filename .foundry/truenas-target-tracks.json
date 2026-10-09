@@ -55,7 +55,7 @@
       "source_qualification": "qualified",
       "runtime_qualification": "public-gha-rdte-t5-accepted",
       "accepted_runtime_rung": "T5",
-      "apply_qualified": false,
+      "apply_qualified": true,
       "runtime_evidence": {
         "run_id": 36882850660,
         "head_sha": "35aed912cb18119d08786953f82b909dcb6401b8",
@@ -82,6 +82,19 @@
           "app.start",
           "app.delete"
         ]
+      },
+      "apply_qualification": {
+        "authority": "SemperSupra/truenas-app-foundry-private#291",
+        "scope": "exact-target-only",
+        "public_contract_commit": "c399d82780c78167792ec2e90c09fb9b73e16a54",
+        "generic_apply_lifecycle_commit": "cb99ee546330364e81bee16cffffbedbba41c8ff",
+        "generic_site_resources_commit": "5ff726f3bd8b6bf549cfcf4a41a94eb69a538e46",
+        "target_runtime_run_id": 36882850660,
+        "target_runtime_artifact_id": 11174282172,
+        "classification": "SUPPORTED",
+        "oracle_satisfied": true,
+        "product_first_consumer": "FolioRelay",
+        "product_materialization_identity": "sha256:c97747bdaaa7bac2be0e0b83fe2bb61fce801486bb2a27b75a95c338f9dbeb49"
       }
     },
     {
