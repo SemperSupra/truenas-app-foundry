@@ -86,6 +86,27 @@ class TargetProfileTests(unittest.TestCase):
             for key, value in evidence.items():
                 self.assertEqual(target["runtime_evidence"][key], value)
 
+    def test_250426_is_the_only_apply_qualified_exact_target(self):
+        target = next(t for t in REGISTRY["targets"] if t["version"] == "25.04.2.6")
+        self.assertTrue(target["apply_qualified"])
+        promotion = target["apply_qualification"]
+        self.assertEqual(
+            promotion["authority"],
+            "SemperSupra/truenas-app-foundry-private#291",
+        )
+        self.assertEqual(promotion["scope"], "exact-target-only")
+        got = mod.discover(observation("TrueNAS-25.04.2.6"), REGISTRY)
+        self.assertEqual(got["status"], "EXACT_PROFILE")
+        self.assertTrue(got["apply_qualified"])
+        self.assertFalse(got["qualification_only"])
+
+        for row in REGISTRY["targets"]:
+            if row["version"] != "25.04.2.6":
+                self.assertFalse(
+                    row["apply_qualified"],
+                    f"{row['version']} must not inherit 25.04.2.6 admission",
+                )
+
     def test_current_stable_resolves_exact_profile_but_is_not_apply_qualified(self):
         got = mod.discover(observation("TrueNAS-25.10.7"), REGISTRY)
         self.assertEqual(got["status"], "EXACT_PROFILE")
