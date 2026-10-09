@@ -155,7 +155,7 @@ class TargetProfileTests(unittest.TestCase):
             path = HERE.parent / profile
             raw = path.read_bytes()
             blob_sha = hashlib.sha1(
-                f"blob {len(raw)}\\0".encode() + raw
+                b"blob " + str(len(raw)).encode() + b"\0" + raw
             ).hexdigest()
             self.assertEqual(contract["profile_blob_sha"], blob_sha, target["version"])
             self.assertEqual(contract["middleware_commit"], target["middleware_commit"])
