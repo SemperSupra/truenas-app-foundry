@@ -56,10 +56,6 @@ jobs:
           repository: SemperSupra/truenas-app-foundry
           ref: ${{ steps.source.outputs.ref }}
           persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - name: Qualify cheap producer contract
         shell: bash
         run: |
