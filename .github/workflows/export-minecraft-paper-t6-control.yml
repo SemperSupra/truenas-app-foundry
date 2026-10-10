@@ -1,0 +1,108 @@
+name: Export Minecraft Paper TrueNAS T6 candidate
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        type: string
+        required: true
+      target_version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        type: string
+        required: false
+      target_version:
+        type: choice
+        required: true
+        options:
+          - "25.04.1"
+  pull_request:
+    paths:
+      - ".github/workflows/export-minecraft-paper-t6-control.yml"
+      - "tools/export_minecraft_paper_t6_control.py"
+      - "tests/test_export_minecraft_paper_t6_control.py"
+      - ".foundry/controls/minecraft-paper-world-hostpath-values.yaml"
+      - ".foundry/truenas-apps-upstream.json"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Resolve exact source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          ref="$GITHUB_SHA"
+          if [[ -n "$REQUESTED_REF" ]]; then ref="$REQUESTED_REF"; fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          target="25.04.1"
+          if [[ -n "$TARGET_VERSION" ]]; then target="$TARGET_VERSION"; fi
+          [[ "$target" == "25.04.1" ]] || exit 2
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout exact Foundry source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Qualify cheap producer contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python3 -m unittest -v tests/test_export_minecraft_paper_t6_control.py
+          python3 -m py_compile tools/export_minecraft_paper_t6_control.py
+      - name: Qualify existing pinned source render
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_world_control.py
+          jq -e '.result == "PASS" and .upstream.app == "community/minecraft"' minecraft-world-control-evidence.json >/dev/null
+      - name: Emit native catalog source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/export_minecraft_paper_t6_control.py \
+            --foundry-ref "${{ steps.source.outputs.ref }}" \
+            --target-version "25.04.1" \
+            --source-evidence minecraft-world-control-evidence.json \
+            --output /tmp/minecraft-paper-t6
+          jq -e '
+            .schema == "semper-supra.minecraft-paper-truenas-t6-control/1" and
+            .target.truenas_version == "25.04.1" and
+            .runtime.catalog_app == "minecraft" and
+            .runtime.paper_version == "1.21.11" and
+            .evidence.live_minecraft_server_qualified == false and
+            .evidence.physical_truenas_qualified == false and
+            .secrets_captured == false
+          ' /tmp/minecraft-paper-t6/control.json >/dev/null
+      - name: Upload source candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minecraft-paper-truenas-t6-control
+          path: /tmp/minecraft-paper-t6/
+          if-no-files-found: error
+          retention-days: 7
+      - name: State no runtime claim
+        if: always()
+        shell: bash
+        run: |
+          echo "### Source candidate only" >> "$GITHUB_STEP_SUMMARY"
+          echo "Foundry ref: ${{ steps.source.outputs.ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "No nested TrueNAS, runtime, world-retention, or physical-HIL PASS is claimed." >> "$GITHUB_STEP_SUMMARY"
