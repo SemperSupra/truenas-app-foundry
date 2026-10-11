@@ -351,6 +351,45 @@
       }
     },
     {
+      "id": "minecraft-paper-app",
+      "classification": "product",
+      "required_for_all_products_claim": false,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SupraCraft/mc-server-images#53",
+        "foundry_authority": "SemperSupra/truenas-app-foundry-private#288",
+        "dispatch_authority": "SemperSupra/agent-dispatch-private#588"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "scope": "experimental Paper 1.21.11 native-catalog consumer; not vanilla Minecraft 26.x; declared universal four-version support not admitted",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_failure_evidence": {
+            "run_id": 38170800682,
+            "artifact_id": 11714246961,
+            "classification": "ORACLE_FAILURE",
+            "oracle_satisfied": false,
+            "detail": "actual disposable TrueNAS Paper native app RUNNING owner readback mismatch; cleanup/session healthy; diagnostic rep 007 pending",
+            "claim_boundary": "no product F0-F5 or Paper support"
+          }
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    },
+    {
       "id": "foundry-rdte-probe",
       "classification": "qualification-control",
       "required_for_all_products_claim": false,
@@ -384,6 +423,7 @@
   "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied.",
   "required_external_product_ids": [
     "litellm-app",
-    "foliorelay-app"
+    "foliorelay-app",
+    "minecraft-paper-app"
   ]
 }
