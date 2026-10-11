@@ -50,7 +50,7 @@ jobs:
           test "$(jq -r '.source_contract.structural_preflight' "$bootstrap_receipt")" = "PASS"
           test "$(jq -r '.source_contract.official_validator' "$bootstrap_receipt")" = "PENDING"
 
-          for version in 25.04.1 25.10.7 26.0.0-BETA.3; do
+          for version in 25.04.1 25.04.2.6 25.10.7 26.0.0-BETA.3; do
             python3 tools/foundry_app_inventory.py \
               --inventory "$proposal" \
               --targets .foundry/truenas-target-tracks.json \
@@ -178,7 +178,7 @@ jobs:
           test "$(jq -r '.apps[0].catalog_export.status' "$qualified_inventory")" = "catalog-ready-candidate"
           test "$(jq -r '.apps[0].catalog_qualification.status' "$qualified_inventory")" = "PASS"
 
-          for version in 25.04.1 25.10.7 26.0.0-BETA.3; do
+          for version in 25.04.1 25.04.2.6 25.10.7 26.0.0-BETA.3; do
             python3 tools/foundry_inventory_materialize.py \
               --inventory "$qualified_inventory" \
               --targets .foundry/truenas-target-tracks.json \
@@ -211,7 +211,7 @@ jobs:
               app:{id:"foundry-rdte-probe",version:"1.0.0",source_ref:$source_ref,source_tree_sha256:$source_tree_sha},
               toolchain:{apps_ref:$apps_ref,apps_validation_ref:$validator_ref,middleware_base:$base_digest,validator_image_id:$image_id,upstream_ci_sha256:$original_ci_sha,patched_ci_sha256:$patched_ci_sha},
               gates:{bootstrap:"PASS",native_validator:"PASS",render_install:"PASS",catalog_qualification:"PASS",inventory_materialization:"PASS"},
-              exact_targets:["25.04.1","25.10.7","26.0.0-BETA.3"],
+              exact_targets:["25.04.1","25.04.2.6","25.10.7","26.0.0-BETA.3"],
               materialization_identity:$materialization_identity,
               catalog_ready_candidate:true,
               non_claims:["not submitted to the official TrueNAS catalog","no target mutation","no publication approval","runtime compatibility remains exact-version gated"]
