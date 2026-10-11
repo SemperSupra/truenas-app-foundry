@@ -6,10 +6,11 @@
   },
   "controller": {
     "repository": "https://github.com/SemperSupra/garm.git",
-    "sha": "8a72cb23deacc712786945ac5e7ee63f8b4976d6",
-    "version_label": "v0.2.1-semper.8a72cb23",
-    "qualification_run": 35420114185,
-    "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names"
+    "sha": "c2186af1f8bd5df0d9e2888f5f42f0728e26d60c",
+    "version_label": "v0.2.1-semper.c2186af1",
+    "qualification_run": null,
+    "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names",
+    "qualification_note": "Draft GARM fork PR #14; local full Go race suite PASS on exact head and isolated Foundry appliance validation PASS. Independent semantic review, published digest, physical HIL and capacity-one recovery remain pending."
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
@@ -31,8 +32,8 @@
     "controller_observations": []
   },
   "publication": {
-    "immutable_tag_prefix": "controller-8a72cb23-provider-14535745",
+    "immutable_tag_prefix": "controller-c2186af1-provider-14535745",
     "mutable_alias": "mvp"
   },
-  "claim_boundary": "MVP controller image assembly only. Controller identity is exact qualified merged source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. TrueNAS provider remains exact source 6a28ea5c614dce67efb16ca004271ff01e9bff61 with reproducible binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
+  "claim_boundary": "Candidate source and appliance assembly only. Exact GARM fork head c2186af1f8bd5df0d9e2888f5f42f0728e26d60c and accepted TrueNAS provider head 14535745dc3aa3c0b5466da7c704bca4d23dcec5. No live capacity-one recovery, physical TrueNAS promotion, capacity-two, or HIL claim. Publish only after independent source review and qualified main-branch release; deploy only by state-preserving TrueNAS App lifecycle against an immutable digest and exact rollback contract."
 }
