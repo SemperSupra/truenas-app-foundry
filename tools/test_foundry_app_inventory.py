@@ -72,6 +72,19 @@ def write_source(root: pathlib.Path, *, app="probe-app", version="1.0.0", train=
 
 
 class InventoryTests(unittest.TestCase):
+    def test_foundry_born_probe_declares_every_exact_admitted_target(self):
+        root = HERE.parent
+        spec = json.loads((root / ".foundry/bootstrap/foundry-rdte-probe.json").read_text())
+        registry = json.loads((root / ".foundry/truenas-target-tracks.json").read_text())
+        declared = spec["entry"]["target_versions"]
+        admitted = [item["version"] for item in registry["targets"]]
+        self.assertEqual(declared, admitted)
+        workflow = (root / ".github/workflows/qualify-foundry-born-catalog-probe.yml").read_text()
+        for version in declared:
+            self.assertEqual(workflow.count("for version in " + " ".join(declared) + "; do"), 2)
+            self.assertIn('"' + version + '"', workflow)
+        self.assertIn('exact_targets:[' + ",".join('"' + version + '"' for version in declared) + ']', workflow)
+
     def test_empty_repository_inventory_is_valid(self):
         apps = MOD.validate_inventory(
             {"schema": "truenas-foundry-app-inventory/v1", "apps": []}
