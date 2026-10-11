@@ -20,9 +20,10 @@ REF = "a" * 40
 EVIDENCE = {
     "result": "PASS",
     "upstream": {
-        "ref": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+        "ref": "bb96ef6fd8c2708765012a4a3ca3739370a4f92c",
         "app": "community/minecraft",
     },
+    "server": {"catalog_version": "1.15.29", "image_ref": "ghcr.io/itzg/minecraft-server:2026.9.2-java21@sha256:edf50d431ddc6f73929368e82f4334a405796874f7b0ae11f1edcbb267d670aa"},
     "compose_sha256": "1" * 64,
 }
 
@@ -55,6 +56,18 @@ class TestControl(unittest.TestCase):
         evidence = copy.deepcopy(EVIDENCE)
         evidence["upstream"]["ref"] = "0" * 40
         with self.assertRaisesRegex(mod.ControlError, "upstream identity"):
+            mod.source_control(REF, evidence)
+
+    def test_catalog_version_mismatch_refused(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["server"]["catalog_version"] = "1.15.24"
+        with self.assertRaisesRegex(mod.ControlError, "catalog revision"):
+            mod.source_control(REF, evidence)
+
+    def test_image_digest_mismatch_refused(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["server"]["image_ref"] = "ghcr.io/itzg/minecraft-server:latest"
+        with self.assertRaisesRegex(mod.ControlError, "digest-pinned image"):
             mod.source_control(REF, evidence)
 
     def test_no_compose_digest_refused(self):

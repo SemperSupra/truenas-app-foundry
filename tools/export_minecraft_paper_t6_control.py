@@ -18,11 +18,11 @@ import sys
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-PIN = ROOT / ".foundry/truenas-apps-upstream.json"
+PIN = ROOT / ".foundry/controls/minecraft-paper-upstream.json"
 PROFILE = ROOT / ".foundry/truenas-compatibility/25.04.1-materialization.json"
 VALUES = ROOT / ".foundry/controls/minecraft-paper-world-hostpath-values.yaml"
 TARGET = "25.04.1"
-CATALOG_VERSION = "1.15.24"
+CATALOG_VERSION = "1.15.29"
 PAPER_VERSION = "1.21.11"
 SCHEMA = "semper-supra.minecraft-paper-truenas-t6-control/1"
 OWNERSHIP = {
@@ -72,7 +72,7 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
     ).strip()
     if profile_blob != "800aca038ded29e6a91bfc4c1b1fe2d2199182e8":
         raise ControlError("target profile Git blob drift")
-    if pin.get("ref") != "532236882212e8c5e51d5b49cfe2c6ce3dd5675e":
+    if pin.get("ref") != "bb96ef6fd8c2708765012a4a3ca3739370a4f92c":
         raise ControlError("upstream TrueNAS Apps source drift")
     if pin.get("library_version") != "2.3.4":
         raise ControlError("upstream library version drift")
@@ -81,6 +81,12 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
     upstream = evidence.get("upstream") or {}
     if upstream.get("ref") != pin["ref"] or upstream.get("app") != "community/minecraft":
         raise ControlError("source render upstream identity drift")
+    server = evidence.get("server") or {}
+    if (pin.get("catalog_version") != CATALOG_VERSION or
+        pin.get("image") != "ghcr.io/itzg/minecraft-server:2026.9.2-java21@sha256:edf50d431ddc6f73929368e82f4334a405796874f7b0ae11f1edcbb267d670aa" or
+        server.get("catalog_version") != CATALOG_VERSION or
+        server.get("image_ref") != pin["image"]):
+        raise ControlError("source-render catalog revision or digest-pinned image drift")
     compose_hash = evidence.get("compose_sha256")
     if not isinstance(compose_hash, str) or not re.fullmatch("[0-9a-f]{64}", compose_hash):
         raise ControlError("missing exact source-render Compose digest")
@@ -133,6 +139,7 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
             "repository": pin["repository"],
             "apps_commit": pin["ref"],
             "app": "community/minecraft",
+            "image_reference": pin["image"],
             "library_version": pin["library_version"],
             "source_compose_sha256": compose_hash,
             "values_raw_sha256": hashlib.sha256(VALUES.read_bytes()).hexdigest(),

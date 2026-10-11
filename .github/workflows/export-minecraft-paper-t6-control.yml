@@ -26,6 +26,7 @@ on:
       - "tests/test_export_minecraft_paper_t6_control.py"
       - ".foundry/controls/minecraft-paper-world-hostpath-values.yaml"
       - ".foundry/truenas-apps-upstream.json"
+      - ".foundry/controls/minecraft-paper-upstream.json"
 
 permissions:
   contents: read
