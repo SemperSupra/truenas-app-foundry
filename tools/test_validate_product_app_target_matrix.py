@@ -156,6 +156,28 @@ class MatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(MatrixError, "required external product"):
             validate(m, registry(), root)
 
+    def test_external_minecraft_paper_is_registered_without_support_inheritance(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        doc = json.loads((root / ".foundry/product-app-target-matrix.json").read_text(encoding="utf-8"))
+        self.assertIn("minecraft-paper-app", doc["required_external_product_ids"])
+        rows = {entry["id"]: entry for entry in doc["entries"]}
+        paper = rows["minecraft-paper-app"]
+        self.assertEqual(paper["classification"], "product")
+        self.assertFalse(paper["required_for_all_products_claim"])
+        self.assertEqual(paper["source"]["kind"], "external-foundry-product-authority")
+        for version in VERSIONS:
+            self.assertEqual(paper["target_status"][version]["status"], "OPEN")
+            self.assertIsNone(paper["target_status"][version]["evidence"])
+        failure = paper["target_status"]["25.04.1"]["prior_failure_evidence"]
+        self.assertEqual(failure["run_id"], 38170800682)
+        self.assertEqual(failure["classification"], "ORACLE_FAILURE")
+        self.assertFalse(failure["oracle_satisfied"])
+        omitted = copy.deepcopy(doc)
+        omitted["entries"] = [x for x in omitted["entries"] if x["id"] != "minecraft-paper-app"]
+        reg = json.loads((root / ".foundry/truenas-target-tracks.json").read_text(encoding="utf-8"))
+        with self.assertRaisesRegex(MatrixError, "required external products omitted"):
+            validate(omitted, reg, root)
+
     def test_repository_matrix_requires_foliorelay_external_product(self):
         root = pathlib.Path(__file__).resolve().parents[1]
         doc = json.loads((root / ".foundry/product-app-target-matrix.json").read_text(encoding="utf-8"))
