@@ -307,6 +307,41 @@ jobs:
           print(json.dumps({"negative_cases_rejected":len(results)}))
           PY
 
+      - name: Element Web owned-config source readiness on real emitted artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Different independent executor/source gate: never classify this
+          # source result as F0-F5 runtime qualification.
+          preflight_ref="ad556e9226f429b4cc84873c9e3f4d64690d9b2b"
+          preflight_repo="$RUNNER_TEMP/agent-dispatch-element-web-preflight"
+          git init -q "$preflight_repo"
+          git -C "$preflight_repo" fetch -q --depth=1 \
+            https://github.com/SemperSupra/agent-dispatch.git "$preflight_ref"
+          git -C "$preflight_repo" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$preflight_repo" rev-parse HEAD)" = "$preflight_ref"
+          python3 -m py_compile "$preflight_repo/scripts/truenas_foundry_element_web_live_preflight.py"
+          for version in 25.04.1 25.04.2.6 25.10.7 26.0.0-BETA.3; do
+            artifact="$RUNNER_TEMP/foundry-rdte-probe.$version.artifact.json"
+            source_ref="$(jq -r '.provenance.source_identity.ref' "$artifact")"
+            source_tree_sha="$(jq -r '.provenance.source_tree_sha256' "$artifact")"
+            profile="$(jq -r '.provenance.target_profile' "$artifact")"
+            python3 "$preflight_repo/scripts/truenas_foundry_element_web_live_preflight.py" \
+              --artifact "$artifact" \
+              --target-version "$version" \
+              --source-ref "$source_ref" \
+              --source-tree-sha256 "$source_tree_sha" \
+              --profile-path "$profile" \
+              > "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
+            jq -e '.classification=="SOURCE_ADMITTED_LIVE_BLOCKED" and
+                   .source_admission=="SOURCE_ADMITTED_NOT_RUN" and
+                   .live_execution_admitted==false and
+                   .f0_f5_qualified==false and
+                   .physical_apply_authority=="HOLD" and
+                   (.blocking_gates | index("OWNED_CONFIG_JSON_BIND_MISSING") != null)' \
+              "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
+          done
+
       - name: Upload Foundry-born probe evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -323,6 +358,7 @@ jobs:
             ${{ runner.temp }}/foundry-rdte-probe.*.artifact.json
             ${{ runner.temp }}/foundry-rdte-probe.*.materialize.json
             ${{ runner.temp }}/foundry-rdte-probe.*.admission.json
+            ${{ runner.temp }}/foundry-rdte-probe.*.element-web-preflight.json
             ${{ runner.temp }}/foundry-rdte-probe.interop-negative.json
             ${{ runner.temp }}/foundry-rdte-probe.overall.json
           if-no-files-found: warn
