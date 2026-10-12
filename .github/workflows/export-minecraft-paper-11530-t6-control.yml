@@ -1,6 +1,14 @@
 name: Export immutable Minecraft 1.15.30 Paper T6 source control
 
 on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        type: string
+        required: true
+      target_version:
+        type: string
+        required: true
   pull_request:
     paths:
       - 'tools/export_minecraft_paper_t6_control.py'
@@ -17,10 +25,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Resolve exact candidate source identity
+        id: candidate
+        env:
+          FOUND_REF: ${{ inputs.foundry_ref }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          ref="${FOUND_REF:-$GITHUB_SHA}"
+          test "${TARGET_VERSION:-25.04.1}" = 25.04.1
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - name: Checkout exact candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.candidate.outputs.ref }}
           persist-credentials: false
+      - name: Confirm exact immutable candidate checkout
+        run: test "$(git rev-parse HEAD)" = "${{ steps.candidate.outputs.ref }}"
       - name: Qualify historical and new source-only control contracts
         run: |
           set -euo pipefail
