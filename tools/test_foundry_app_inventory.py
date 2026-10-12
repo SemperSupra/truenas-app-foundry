@@ -81,7 +81,15 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(declared, admitted)
         workflow = (root / ".github/workflows/qualify-foundry-born-catalog-probe.yml").read_text()
         for version in declared:
-            self.assertEqual(workflow.count("for version in " + " ".join(declared) + "; do"), 2)
+            # Assert the two ORIGINAL bootstrap/native producer loops. Subsequent
+        # independent consumer/readiness loops must not break the inventory
+        # source-target regression, nor count as native producer evidence.
+        producer_steps = workflow.split(
+            "      - name: Real producer artifacts against exact Agent Dispatch consumer", 1
+        )[0]
+        self.assertEqual(
+            producer_steps.count("for version in " + " ".join(declared) + "; do"), 2
+        )
             self.assertIn('"' + version + '"', workflow)
         self.assertIn('exact_targets:[' + ",".join('"' + version + '"' for version in declared) + ']', workflow)
 
