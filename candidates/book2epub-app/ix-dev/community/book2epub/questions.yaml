@@ -1,0 +1,130 @@
+groups:
+  - name: Network
+    description: HTTP browser bind settings (a site-local LAN IP is mandatory before any physical APPLY)
+  - name: Storage
+    description: Durable jobs, inputs, models, and results
+  - name: Resources
+    description: CPU-only conversion worker limits
+questions:
+  - variable: network
+    label: Network
+    group: Network
+    schema:
+      type: dict
+      attrs:
+        - variable: web_port
+          label: Book2EPUB Web Port
+          schema:
+            type: dict
+            attrs:
+              - variable: bind_mode
+                label: Port Bind Mode
+                schema:
+                  type: string
+                  default: published
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: published
+                      description: Published on host
+              - variable: port_number
+                label: Host Port
+                schema:
+                  type: int
+                  default: 18787
+                  min: 1024
+                  max: 65535
+                  required: true
+              - variable: container_port
+                label: Container Port
+                schema:
+                  type: int
+                  default: 8080
+                  hidden: true
+                  required: true
+              - variable: host_ips
+                label: Trusted host bind IPs
+                description: Select trusted LAN address; empty may expose all host interfaces.
+                schema:
+                  type: list
+                  default: []
+                  items:
+                    - variable: host_ip
+                      label: Host IP
+                      schema:
+                        type: string
+                        required: true
+                        $ref:
+                          - definitions/node_bind_ip
+  - variable: storage
+    label: Storage
+    group: Storage
+    schema:
+      type: dict
+      attrs:
+        - variable: state
+          label: Durable Book2EPUB State
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Storage Type
+                schema:
+                  type: string
+                  required: true
+                  default: ix_volume
+                  hidden: true
+                  enum:
+                    - value: ix_volume
+                      description: Managed ixVolume
+              - variable: ix_volume_config
+                label: ixVolume
+                schema:
+                  type: dict
+                  $ref:
+                    - normalize/ix_volume
+                  attrs:
+                    - variable: acl_enable
+                      label: Enable ACL
+                      schema:
+                        type: boolean
+                        default: false
+                    - variable: dataset_name
+                      label: Dataset Name
+                      schema:
+                        type: string
+                        default: book2epub-state
+                        required: true
+                        hidden: true
+                    - variable: acl_entries
+                      label: ACL Configuration
+                      schema:
+                        type: dict
+                        show_if: [["acl_enable", "=", true]]
+                        attrs: []
+  - variable: resources
+    label: Resources
+    group: Resources
+    schema:
+      type: dict
+      attrs:
+        - variable: limits
+          label: Limits
+          schema:
+            type: dict
+            attrs:
+              - variable: cpus
+                label: CPU limit
+                schema:
+                  type: float
+                  default: 4
+                  min: 1
+                  required: true
+              - variable: memory
+                label: Memory limit (MiB)
+                schema:
+                  type: int
+                  default: 12288
+                  min: 2048
+                  unit: MiB
+                  required: true

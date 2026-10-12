@@ -1,0 +1,35 @@
+app_version: 0.1.0-candidate
+capabilities: []
+categories:
+  - productivity
+  - education
+changelog_url: https://github.com/ShelfMark-Bindery/pipeline
+date_added: '2026-10-12'
+description: >-
+  Explainable PDF inspection, OCR routing and illustrated fiction EPUB conversion.
+home: https://github.com/ShelfMark-Bindery/pipeline
+host_mounts: []
+icon: https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/icon-transparent.svg
+keywords:
+  - epub
+  - pdf
+  - ocr
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+  - name: ShelfMark Bindery
+    url: https://github.com/ShelfMark-Bindery
+name: book2epub
+run_as_context:
+  - description: Non-root web/worker identity
+    uid: 568
+    gid: 568
+    user_name: apps
+    group_name: apps
+screenshots: []
+sources:
+  - https://github.com/ShelfMark-Bindery/pipeline
+  - https://github.com/SemperSupra/truenas-app-foundry
+title: ShelfMark Book2EPUB
+train: community
+version: 0.1.0
