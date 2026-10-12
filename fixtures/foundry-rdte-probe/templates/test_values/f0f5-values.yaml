@@ -1,0 +1,32 @@
+# Separately source-qualified 4RDTE runtime-values variant.
+# Actual F5 configuration is guest-owned, read-only bound to Element Web.
+# The file is created only inside the disposable TrueNAS guest, after
+# confirmed preexisting absence; never on a physical or production target.
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
+
+TZ: Etc/UTC
+
+element_web:
+  additional_envs: []
+
+run_as:
+  user: 568
+  group: 568
+
+network:
+  web_port:
+    bind_mode: published
+    port_number: 8080
+  host_network: false
+
+storage:
+  additional_storage:
+    - type: host_path
+      read_only: true
+      mount_path: /app/config.json
+      host_path_config:
+        acl_enable: false
+        path: /mnt/rdtepool/rdte-foundry-element-web-f0f5/config.json

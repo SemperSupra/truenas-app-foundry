@@ -134,6 +134,31 @@ jobs:
               --train community \
               --app foundry-rdte-probe \
               --test-file basic-values.yaml
+            # The genuine upstream render-install executes the container,
+            # so its *disposable public CI host* needs an ephemeral config
+            # file at the same bind source. This is not a TrueNAS guest,
+            # ownership receipt, runtime F5, or mutation authorization.
+            host_dir=/mnt/rdtepool/rdte-foundry-element-web-f0f5
+            host_file="$host_dir/config.json"
+            test ! -e "$host_dir"
+            test ! -e "$host_file"
+            sudo install -d -m 0755 "$host_dir"
+            cleanup_render_fixture() {
+              sudo rm -f -- "$host_file"
+              sudo rmdir -- "$host_dir"
+              sudo rmdir -- /mnt/rdtepool 2>/dev/null || true
+            }
+            trap cleanup_render_fixture EXIT
+            printf '%s\n' '{"brand":"4RDTE-native-render-install","default_server_config":{"m.homeserver":{"base_url":"https://matrix-client.matrix.org"}},"disable_custom_urls":true}' \
+              > "$RUNNER_TEMP/f0f5-native-render-config.json"
+            sudo install -m 0644 "$RUNNER_TEMP/f0f5-native-render-config.json" "$host_file"
+            # Independently render with genuine upstream TrueNAS Apps library
+            # using the second source-owned values fixture; this exact output
+            # is what Foundry materialize() emits for guest qualification.
+            python3 .github/scripts/ci.py \
+              --train community \
+              --app foundry-rdte-probe \
+              --test-file f0f5-values.yaml
           )
 
           rendered="$root/apps/ix-dev/community/foundry-rdte-probe/templates/rendered/docker-compose.yaml"
@@ -333,12 +358,13 @@ jobs:
               --source-tree-sha256 "$source_tree_sha" \
               --profile-path "$profile" \
               > "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
-            jq -e '.classification=="SOURCE_ADMITTED_LIVE_BLOCKED" and
+            jq -e '.classification=="SOURCE_LAYOUT_READY_NOT_RUN" and
                    .source_admission=="SOURCE_ADMITTED_NOT_RUN" and
                    .live_execution_admitted==false and
                    .f0_f5_qualified==false and
                    .physical_apply_authority=="HOLD" and
-                   (.blocking_gates | index("OWNED_CONFIG_JSON_BIND_MISSING") != null)' \
+                   .config_bind_checked==true and
+                   (.blocking_gates | index("INDEPENDENT_LIVE_ADMISSION_REVIEW") != null)' \
               "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
           done
 
