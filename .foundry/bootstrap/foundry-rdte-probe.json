@@ -13,6 +13,7 @@
     "catalog_train": "community",
     "target_versions": [
       "25.04.1",
+      "25.04.2.6",
       "25.10.7",
       "26.0.0-BETA.3"
     ],
