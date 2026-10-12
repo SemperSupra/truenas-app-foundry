@@ -371,8 +371,25 @@
             "artifact_id": 11714246961,
             "classification": "ORACLE_FAILURE",
             "oracle_satisfied": false,
-            "detail": "actual disposable TrueNAS Paper native app RUNNING owner readback mismatch; cleanup/session healthy; diagnostic rep 007 pending",
+            "detail": "historic run 38170800682: native app owner readback mismatch, zero-residue cleanup; later fixed and an independent exact native Paper T6 run passed, but F0-F5 support remains separately unproven",
             "claim_boundary": "no product F0-F5 or Paper support"
+          },
+          "separate_scoped_control_evidence": {
+            "schema": "supracraft-minecraft-native-app-t6-evidence/v1",
+            "classification": "SUPPORTED",
+            "control_scope": "native-truenas-minecraft-paper/TrueNAS-25.04.1/T6",
+            "paper_version": "1.21.11",
+            "java_protocol": 774,
+            "run_id": 38200675099,
+            "execution_sha": "50d6aa75835727997395156d4b44c3ce668b38f4",
+            "guest_receipt_artifact_id": 11726177363,
+            "guest_receipt_zip_sha256": "22fba44f416871585af42c4361b090ee42438c48a589a54e1c02841f5ad00c08",
+            "product_authority_receipt": "https://github.com/SupraCraft/mc-server-images/blob/main/docs/evidence/minecraft-paper-truenas-25.04.1-t6-2026-10-12.json",
+            "app_semantic_oracle_satisfied": true,
+            "cleanup_zero_residue": true,
+            "guest_session_clean": true,
+            "f0_f5_matrix_qualification_inferred": false,
+            "physical_apply_authorized": false
           }
         },
         "25.04.2.6": {
