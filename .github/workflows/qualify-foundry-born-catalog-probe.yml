@@ -149,7 +149,7 @@ jobs:
               sudo rmdir -- /mnt/rdtepool 2>/dev/null || true
             }
             trap cleanup_render_fixture EXIT
-            printf '%s\\n' '{"brand":"4RDTE-native-render-install","default_server_config":{"m.homeserver":{"base_url":"https://matrix-client.matrix.org"}},"disable_custom_urls":true}' \
+            printf '%s\n' '{"brand":"4RDTE-native-render-install","default_server_config":{"m.homeserver":{"base_url":"https://matrix-client.matrix.org"}},"disable_custom_urls":true}' \
               > "$RUNNER_TEMP/f0f5-native-render-config.json"
             sudo install -m 0644 "$RUNNER_TEMP/f0f5-native-render-config.json" "$host_file"
             # Independently render with genuine upstream TrueNAS Apps library
