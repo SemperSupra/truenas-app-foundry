@@ -24,9 +24,14 @@ EVIDENCE={
 
 class ExactProfileTests(unittest.TestCase):
     def setUp(self):
-        self.patch=mock.patch.object(mod.subprocess,"check_output",side_effect=[
-            REF,"800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
-        ])
+        def exact_git_response(command, text=False):
+            if command[-2:] == ["rev-parse", "HEAD"]:
+                return REF
+            if command[-2] == "hash-object":
+                return "800aca038ded29e6a91bfc4c1b1fe2d2199182e8"
+            raise AssertionError("unexpected git source inspection")
+        self.patch=mock.patch.object(mod.subprocess,"check_output",
+                                     side_effect=exact_git_response)
         self.patch.start()
         self.addCleanup(self.patch.stop)
 
