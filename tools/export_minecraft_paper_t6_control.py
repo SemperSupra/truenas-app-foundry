@@ -23,6 +23,19 @@ PROFILE = ROOT / ".foundry/truenas-compatibility/25.04.1-materialization.json"
 VALUES = ROOT / ".foundry/controls/minecraft-paper-world-hostpath-values.yaml"
 TARGET = "25.04.1"
 CATALOG_VERSION = "1.15.29"
+CATALOG_PROFILES = {
+    "1.15.29": {
+        "pin": PIN,
+        "ref": "bb96ef6fd8c2708765012a4a3ca3739370a4f92c",
+        "image": "ghcr.io/itzg/minecraft-server:2026.9.2-java21@sha256:edf50d431ddc6f73929368e82f4334a405796874f7b0ae11f1edcbb267d670aa",
+    },
+    "1.15.30": {
+        "pin": ROOT / ".foundry/controls/minecraft-paper-11530-upstream.json",
+        "ref": "559b9fe85212c800bc6770f152a65211df137a44",
+        "image": "ghcr.io/itzg/minecraft-server:2026.10.0-java21@sha256:d4057e7019e9b19f25e039d4a204cc502e1a112d1a2305966a534f3d7079e644",
+    },
+}
+
 PAPER_VERSION = "1.21.11"
 SCHEMA = "semper-supra.minecraft-paper-truenas-t6-control/1"
 OWNERSHIP = {
@@ -52,13 +65,17 @@ def load_json(path: pathlib.Path) -> dict:
     return value
 
 
-def source_control(foundry_ref: str, evidence: dict) -> dict:
+def source_control(foundry_ref: str, evidence: dict,
+                   catalog_version: str = CATALOG_VERSION) -> dict:
     if not re.fullmatch(r"[0-9a-f]{40}", foundry_ref):
         raise ControlError("Foundry ref must be full immutable commit SHA")
     head = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
     if head != foundry_ref:
         raise ControlError("Foundry checkout is not exact requested commit")
-    pin = load_json(PIN)
+    if catalog_version not in CATALOG_PROFILES:
+        raise ControlError("unadmitted native catalog profile")
+    profile_spec = CATALOG_PROFILES[catalog_version]
+    pin = load_json(profile_spec["pin"])
     profile = load_json(PROFILE)
     values = yaml.safe_load(VALUES.read_text(encoding="utf-8"))
     if not isinstance(values, dict):
@@ -72,7 +89,7 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
     ).strip()
     if profile_blob != "800aca038ded29e6a91bfc4c1b1fe2d2199182e8":
         raise ControlError("target profile Git blob drift")
-    if pin.get("ref") != "bb96ef6fd8c2708765012a4a3ca3739370a4f92c":
+    if pin.get("ref") != profile_spec["ref"]:
         raise ControlError("upstream TrueNAS Apps source drift")
     if pin.get("library_version") != "2.3.4":
         raise ControlError("upstream library version drift")
@@ -82,9 +99,9 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
     if upstream.get("ref") != pin["ref"] or upstream.get("app") != "community/minecraft":
         raise ControlError("source render upstream identity drift")
     server = evidence.get("server") or {}
-    if (pin.get("catalog_version") != CATALOG_VERSION or
-        pin.get("image") != "ghcr.io/itzg/minecraft-server:2026.9.2-java21@sha256:edf50d431ddc6f73929368e82f4334a405796874f7b0ae11f1edcbb267d670aa" or
-        server.get("catalog_version") != CATALOG_VERSION or
+    if (pin.get("catalog_version") != catalog_version or
+        pin.get("image") != profile_spec["image"] or
+        server.get("catalog_version") != catalog_version or
         server.get("image_ref") != pin["image"]):
         raise ControlError("source-render catalog revision or digest-pinned image drift")
     compose_hash = evidence.get("compose_sha256")
@@ -148,7 +165,7 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
             "app_name": "rdte-t6-minecraft-paper",
             "catalog_app": "minecraft",
             "train": "community",
-            "catalog_version_candidate": CATALOG_VERSION,
+            "catalog_version_candidate": catalog_version,
             "paper_version": PAPER_VERSION,
             "values_template": values,
             "site_bindings_required": {
@@ -174,6 +191,7 @@ def source_control(foundry_ref: str, evidence: dict) -> dict:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--foundry-ref", required=True)
+    p.add_argument("--catalog-version", choices=sorted(CATALOG_PROFILES), default=CATALOG_VERSION)
     p.add_argument("--target-version", default=TARGET)
     p.add_argument("--source-evidence", type=pathlib.Path, required=True)
     p.add_argument("--output", type=pathlib.Path, required=True)
@@ -182,7 +200,7 @@ def main() -> int:
         if args.target_version != TARGET:
             raise ControlError("first Minecraft control is 25.04.1 only")
         evidence = load_json(args.source_evidence)
-        control = source_control(args.foundry_ref, evidence)
+        control = source_control(args.foundry_ref, evidence, catalog_version=args.catalog_version)
         args.output.mkdir(parents=True, exist_ok=True)
         (args.output / "control.json").write_text(
             json.dumps(control, indent=2, sort_keys=True) + "\n", encoding="utf-8"
