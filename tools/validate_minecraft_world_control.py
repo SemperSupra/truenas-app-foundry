@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = ROOT / ".foundry" / "truenas-apps-upstream.json"
+PIN = ROOT / ".foundry" / "controls" / "minecraft-paper-upstream.json"
 VALUES = ROOT / ".foundry" / "controls" / "minecraft-paper-world-hostpath-values.yaml"
 WORLD_SOURCE = "/opt/tests/collage-world-only"
 OWNERSHIP_ENV = {
@@ -170,6 +170,14 @@ def validate():
             if "/var/run/docker.sock" in mount["source"] or "/var/run/docker.sock" in mount["target"]:
                 raise ValidationError("unexpected Docker socket")
 
+        expected_image = pin.get("image")
+        if service.get("image") != expected_image or "@sha256:" not in expected_image:
+            raise ValidationError("pinned digest Minecraft image drift")
+        expected_catalog_version = pin.get("catalog_version")
+        version_yaml = checkout / "trains" / pin["train"] / "minecraft" / expected_catalog_version / "app.yaml"
+        if not version_yaml.is_file() or f"version: {expected_catalog_version}" not in version_yaml.read_text():
+            raise ValidationError("requested native catalog revision absent at pinned upstream commit")
+
         canonical=json.dumps(compose,sort_keys=True,separators=(",",":")).encode()
         return {
             "result":"PASS",
@@ -184,6 +192,8 @@ def validate():
             },
             "server":{
                 "type":env.get("TYPE"),
+                "image_ref":service.get("image"),
+                "catalog_version":expected_catalog_version,
                 "base_data_mount":data[0],
                 "world_mount":world[0],
                 "ownership_metadata":observed_ownership,
