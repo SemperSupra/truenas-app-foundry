@@ -8,6 +8,10 @@ One source-defined application **not yet in the official TrueNAS catalog** must 
 
 Primary free compute: existing **public standard GitHub Actions x64 KVM TrueNAS harness** `SemperSupra/agent-dispatch@experiment/gha-kvm-system-rdte`. No private-hosted Actions usage, paid or larger runners, external private secrets, user workstation, local NAS, or persistent cloud VM required. Public work is strictly public-safe. Agent Dispatch coordinates bounded execution and the one-heavyweight lane; it is not an additional product source of truth. GitHub is the durable authority. This contract does not grant a job or actor release/merge/physical-APPLY authority.
 
+## External candidate admission and failure evidence
+
+The public repository's `candidates/*/candidate.json` discovery cannot enumerate externally developed products. Those products must be explicitly admitted by the owning program to `required_external_product_ids` and an explicit product row (even when no target is qualified). Current inventory includes an **experimental Minecraft Paper 1.21.11** candidate under `SupraCraft/mc-server-images#53` and Foundry private #288. Its exact 25.04.1 live negative receipt is retained as `prior_failure_evidence`; all four current matrix cells remain OPEN and this is not a vanilla Minecraft claim. New external product admission should be a single bounded inventory+test change, not a new scheduler, database or broadened runtime contract. An explicit experimental row does **not** declare every TrueNAS version supported.
+
 ## Source-first, actual systems first
 
 1. Read pinned upstream `truenas/middleware`, `truenas/apps` (including templates, schema, renderer, migrations, middleware Apps CRUD/upgrade/rollback) and the exact Foundry/Agent Dispatch producer/consumer source. Prefer actual release/source interfaces, not presumed common semantics.
