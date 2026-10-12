@@ -2,6 +2,7 @@
 """Public-safe H3 source-render control: externalize only /data/world."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import shutil
@@ -64,12 +65,14 @@ def envmap(service):
             out[k]=v
     return out
 
-def validate():
+def validate(*, pin_path=PIN):
     for tool in ("git","docker","python3"):
         if not shutil.which(tool):
             raise ValidationError("missing tool: "+tool)
 
-    pin=json.loads(PIN.read_text())
+    if pin_path not in (PIN, ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json'):
+        raise ValidationError('Unadmitted pinned Minecraft catalog profile')
+    pin=json.loads(pin_path.read_text())
     ref=str(pin["ref"])
     tmp=Path(tempfile.mkdtemp(prefix="collage-world-control-"))
     try:
@@ -214,8 +217,14 @@ def validate():
         shutil.rmtree(tmp,ignore_errors=True)
 
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--catalog-profile", choices=["1.15.29", "1.15.30"],
+                        default="1.15.29")
+    args=parser.parse_args()
+    pin_path=(PIN if args.catalog_profile=="1.15.29" else
+              ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json')
     try:
-        evidence=validate()
+        evidence=validate(pin_path=pin_path)
         payload=json.dumps(evidence,indent=2,sort_keys=True)+"\n"
         (ROOT/"minecraft-world-control-evidence.json").write_text(payload)
         print(payload,end="")
