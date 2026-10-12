@@ -134,6 +134,13 @@ jobs:
               --train community \
               --app foundry-rdte-probe \
               --test-file basic-values.yaml
+            # Independently render with genuine upstream TrueNAS Apps library
+            # using the second source-owned values fixture; this exact output
+            # is what Foundry materialize() emits for guest qualification.
+            python3 .github/scripts/ci.py \
+              --train community \
+              --app foundry-rdte-probe \
+              --test-file f0f5-values.yaml
           )
 
           rendered="$root/apps/ix-dev/community/foundry-rdte-probe/templates/rendered/docker-compose.yaml"
@@ -333,12 +340,13 @@ jobs:
               --source-tree-sha256 "$source_tree_sha" \
               --profile-path "$profile" \
               > "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
-            jq -e '.classification=="SOURCE_ADMITTED_LIVE_BLOCKED" and
+            jq -e '.classification=="SOURCE_LAYOUT_READY_NOT_RUN" and
                    .source_admission=="SOURCE_ADMITTED_NOT_RUN" and
                    .live_execution_admitted==false and
                    .f0_f5_qualified==false and
                    .physical_apply_authority=="HOLD" and
-                   (.blocking_gates | index("OWNED_CONFIG_JSON_BIND_MISSING") != null)' \
+                   .config_bind_checked==true and
+                   (.blocking_gates | index("INDEPENDENT_LIVE_ADMISSION_REVIEW") != null)' \
               "$RUNNER_TEMP/foundry-rdte-probe.$version.element-web-preflight.json"
           done
 
