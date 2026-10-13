@@ -184,15 +184,13 @@ def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
             if "/var/run/docker.sock" in mount["source"] or "/var/run/docker.sock" in mount["target"]:
                 raise ValidationError("unexpected Docker socket")
 
+        if expected_type=="VANILLA" and "image_selector: j25_image" not in values_path.read_text():
+            raise ValidationError("Java25 selector drift")
         expected_image = pin.get("image")
         if service.get("image") != expected_image or "@sha256:" not in expected_image:
             raise ValidationError("pinned digest Minecraft image drift")
         if (expected_type=="VANILLA" and not expected_image.endswith("@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")):
             raise ValidationError("Java25 native catalog digest drift")
-        if expected_type=="VANILLA" and env.get("TYPE")!="VANILLA":
-            raise ValidationError("native vanilla backend type drift")
-        if False:
-            raise ValidationError("pinned digest Minecraft image drift")
         expected_catalog_version = pin.get("catalog_version")
         version_yaml = checkout / "trains" / pin["train"] / "minecraft" / expected_catalog_version / "app.yaml"
         if not version_yaml.is_file() or f"version: {expected_catalog_version}" not in version_yaml.read_text():
@@ -201,7 +199,7 @@ def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
         canonical=json.dumps(compose,sort_keys=True,separators=(",",":")).encode()
         return {
             "result":"PASS",
-            "experiment":"COLLAGE H3 world-only source-render control",
+            "experiment":("SupraCraft vanilla26.3 Java25 exact native source-only render" if expected_type=="VANILLA" else "COLLAGE H3 world-only source-render control"),
             "trust_claim":"Pinned upstream TrueNAS Minecraft app can keep ordinary /data on App storage, independently mount a writable external world at /data/world, and carry bounded non-secret COLLAGE ownership/adoption metadata through its supported additional_envs surface",
             "upstream":{
                 "repository":pin["repository"],
@@ -212,6 +210,8 @@ def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
             },
             "server":{
                 "type":env.get("TYPE"),
+                "minecraft_version":env.get("VERSION"),
+                "image_selector":expected_selector,
                 "image_ref":service.get("image"),
                 "catalog_version":expected_catalog_version,
                 "base_data_mount":data[0],
@@ -223,6 +223,7 @@ def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
                 "actions":actions,
             },
             "non_claims":[
+                "no evidence of TrueNAS 25.04.2.6 runtime App lifecycle or current image OCI boot from source render alone",
                 "no live TrueNAS qualification",
                 "no proof yet that Paper creates/loads the world successfully through the nested mount",
                 "no snapshot/clone or single-writer qualification",
