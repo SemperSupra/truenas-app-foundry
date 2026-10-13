@@ -14,6 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIN = ROOT / ".foundry" / "controls" / "minecraft-paper-upstream.json"
 VALUES = ROOT / ".foundry" / "controls" / "minecraft-paper-world-hostpath-values.yaml"
+VANILLA_PIN = ROOT / ".foundry/controls/minecraft-vanilla-263-11530-upstream.json"
+VANILLA_VALUES = ROOT / ".foundry/controls/minecraft-vanilla-263-world-hostpath-values.yaml"
 WORLD_SOURCE = "/opt/tests/collage-world-only"
 OWNERSHIP_ENV = {
     "SUPRACRAFT_COLLAGE_MANAGED": "true",
@@ -65,13 +67,22 @@ def envmap(service):
             out[k]=v
     return out
 
-def validate(*, pin_path=PIN):
+def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
+             expected_version="1.21.11", expected_selector="image",
+             expected_world_path=WORLD_SOURCE, expected_ownership=OWNERSHIP_ENV):
     for tool in ("git","docker","python3"):
         if not shutil.which(tool):
             raise ValidationError("missing tool: "+tool)
 
-    if pin_path not in (PIN, ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json'):
+    if pin_path not in (PIN, ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json', VANILLA_PIN):
         raise ValidationError('Unadmitted pinned Minecraft catalog profile')
+    if pin_path == VANILLA_PIN:
+        if (values_path != VANILLA_VALUES or expected_type != 'VANILLA'
+                or expected_version != '26.3' or expected_selector != 'j25_image'
+                or expected_world_path != '/opt/tests/collage-vanilla-263-world'):
+            raise ValidationError('unadmitted vanilla 26.3 source configuration')
+    elif values_path != VALUES or expected_type != 'PAPER' or expected_version != '1.21.11':
+        raise ValidationError('legacy Paper source configuration drift')
     pin=json.loads(pin_path.read_text())
     ref=str(pin["ref"])
     tmp=Path(tempfile.mkdtemp(prefix="collage-world-control-"))
@@ -107,7 +118,7 @@ def validate(*, pin_path=PIN):
         run([
             "python3", str(ROOT / "tools" / "prepare_truenas_platform_values.py"),
             "--questions", str(app / "questions.yaml"),
-            "--values", str(VALUES),
+            "--values", str(values_path),
             "--resolved", str(resolved),
             "--output-values", str(normalized),
             "--plan", str(platform_plan),
@@ -123,7 +134,7 @@ def validate(*, pin_path=PIN):
         if "/opt/tests/collage-server-data" in json.dumps(plan, sort_keys=True):
             raise ValidationError("sanitized platform plan leaked the resolved host path")
 
-        test_name="collage-paper-world-hostpath-values.yaml"
+        test_name=("collage-vanilla263-world-hostpath-values.yaml" if expected_type=="VANILLA" else "collage-paper-world-hostpath-values.yaml")
         shutil.copyfile(normalized, app/"templates"/"test_values"/test_name)
         run([
             "python3",".github/scripts/ci.py",
@@ -143,13 +154,13 @@ def validate(*, pin_path=PIN):
             raise ValidationError("minecraft service missing")
 
         env=envmap(service)
-        if env.get("TYPE")!="PAPER":
-            raise ValidationError("TYPE=PAPER not preserved")
+        if env.get("TYPE")!=expected_type or env.get("VERSION")!=expected_version:
+            raise ValidationError("exact Minecraft type/version not preserved")
         observed_ownership={
             key:value for key,value in env.items()
             if key.startswith("SUPRACRAFT_COLLAGE_")
         }
-        if observed_ownership != OWNERSHIP_ENV:
+        if observed_ownership != expected_ownership:
             raise ValidationError(
                 f"COLLAGE ownership metadata drift: {observed_ownership!r}"
             )
@@ -161,9 +172,9 @@ def validate(*, pin_path=PIN):
             raise ValidationError(f"expected one base /data mount, got {data!r}")
         if len(world)!=1:
             raise ValidationError(f"expected one /data/world mount, got {world!r}")
-        if data[0]["source"]==WORLD_SOURCE:
+        if data[0]["source"]==expected_world_path:
             raise ValidationError("world source incorrectly owns entire /data")
-        if world[0]["source"]!=WORLD_SOURCE:
+        if world[0]["source"]!=expected_world_path:
             raise ValidationError(f"world host path not preserved: {world[0]!r}")
         if world[0]["read_only"]:
             raise ValidationError("world mount unexpectedly read-only")
@@ -175,6 +186,12 @@ def validate(*, pin_path=PIN):
 
         expected_image = pin.get("image")
         if service.get("image") != expected_image or "@sha256:" not in expected_image:
+            raise ValidationError("pinned digest Minecraft image drift")
+        if (expected_type=="VANILLA" and not expected_image.endswith("@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")):
+            raise ValidationError("Java25 native catalog digest drift")
+        if expected_type=="VANILLA" and env.get("TYPE")!="VANILLA":
+            raise ValidationError("native vanilla backend type drift")
+        if False:
             raise ValidationError("pinned digest Minecraft image drift")
         expected_catalog_version = pin.get("catalog_version")
         version_yaml = checkout / "trains" / pin["train"] / "minecraft" / expected_catalog_version / "app.yaml"
@@ -218,13 +235,32 @@ def validate(*, pin_path=PIN):
 
 def main():
     parser=argparse.ArgumentParser()
+    parser.add_argument("--product", choices=["paper-legacy", "vanilla-263"], default="paper-legacy")
+    parser.add_argument("--target-version", default="25.04.1")
     parser.add_argument("--catalog-profile", choices=["1.15.29", "1.15.30"],
                         default="1.15.29")
     args=parser.parse_args()
     pin_path=(PIN if args.catalog_profile=="1.15.29" else
               ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json')
     try:
-        evidence=validate(pin_path=pin_path)
+        if args.product == "vanilla-263":
+            if args.target_version != "25.04.2.6" or args.catalog_profile != "1.15.30":
+                raise ValidationError("vanilla 26.3 requires exact 25.04.2.6 target and 1.15.30 catalog")
+            target=json.loads((ROOT/".foundry/truenas-compatibility/25.04.2.6-materialization.json").read_text())
+            if (target.get("truenas_version") != "25.04.2.6" or
+                    target.get("middleware",{}).get("commit") != "244b717370fe35fb9eefc3096acfbc25f12b57b6"):
+                raise ValidationError("exact target profile drift")
+            evidence=validate(pin_path=VANILLA_PIN,values_path=VANILLA_VALUES,
+                expected_type="VANILLA", expected_version="26.3",
+                expected_selector="j25_image",
+                expected_world_path="/opt/tests/collage-vanilla-263-world",
+                expected_ownership={**OWNERSHIP_ENV,"SUPRACRAFT_COLLAGE_WORLD_ID":"lantern-rdte"})
+            evidence["truenas_target"]="25.04.2.6"
+            evidence["runtime_qualification"]=False
+        else:
+            if args.target_version != "25.04.1":
+                raise ValidationError("legacy control requires target 25.04.1")
+            evidence=validate(pin_path=pin_path)
         payload=json.dumps(evidence,indent=2,sort_keys=True)+"\n"
         (ROOT/"minecraft-world-control-evidence.json").write_text(payload)
         print(payload,end="")
