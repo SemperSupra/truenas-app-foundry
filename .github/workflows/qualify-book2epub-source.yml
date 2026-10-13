@@ -48,7 +48,10 @@ jobs:
           from pathlib import Path
           src = Path("candidates/book2epub-app/ix-dev/community/book2epub/templates/test_values/basic-values.yaml")
           values = yaml.safe_load(src.read_text())
-          values["network"]["web_port"]["host_ips"] = [{"host_ip": "127.0.0.1"}]
+          # TrueNAS ix-lib Ports expects host_ips as list[str], not list[dict].
+          # Wrong-shaped values silently fall back to unrestricted host publishing.
+          values["network"]["web_port"]["host_ips"] = ["127.0.0.1"]
+          assert values["network"]["web_port"]["host_ips"] == ["127.0.0.1"]
           values["ix_volumes"] = {"book2epub-state": "/opt/tests/mnt/book2epub/state"}
           Path("/tmp/book2epub-test-values.yaml").write_text(yaml.safe_dump(values))
           PY
@@ -76,7 +79,10 @@ jobs:
           assert str(worker.get("user")) in {"568:568", "568"}
           ports = worker.get("ports") or []
           assert ports, "No published browser port"
-          assert all(str(v.get("host_ip", "")) in {"127.0.0.1", "::1"} for v in ports), ports
+          # Compose normalization must actually preserve loopback, not just render a valid port.
+          assert len(ports) == 1 and ports[0].get("host_ip") == "127.0.0.1", ports
+          assert int(ports[0]["target"]) == 8080, ports
+          assert int(ports[0]["published"]) == 18787, ports
           assert not any("UNPUBLISHED" not in str(v.get("image", "")) for k,v in services.items() if k == "book2epub")
           out = {
               "claim": "official-pinned-iX-source-render-and-normalized-compose-only",
