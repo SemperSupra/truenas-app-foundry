@@ -47,7 +47,7 @@ questions:
                 description: Select trusted LAN address; empty may expose all host interfaces.
                 schema:
                   type: list
-                  default: []
+                  default: ['127.0.0.1']
                   items:
                     - variable: host_ip
                       label: Host IP

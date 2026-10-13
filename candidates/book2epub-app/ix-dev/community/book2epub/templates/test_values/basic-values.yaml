@@ -16,7 +16,8 @@ network:
     bind_mode: published
     port_number: 18787
     container_port: 8080
-    host_ips: []
+    host_ips:
+      - 127.0.0.1
 storage:
   state:
     type: ix_volume
