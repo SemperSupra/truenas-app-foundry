@@ -1,0 +1,76 @@
+name: Foundry native vanilla 26.3 Java25 exact 25.04.2.6 source render
+on:
+  pull_request:
+    paths:
+      - 'tools/validate_minecraft_world_control.py'
+      - 'tests/test_vanilla_263_native_source.py'
+      - '.foundry/controls/minecraft-vanilla-263-11530-upstream.json'
+      - '.foundry/controls/minecraft-vanilla-263-world-hostpath-values.yaml'
+      - '.github/workflows/qualify-minecraft-vanilla263-native-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-vanilla263-250426-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  source-render:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - name: Exact Foundry checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Source and negative gates before upstream checkout
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/validate_minecraft_world_control.py
+          python3 -m unittest discover -s tests -p 'test_vanilla_263_native_source.py' -v
+          docker compose version
+          if python3 tools/validate_minecraft_world_control.py \
+             --product vanilla-263 --catalog-profile 1.15.30 \
+             --target-version 25.04.1 > /dev/null 2>&1; then
+            echo 'FAIL target version 25.04.1 must be refused for operational vanilla'
+            exit 1
+          fi
+      - name: Real pinned native upstream Apps source render, no TrueNAS guest
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_world_control.py \
+            --product vanilla-263 --catalog-profile 1.15.30 \
+            --target-version 25.04.2.6 \
+            > "$RUNNER_TEMP/vanilla263-source-render.json"
+          python3 - "$RUNNER_TEMP/vanilla263-source-render.json" <<'PY'
+          import json, re, sys
+          r=json.load(open(sys.argv[1]))
+          assert r["result"]=="PASS"
+          assert r["truenas_target"]=="25.04.2.6"
+          assert r["runtime_qualification"] is False
+          assert r["upstream"]["ref"]=="559b9fe85212c800bc6770f152a65211df137a44"
+          assert r["server"]["catalog_version"]=="1.15.30"
+          assert r["server"]["minecraft_version"]=="26.3"
+          assert r["server"]["type"]=="VANILLA"
+          assert r["server"]["image_selector"]=="j25_image"
+          assert r["server"]["image_ref"]==(
+            "ghcr.io/itzg/minecraft-server:2026.10.0-java25@sha256:"
+            "5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")
+          assert r["server"]["world_mount"]["target"]=="/data/world"
+          assert r["server"]["world_mount"]["source"]=="/opt/tests/collage-vanilla-263-world"
+          assert r["server"]["world_mount"]["read_only"] is False
+          assert not r["server"]["base_data_mount"]["source"]==r["server"]["world_mount"]["source"]
+          assert re.fullmatch("[a-f0-9]{64}",r["compose_sha256"])
+          PY
+      - name: Retain exact digest/Compose identity receipt only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-vanilla263-java25-foundry-source-only
+          path: ${{ runner.temp }}/vanilla263-source-render.json
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Explicit no-runtime-guest claims
+        if: always()
+        run: |
+          echo 'Pinned upstream TrueNAS Minecraft 1.15.30 + Java25 vanilla26.3 source/Compose contract only. Does not boot TrueNAS25.04.2.6, create App, perform COLLAGE readback, qualify native ZFS world, or physical APPLY.' >> "$GITHUB_STEP_SUMMARY"

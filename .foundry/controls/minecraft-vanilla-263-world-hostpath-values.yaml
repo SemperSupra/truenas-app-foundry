@@ -1,0 +1,84 @@
+resources:
+  limits:
+    cpus: 2
+    memory: 4096
+
+TZ: Etc/UTC
+
+minecraft:
+  image_selector: j25_image
+  eula: true
+  version: 26.3
+  type: VANILLA
+  motd: SupraCraft Vanilla 26.3 RDTE
+  difficulty: normal
+  mode: survival
+  server_name: SupraCraft Vanilla 26.3 RDTE
+  max_players: 10
+  max_world_size: 10000
+  allow_nether: true
+  announce_player_achievements: true
+  enable_command_block: false
+  force_game_mode: false
+  generate_structures: true
+  hardcore: false
+  max_build_height: 256
+  spawn_animals: true
+  spawn_monsters: true
+  spawn_npcs: true
+  spawn_protection: 0
+  view_distance: 10
+  pvp: true
+  level_type: minecraft:default
+  allow_flight: false
+  online_mode: true
+  max_tick_time: 60000
+  enable_rcon: false
+  rcon_password: ""
+  seed: null
+  ops: []
+  whitelist: []
+  enable_auto_pause: false
+  additional_envs:
+    - name: SUPRACRAFT_COLLAGE_MANAGED
+      value: "true"
+    - name: SUPRACRAFT_COLLAGE_SCHEMA
+      value: "1"
+    - name: SUPRACRAFT_COLLAGE_MANAGER_ID
+      value: manager-rdte
+    - name: SUPRACRAFT_COLLAGE_FLEET_ID
+      value: rdte
+    - name: SUPRACRAFT_COLLAGE_SERVICE_ID
+      value: 11111111-1111-4111-8111-111111111111
+    - name: SUPRACRAFT_COLLAGE_WORLD_ID
+      value: lantern-rdte
+
+network:
+  host_network: false
+  server_port:
+    bind_mode: published
+    port_number: 25565
+  rcon_port:
+    bind_mode: published
+    port_number: 25575
+  additional_ports: []
+
+run_as:
+  user: 568
+  group: 568
+
+storage:
+  data:
+    type: ix_volume
+    ix_volume_config:
+      acl_enable: false
+      dataset_name: data
+  additional_storage:
+    - type: host_path
+      read_only: false
+      mount_path: /data/world
+      host_path_config:
+        acl_enable: false
+        path: /opt/tests/collage-vanilla-263-world
+
+labels: []
