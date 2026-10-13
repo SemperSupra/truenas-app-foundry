@@ -1,0 +1,96 @@
+name: Export immutable vanilla 26.3 Java25 native T6 candidate for TrueNAS 25.04.2.6
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        type: string
+        required: true
+      target_version:
+        type: string
+        required: true
+  pull_request:
+    paths:
+      - 'tools/export_minecraft_vanilla_263_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_t6_control.py'
+      - '.github/workflows/export-minecraft-vanilla-263-t6-control.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-vanilla263-export-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native-source:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - name: Discover exact candidate source and target
+        id: src
+        env:
+          FOUND_REF: ${{ inputs.foundry_ref }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          ref="${FOUND_REF:-$GITHUB_SHA}"
+          target="${TARGET_VERSION:-25.04.2.6}"
+          [[ "$ref" =~ ^[a-f0-9]{40}$ ]] || exit 2
+          test "$target" = 25.04.2.6
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout exactly specified Foundry candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.src.outputs.ref }}
+          persist-credentials: false
+      - name: Cheap export adversarial tests before source render
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.src.outputs.ref }}"
+          python3 -m py_compile tools/export_minecraft_vanilla_263_t6_control.py
+          python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_t6_control.py' -v
+          python3 -m unittest discover -s tests -p 'test_vanilla_263_native_source.py' -v
+      - name: Source-render exact upstream 1.15.30 native Java25 tuple
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_world_control.py \
+            --product vanilla-263 --catalog-profile 1.15.30 \
+            --target-version 25.04.2.6 \
+            > "$RUNNER_TEMP/native-source.json"
+      - name: Export SHA-bound native T6 candidate, not guest acceptance
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/native-control"
+          python3 tools/export_minecraft_vanilla_263_t6_control.py \
+            --foundry-ref "${{ steps.src.outputs.ref }}" \
+            --target-version 25.04.2.6 \
+            --source-evidence "$RUNNER_TEMP/native-source.json" \
+            --out "$RUNNER_TEMP/native-control/control.json"
+          python3 - "$RUNNER_TEMP/native-control/control.json" "${{ steps.src.outputs.ref }}" <<'PY'
+          import hashlib,json,sys
+          c=json.load(open(sys.argv[1]))
+          assert c["foundry_ref"]==sys.argv[2]
+          assert c["schema"]=="semper-supra.minecraft-vanilla-263-truenas-t6-control/1"
+          assert c["target"]["truenas_version"]=="25.04.2.6"
+          assert c["runtime"]["minecraft_version"]=="26.3"
+          assert c["runtime"]["minecraft_protocol"]==777
+          assert c["runtime"]["java_version"]==25
+          assert c["source"]["catalog_version"]=="1.15.30"
+          assert c["source"]["image_reference"].endswith("@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")
+          assert not c["evidence"]["native_guest_created"]
+          assert not c["evidence"]["physical_truenas_qualified"]
+          assert c["physical_truenas_apply"]=="HOLD"
+          original=c.copy()
+          claimed=original.pop("control_sha256")
+          assert claimed==hashlib.sha256(json.dumps(original,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+          PY
+      - name: Upload only public-safe source-bound guest control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minecraft-vanilla263-java25-truenas-250426-t6-source-candidate
+          path: ${{ runner.temp }}/native-control/control.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Explicit evidence boundary
+        run: |
+          echo 'Native vanilla26.3 Java25 source control only, SHA-bound to exact Foundry checkout/TrueNAS25.04.2.6 profile and upstream catalog. Real OCI proof is separate; no disposable native TrueNAS guest, actual App or physical APPLY acceptance.' >> "$GITHUB_STEP_SUMMARY"

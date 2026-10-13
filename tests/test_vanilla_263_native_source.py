@@ -23,7 +23,7 @@ class NativeVanillaTests(unittest.TestCase):
     def test_only_current_backend_and_selector(self):
         self.assertIn("image_selector: j25_image",VALUES)
         self.assertIn("type: VANILLA",VALUES)
-        self.assertIn("version: 26.3",VALUES)
+        self.assertIn('version: "26.3"',VALUES)
         self.assertIn("online_mode: true",VALUES)
         self.assertIn("enable_rcon: false",VALUES)
         self.assertIn("path: /opt/tests/collage-vanilla-263-world",VALUES)
