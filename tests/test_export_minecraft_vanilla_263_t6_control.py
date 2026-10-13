@@ -79,6 +79,12 @@ class NativeExportTests(unittest.TestCase):
         args[3]["minecraft"]["additional_envs"][0]["value"]="false"
         with self.assertRaises(ExportRefused):
             produce(*args)
+    def test_unquoted_yaml_float_version_is_refused(self):
+        args=list(copy.deepcopy(fixture()))
+        args[3]["minecraft"]["version"]=26.3
+        with self.assertRaisesRegex(ExportRefused,"NATIVE_RUNTIME_INPUT_DRIFT"):
+            produce(*args)
+
     def test_reject_bad_online_rcon_and_network_defaults(self):
         for k,v in (("online_mode",False),("enable_rcon",True)):
             args=list(copy.deepcopy(fixture()))
