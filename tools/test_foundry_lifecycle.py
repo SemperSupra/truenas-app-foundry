@@ -331,5 +331,102 @@ class LifecycleV2Tests(unittest.TestCase):
         self.assertIn("materialization UPDATE", recipe["adapter_rule"]["foundry-custom"])
 
 
+
+class OneShotCompletionTests(unittest.TestCase):
+    def fixture(self):
+        desired = intent("ENSURE_COMPLETED", token="job-001")
+        desired["job_services"] = {"worker": "sha256:" + "a" * 64}
+        observed = observation(state="STOPPED", workloads=0)
+        observed["app"]["job"] = {
+            "operation_token": "job-001",
+            "materialization_identity": desired["materialization_identity"],
+            "containers": [{"id": "container-001", "service": "worker",
+                            "image_digest": desired["job_services"]["worker"],
+                            "state": "exited", "exit_code": 0}],
+        }
+        return observed, desired
+
+    def assert_blocked(self, observed, desired):
+        result = MOD.plan(observed, desired, qualified_registry())
+        self.assertEqual((result["status"], result["action"]), ("BLOCKED", "BLOCKED"))
+        self.assertIsNone(result["required_method"])
+        self.assertEqual(MOD.verify(observed, desired, qualified_registry())["status"],
+                         "VERIFY_FAILED")
+
+    def test_terminal_success_is_noop_without_start(self):
+        observed, desired = self.fixture()
+        result = MOD.plan(observed, desired, qualified_registry())
+        self.assertEqual((result["status"], result["action"]), ("READY", "NOOP"))
+        self.assertIsNone(result["required_method"])
+        self.assertEqual(MOD.verify(observed, desired, qualified_registry())["status"], "VERIFIED")
+        # The daemon contract retains its old semantics and output shape.
+        daemon = MOD.plan(observed, intent("ENSURE_RUNNING"), qualified_registry())
+        self.assertEqual(daemon["action"], "START")
+        self.assertNotIn("job_services", daemon)
+
+    def test_unqualified_target_does_not_gain_authority(self):
+        observed, desired = self.fixture()
+        self.assertEqual(MOD.plan(observed, desired, REGISTRY)["status"], "BLOCKED")
+
+    def test_missing_and_malformed_readback_is_not_success(self):
+        for job in (None, {}, {"operation_token": "job-001"}):
+            observed, desired = self.fixture()
+            observed["app"]["job"] = job
+            self.assert_blocked(observed, desired)
+
+    def test_stale_job_and_wrong_materialization_block(self):
+        for field in ("operation_token", "materialization_identity"):
+            observed, desired = self.fixture()
+            observed["app"]["job"][field] = "stale"
+            self.assert_blocked(observed, desired)
+
+    def test_nonzero_unknown_bool_exit_or_active_container_block(self):
+        for field, value in (("exit_code", 1), ("exit_code", None),
+                             ("exit_code", False), ("state", "running"),
+                             ("image_digest", "sha256:" + "b" * 64),
+                             ("id", ""), ("service", "foreign")):
+            with self.subTest(field=field, value=value):
+                observed, desired = self.fixture()
+                observed["app"]["job"]["containers"][0][field] = value
+                self.assert_blocked(observed, desired)
+
+    def test_extra_missing_or_duplicate_container_block(self):
+        for mutation in ("extra", "missing", "duplicate"):
+            observed, desired = self.fixture()
+            containers = observed["app"]["job"]["containers"]
+            if mutation == "missing":
+                containers.clear()
+            else:
+                containers.append(copy.deepcopy(containers[0]))
+                if mutation == "duplicate":
+                    desired["job_services"]["second"] = "sha256:" + "a" * 64
+            self.assert_blocked(observed, desired)
+
+    def test_workload_counts_and_ownership_fail_closed(self):
+        for value in (1, -1, None, False):
+            observed, desired = self.fixture()
+            observed["app"]["active_workloads"] = value
+            self.assert_blocked(observed, desired)
+        for ownership in ("foreign", "absent"):
+            observed, desired = self.fixture()
+            observed["ownership"]["state"] = ownership
+            self.assert_blocked(observed, desired)
+
+    def test_ambiguous_operation_never_retries(self):
+        for state in ("ambiguous", "in-flight"):
+            observed, desired = self.fixture()
+            observed["operation"]["state"] = state
+            self.assert_blocked(observed, desired)
+
+    def test_intent_requires_token_and_immutable_service_inventory(self):
+        for field, value in (("operation_token", None), ("job_services", {}),
+                             ("job_services", {"worker": "latest"}),
+                             ("adapter", "official-catalog")):
+            observed, desired = self.fixture()
+            desired[field] = value
+            with self.assertRaises(MOD.LifecycleError):
+                MOD.plan(observed, desired, qualified_registry())
+
+
 if __name__ == "__main__":
     unittest.main()

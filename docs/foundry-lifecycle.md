@@ -92,3 +92,30 @@ The full recipe is machine-readable through:
 
 This contract does not make any currently registered target `apply_qualified`; runtime
 promotion still requires accepted exact-version evidence.
+
+## One-shot terminal observation (candidate)
+
+`ENSURE_COMPLETED` is an observation-only operation for `foundry-custom` jobs.
+It requires `operation_token` and `job_services`, a nonempty mapping of service
+names to immutable `sha256:<64 lowercase hex>` image digests. The same exact
+profile, ownership and materialization checks still apply. It never plans START,
+REDEPLOY, DELETE or another retry: only a matching successful terminal readback
+can produce NOOP; every other outcome is BLOCKED.
+
+The independent target observer must supply `app.job` with the matching
+`operation_token`, `materialization_identity`, and complete `containers` list.
+Each container has a unique nonempty `id`, exact `service` and `image_digest`,
+`state: exited`, and integer `exit_code: 0`. The app has exactly zero active
+workloads. A stopped app, completed token, success log or product-written result
+file alone is insufficient. Missing/extra/duplicate containers, failed jobs,
+unknown exits, stale identity and ambiguous operations fail closed.
+
+This is a proposed projection contract, **not a qualified TrueNAS observer**.
+The exact native middleware fields and operation-token/container binding must
+be qualified by the target adapter before a runtime verdict can rely on it.
+The function only validates supplied evidence; it cannot establish that evidence
+came from a live independent readback. No target/profile promotion follows.
+Initial create and explicit restart remain separately admitted generic lifecycle
+operations. Product integrity/retention and cleanup oracles remain separate.
+Daemon ENSURE_RUNNING and the existing F0-F5 recipe are unchanged; do not apply
+the daemon RUNNING oracle to a successfully completed job.
