@@ -57,8 +57,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import hashlib, json, os
+          import hashlib, json, os, subprocess
           from pathlib import Path
+          # pull_request GITHUB_SHA is the merge ref, not necessarily the
+          # checked-out PR head. Never mislabel evidence as the exact head.
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          expected=(event.get('pull_request') or {}).get('head',{}).get('sha') or os.environ['GITHUB_SHA']
+          checked_out=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert checked_out == expected, 'source checkout differs from event head'
           p=Path(os.environ['RUNNER_TEMP'])/'takeout-rendered-private.json'
           d=json.loads(p.read_text())
           services=d.get('services') or {}
@@ -79,7 +85,7 @@ jobs:
           out={'classification':'SOURCE_RENDER_ONLY',
                'official_pinned_library':'2.3.4',
                'trueNAS':'25.04.2.6',
-               'source_sha':os.environ['GITHUB_SHA'],
+               'source_sha':checked_out,
                'compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
                'services':sorted(services),
                'private_source':'NOT_PRESENT',
