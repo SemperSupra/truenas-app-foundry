@@ -109,3 +109,61 @@ jobs:
                'physical_apply':'HOLD'}
           print(json.dumps(out,sort_keys=True))
           PY
+
+      - name: Prepare isolated guest-local Docker image override (no registry publication)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, yaml
+          fixture=Path('candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic/templates/test_values/basic-values.yaml')
+          values=yaml.safe_load(fixture.read_text())
+          assert 'UNPUBLISHED' in values['images']['image']['tag']
+          values['images']['image']={'repository':'takeout-synthetic', 'tag':'local'}
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-local-values.yaml'
+          p.write_text(yaml.safe_dump(values,sort_keys=False))
+          p.chmod(0o600)
+          print('GUEST_LOCAL_IMAGE_OVERRIDE_PREPARED_SOURCE_ONLY')
+          PY
+      - name: Render the exact pinned upstream official template with local-only image
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/takeout-synthetic-app/candidate.json \
+            --values "$RUNNER_TEMP/takeout-guest-local-values.yaml" \
+            --output-compose "$RUNNER_TEMP/takeout-guest-local-rendered-private.json"
+      - name: Independently guard local Docker image identity, zero ingress and unchanged holds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,hashlib,json
+          path=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-local-rendered-private.json'
+          d=json.loads(path.read_text())
+          services=d['services']
+          worker=services['takeoutsynthetic']
+          assert worker['image']=='takeout-synthetic:local',worker['image']
+          assert worker['read_only'] is True
+          assert str(worker['user']) in ('10001:10001','10001')
+          assert not worker.get('ports') and not worker.get('privileged')
+          assert worker.get('network_mode')!='host'
+          assert not any('docker.sock' in str(v) for v in worker.get('volumes',[]))
+          assert any('/archive' in str(v) for v in worker.get('volumes',[]))
+          assert any('/state' in str(v) for v in worker.get('volumes',[]))
+          assert all(not x.get('ports') for x in services.values())
+          manifest=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          assert manifest['product_image']=='UNPUBLISHED' and manifest['source_only'] is True
+          assert manifest['claims']['disposable_truenas']=='NOT_RUN'
+          assert manifest['claims']['physical_apply']=='HOLD'
+          print(json.dumps({'classification':'GUEST_LOCAL_IMAGE_SOURCE_RENDER_ONLY',
+                            'worker_image':'takeout-synthetic:local',
+                            'services':sorted(services),
+                            'compose_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                            'guest':'NOT_RUN',
+                            'registry_publication':'NOT_RUN',
+                            'native_completion':'NOT_QUALIFIED',
+                            'physical_apply':'HOLD'},sort_keys=True))
+          PY
