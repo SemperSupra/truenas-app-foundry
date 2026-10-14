@@ -18,7 +18,7 @@ def sample(publisher="foundry.example"):
         "apps": [{
             "train": "community", "name": "sample",
             "version": "1.0.0", "path": "community/sample",
-            "manifest_sha256": "sha256:" + "b" * 64,
+            "source_tree_sha256": "sha256:" + "b" * 64,
         }],
     }
 
@@ -43,7 +43,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_conflicting_manifest_fails(self):
         other = sample()
-        other["apps"][0]["manifest_sha256"] = "sha256:" + "c" * 64
+        other["apps"][0]["source_tree_sha256"] = "sha256:" + "c" * 64
         with self.assertRaises(catalog.CatalogIdentityError):
             catalog.federate([sample(), other])
 
@@ -82,6 +82,21 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(catalog.CatalogIdentityError):
             catalog.normalize(entry)
 
+    def test_foundry_inventory_style_source_path_allowed(self):
+        entry = sample()
+        entry["apps"][0]["path"] = "fixtures/foundry-rdte-probe"
+        rows = catalog.normalize(entry)
+        self.assertEqual(rows[0]["path"], "fixtures/foundry-rdte-probe")
+
+    def test_unsafe_source_path_refusal(self):
+        for path in ["../etc", "fixtures/../secret", "/tmp/app", "community/app\\evil",
+                     "fixtures/%2e%2e/secret", "fixtures//app"]:
+            with self.subTest(path=path):
+                entry = sample()
+                entry["apps"][0]["path"] = path
+                with self.assertRaises(catalog.CatalogIdentityError):
+                    catalog.normalize(entry)
+
     def test_ambiguous_repository_path_denied(self):
         entry = sample()
         entry["uri"] = "https://example.org/../catalog.git"
@@ -117,7 +132,7 @@ class CatalogTests(unittest.TestCase):
                       version="1.0.0", revision="a" * 40, digest="sha256:" + "b" * 64)
         resolved = catalog.query(rows, "resolve", **kwargs)
         self.assertFalse(resolved["mutation_eligible"])
-        self.assertEqual(resolved["app"]["manifest_sha256"], kwargs["digest"])
+        self.assertEqual(resolved["app"]["source_tree_sha256"], kwargs["digest"])
         for missing in kwargs:
             args = dict(kwargs)
             args.pop(missing)
