@@ -1,0 +1,26 @@
+name: Foundry Catalog inventory export
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_app_inventory.py'
+      - 'tools/foundry_catalog_inventory_export.py'
+      - 'tools/test_foundry_catalog_inventory_export.py'
+      - '.github/workflows/validate-foundry-catalog-inventory-export.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-catalog-inventory-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  inventory-projection:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile and test pinned Foundry inventory adapter
+        run: |
+          python3 -m py_compile tools/foundry_app_inventory.py tools/foundry_catalog_inventory_export.py
+          python3 -m unittest -v tools/test_foundry_catalog_inventory_export.py
