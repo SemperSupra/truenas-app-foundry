@@ -37,6 +37,15 @@ jobs:
           profile=json.loads(Path('.foundry/truenas-compatibility/25.04.2.6-materialization.json').read_text())
           assert candidate['source_only'] is True and candidate['public_safe'] is True
           assert candidate['product_image'] == 'UNPUBLISHED'
+          transport=candidate['synthetic_transport_evidence']
+          assert transport['source_commit'] == '144aa93eb93fe1fab4a08f780506a1d77f0d5d09'
+          assert transport['artifact_id'] == 11912326284
+          assert transport['artifact_zip_sha256'] == 'sha256:eb485e980c480649c3de88708df165094d77df47211002eaceea5aed79022306'
+          assert transport['oci_manifest_sha256'] == 'sha256:40a3b5b98939a2ae7d37099b1996a91e92a0877db1a1d91d09f403f88bd97fb5'
+          assert transport['public_runner_offline_import'] == 'PASS'
+          assert transport['qualification'] == 'TRANSFER_ONLY'
+          assert transport['disposable_guest_import'] == 'NOT_RUN'
+          assert transport['registry_image'] == 'UNPUBLISHED'
           assert candidate['claims']['native_terminal_observer'] == 'BLOCKED'
           assert candidate['claims']['physical_apply'] == 'HOLD'
           assert candidate['claims']['disposable_truenas'] == 'NOT_RUN'
