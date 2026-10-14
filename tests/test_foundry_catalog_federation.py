@@ -75,5 +75,25 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(catalog.CatalogIdentityError):
             catalog.normalize(entry)
 
+
+    def test_large_catalog_rejected_before_row_normalization(self):
+        entry = sample()
+        entry["apps"] = entry["apps"] * (catalog.MAX_SOURCE_APPS + 1)
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.normalize(entry)
+
+    def test_ambiguous_repository_path_denied(self):
+        entry = sample()
+        entry["uri"] = "https://example.org/../catalog.git"
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.normalize(entry)
+
+    def test_oversized_index_rejected_before_parsing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "catalog.json"
+            path.write_bytes(b"x" * (catalog.MAX_INDEX_BYTES + 1))
+            self.assertEqual(catalog.main([str(path)]), 2)
+
 if __name__ == "__main__":
     unittest.main()
