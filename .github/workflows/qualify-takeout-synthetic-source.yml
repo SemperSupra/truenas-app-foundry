@@ -156,33 +156,63 @@ jobs:
                             'physical_apply':'HOLD'},sort_keys=True))
           PY
 
-      - name: Prepare a guest-only external ZFS host-path source fixture
+      - name: Prepare isolated hostpath source probe, not a product edit
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import os,yaml
+          import copy,json,shutil
           from pathlib import Path
-          original=Path('candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic/templates/test_values/basic-values.yaml')
-          values=yaml.safe_load(original.read_text())
-          # These are synthetic paths in a disposable guest, not host creation.
+          import yaml
+          source=Path('candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic')
+          probe=Path('candidates/takeout-synthetic-app/hostpath-probe-only/ix-dev/community/takeoutsynthetic')
+          assert not probe.exists()
+          probe.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copytree(source,probe)
+          defaults=yaml.safe_load((probe/'ix_values.yaml').read_text())
+          questions=yaml.safe_load((probe/'questions.yaml').read_text())
+          fixture=yaml.safe_load((source/'templates/test_values/basic-values.yaml').read_text())
           for role in ('archives','state'):
-              values['storage'][role]={'type':'host_path',
-                  'host_path_config':{'path':f'/mnt/rdtepool/takeout-synthetic/{role}',
-                                      'auto_permissions':False,'acl_enable':False}}
-          values.pop('ix_volumes',None)
-          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-hostpath-values.yaml'
-          p.write_text(yaml.safe_dump(values,sort_keys=False))
-          p.chmod(0o600)
-          print('GUEST_EXTERNAL_DATASET_VALUES_PREPARED_NO_CREATION')
+              path='/mnt/rdtepool/takeout-synthetic/'+role
+              storage={'type':'host_path',
+                       'host_path_config':{'path':path,'acl_enable':False,
+                                           'auto_permissions':False}}
+              defaults['storage'][role]=copy.deepcopy(storage)
+              fixture['storage'][role]=copy.deepcopy(storage)
+              q=next(x for x in questions['questions'] if x['variable']=='storage')
+              slot=next(x for x in q['schema']['attrs'] if x['variable']==role)
+              slot['schema']['attrs']=[
+                  {'variable':'type','label':'Storage Type','schema':{
+                      'type':'string','default':'host_path','hidden':True,
+                      'required':True,'enum':[{'value':'host_path','description':'Guest external dataset'}]}},
+                  {'variable':'host_path_config','label':'Existing guest dataset','schema':{
+                      'type':'dict','attrs':[
+                          {'variable':'path','label':'Path','schema':{'type':'hostpath','required':True,'default':path}},
+                          {'variable':'acl_enable','label':'ACL','schema':{'type':'boolean','default':False}},
+                          {'variable':'auto_permissions','label':'Auto permissions',
+                           'schema':{'type':'boolean','default':False}}
+                      ]}}
+              ]
+          fixture.pop('ix_volumes',None)
+          (probe/'ix_values.yaml').write_text(yaml.safe_dump(defaults,sort_keys=False))
+          (probe/'questions.yaml').write_text(yaml.safe_dump(questions,sort_keys=False))
+          materialized=probe/'templates/test_values/hostpath-probe-values.yaml'
+          materialized.write_text(yaml.safe_dump(fixture,sort_keys=False))
+          candidate=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          assert candidate['product_image']=='UNPUBLISHED' and candidate['source_only'] is True
+          candidate['source_path']=str(probe)
+          candidate['phase']='EPHEMERAL_HOSTPATH_SOURCE_PROBE_NOT_DEPLOYABLE'
+          (probe.parents[2]/'hostpath-probe-candidate.json').write_text(json.dumps(candidate))
+          assert yaml.safe_load((source/'ix_values.yaml').read_text())['storage']['archives']['type']=='ix_volume'
+          print('SOURCE_VARIANT_ISOLATED_HOLD_PASS')
           PY
       - name: Qualify official iX source render for external archive retention shape
         shell: bash
         run: |
           set -euo pipefail
           python3 tools/render_truenas_candidate.py \
-            --candidate candidates/takeout-synthetic-app/candidate.json \
-            --values "$RUNNER_TEMP/takeout-guest-hostpath-values.yaml" \
+            --candidate candidates/takeout-synthetic-app/hostpath-probe-only/hostpath-probe-candidate.json \
+            --values candidates/takeout-synthetic-app/hostpath-probe-only/ix-dev/community/takeoutsynthetic/templates/test_values/hostpath-probe-values.yaml \
             --output-compose "$RUNNER_TEMP/takeout-guest-hostpath-rendered-private.json"
       - name: Prove external archive roles and permission helper elimination without apply
         shell: bash
