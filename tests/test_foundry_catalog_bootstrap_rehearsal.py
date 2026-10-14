@@ -44,6 +44,7 @@ def site_spec():
     return {
         "schema": binding.SCHEMA,
         "app_name": "foundry-catalog",
+        "strict_host_bind_sources": True,
         "expected_base_compose_sha256": package.canonical_sha256(BASE),
         "patches": [
             {"path": "/services/catalog/volumes/0/source",
@@ -98,6 +99,17 @@ class GenericCatalogBootstrapRehearsal(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(package.build_artifact("foundry-catalog", first),
                          package.build_artifact("foundry-catalog", second))
+
+    def test_unregistered_host_bind_is_blocked_before_artifact(self):
+        attack = copy.deepcopy(BASE)
+        attack["services"]["catalog"]["volumes"].append(
+            {"type": "bind", "source": "/mnt/other/private",
+             "target": "/secrets", "read_only": False}
+        )
+        spec = site_spec()
+        spec["expected_base_compose_sha256"] = package.canonical_sha256(attack)
+        with self.assertRaises(binding.BindingError):
+            binding.bind(attack, spec)
 
     def test_tampered_source_requires_fresh_binding(self):
         spec = site_spec()
