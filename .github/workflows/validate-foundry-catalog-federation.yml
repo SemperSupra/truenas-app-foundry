@@ -4,6 +4,8 @@ on:
     paths:
       - 'tools/foundry_catalog_federation.py'
       - 'tests/test_foundry_catalog_federation.py'
+      - 'tests/test_foundry_catalog_api_contract.py'
+      - 'schemas/foundry-catalog-read-api-v0.openapi.json'
       - '.github/workflows/validate-foundry-catalog-federation.yml'
   push:
     branches: [main]
@@ -31,4 +33,4 @@ jobs:
       - name: Compile offline contract
         run: python3 -m py_compile tools/foundry_catalog_federation.py tests/test_foundry_catalog_federation.py
       - name: Test source federation refusal cases
-        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog_federation.py' -v
+        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog*.py' -v
