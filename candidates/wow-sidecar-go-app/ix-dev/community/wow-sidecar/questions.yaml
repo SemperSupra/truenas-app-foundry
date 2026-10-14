@@ -1,0 +1,309 @@
+groups:
+  - name: WOW Node Identity
+    description: Configure the WOW node and file-backed GitHub App identity.
+  - name: WOW Durable Control Configuration
+    description: Configure durable control repository, profile, capability, authority, and polling.
+  - name: WOW Local Rendezvous Configuration
+    description: Configure optional local rendezvous parameters.
+  - name: WOW Peer Observation Configuration
+    description: Configure optional peer observation URLs and polling.
+  - name: WOW Peer Mutation Configuration
+    description: Configure optional G6.11e peer mutation and file-backed pairwise credentials.
+  - name: Network Configuration
+    description: Configure the TrueNAS-published daemon port.
+  - name: Storage Configuration
+    description: Configure persistent WOW runtime state.
+  - name: Resources Configuration
+    description: Configure worker resource limits.
+
+questions:
+  - variable: wow
+    label: ""
+    group: WOW Node Identity
+    schema:
+      type: dict
+      attrs:
+        - variable: node_id
+          label: WOW Node ID
+          description: Stable identifier for this sovereign WOW node.
+          schema:
+            type: string
+            required: true
+            default: truenas-wow-01
+            valid_chars: '^[a-z0-9][a-z0-9.-]{2,127}$'
+        - variable: github_app_id
+          label: GitHub App ID
+          description: Numeric GitHub App ID used for repository-scoped installation tokens.
+          schema:
+            type: string
+            required: true
+            valid_chars: '^[0-9]+$'
+            valid_chars_error: Enter the numeric GitHub App ID.
+        - variable: github_app_private_key
+          label: GitHub App Private Key
+          description: PEM private key mounted as a read-only file at /run/secrets/github-app.pem.
+          schema:
+            type: string
+            required: true
+            private: true
+
+  - variable: control
+    label: ""
+    group: WOW Durable Control Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: repository
+          label: Control Repository
+          schema:
+            type: string
+            required: true
+            valid_chars: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+            valid_chars_error: Use owner/name.
+        - variable: profile
+          label: Control Profile
+          schema:
+            type: string
+            required: true
+        - variable: capability
+          label: Control Capability
+          schema:
+            type: string
+            required: true
+        - variable: authority_record
+          label: Control Authority Record
+          schema:
+            type: string
+            required: true
+        - variable: authority_revision
+          label: Control Authority Revision
+          description: Exact sha256:<64-lowercase-hex> canonical authority revision.
+          schema:
+            type: string
+            required: true
+            valid_chars: '^sha256:[0-9a-f]{64}$'
+        - variable: poll_seconds
+          label: Control Poll Interval (Seconds)
+          schema:
+            type: int
+            default: 15
+            min: 5
+            max: 3600
+            required: true
+
+  - variable: rendezvous
+    label: ""
+    group: WOW Local Rendezvous Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: enabled
+          label: Enable Local Rendezvous
+          schema:
+            type: boolean
+            default: false
+        - variable: workset_ref
+          label: Workset Reference
+          schema:
+            type: string
+            required: true
+            show_if: [["enabled", "=", true]]
+        - variable: delegation_id
+          label: Delegation ID
+          schema:
+            type: string
+            required: true
+            show_if: [["enabled", "=", true]]
+        - variable: lease_seconds
+          label: Lease Duration (Seconds)
+          schema:
+            type: int
+            default: 300
+            min: 5
+            max: 3600
+            required: true
+            show_if: [["enabled", "=", true]]
+
+  - variable: peer
+    label: ""
+    group: WOW Peer Observation Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: urls
+          label: Normalized Peer URLs
+          description: Comma-separated list of up to eight peer base URLs; blank disables peer observation.
+          schema:
+            type: string
+            default: ""
+        - variable: poll_seconds
+          label: Peer Poll Interval (Seconds)
+          schema:
+            type: int
+            default: 30
+            min: 5
+            max: 3600
+            required: true
+
+  - variable: peer_rendezvous
+    label: ""
+    group: WOW Peer Mutation Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: enabled
+          label: Enable Peer Mutation Rendezvous
+          schema:
+            type: boolean
+            default: false
+        - variable: credentials_json
+          label: Peer Pairwise Credentials JSON
+          description: Strict private credential document mounted read-only at /run/secrets/wow-peer-credentials.json.
+          schema:
+            type: string
+            private: true
+            required: true
+            show_if: [["enabled", "=", true]]
+        - variable: max_skew_seconds
+          label: Max Clock Skew (Seconds)
+          schema:
+            type: int
+            default: 30
+            min: 1
+            max: 600
+            required: true
+            show_if: [["enabled", "=", true]]
+        - variable: replay_ttl_seconds
+          label: Replay Cache TTL (Seconds)
+          schema:
+            type: int
+            default: 60
+            min: 1
+            max: 1800
+            required: true
+            show_if: [["enabled", "=", true]]
+
+  - variable: network
+    label: ""
+    group: Network Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: web_port
+          label: WOW HTTP Port
+          schema:
+            type: dict
+            attrs:
+              - variable: bind_mode
+                label: Port Bind Mode
+                schema:
+                  type: string
+                  default: published
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: published
+                      description: Publish on the TrueNAS host
+              - variable: port_number
+                label: Host Port
+                schema:
+                  type: int
+                  default: 18080
+                  min: 1024
+                  max: 65535
+                  required: true
+              - variable: container_port
+                label: Container Port
+                schema:
+                  type: int
+                  default: 8080
+                  hidden: true
+                  required: true
+              - variable: host_ips
+                label: Host IPs
+                schema:
+                  type: list
+                  default: []
+                  items:
+                    - variable: host_ip
+                      label: Host IP
+                      schema:
+                        type: string
+                        required: true
+                        $ref:
+                          - definitions/node_bind_ip
+
+  - variable: storage
+    label: ""
+    group: Storage Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: state
+          label: Runtime State Storage
+          description: TrueNAS-managed ixVolume for WOW generation and durable local runtime state.
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Type
+                schema:
+                  type: string
+                  required: true
+                  default: ix_volume
+                  hidden: true
+                  enum:
+                    - value: ix_volume
+                      description: ixVolume
+              - variable: ix_volume_config
+                label: ixVolume Configuration
+                schema:
+                  type: dict
+                  $ref:
+                    - normalize/ix_volume
+                  attrs:
+                    - variable: acl_enable
+                      label: Enable ACL
+                      schema:
+                        type: boolean
+                        default: false
+                    - variable: dataset_name
+                      label: Dataset Name
+                      schema:
+                        type: string
+                        required: true
+                        hidden: true
+                        default: wow-sidecar-state
+                    - variable: acl_entries
+                      label: ACL Configuration
+                      schema:
+                        type: dict
+                        show_if: [["acl_enable", "=", true]]
+                        attrs: []
+
+  - variable: resources
+    label: ""
+    group: Resources Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: limits
+          label: Limits
+          schema:
+            type: dict
+            attrs:
+              - variable: cpus
+                label: CPUs
+                schema:
+                  type: float
+                  default: 1
+                  min: 1
+                  required: true
+              - variable: memory
+                label: Memory
+                schema:
+                  type: int
+                  default: 1024
+                  min: 256
+                  required: true
+                  unit: MiB
