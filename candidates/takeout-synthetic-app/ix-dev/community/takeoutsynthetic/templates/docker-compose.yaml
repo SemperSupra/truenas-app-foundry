@@ -9,6 +9,8 @@
 {% endif %}
 {% do worker.set_user(values.consts.runtime_uid, values.consts.runtime_gid) %}
 {% do worker.set_init(true) %}
+{# Synthetic fixture must not have external network egress; its HTTP lives on loopback. #}
+{% do worker.set_network_mode("none") %}
 {# A one-shot job must remain EXITED for independent post-run observation. #}
 {% do worker.restart.set_policy("no") %}
 {% do worker.set_read_only(true) %}
