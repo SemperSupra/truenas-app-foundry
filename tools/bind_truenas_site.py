@@ -71,10 +71,16 @@ def validate_resource(item:Any)->dict[str,Any]:
     if not isinstance(item,dict): raise BindingError("host resource must be an object")
     allowed={"path","kind","uid","gid","mode","ownership","retain_on_remove","content_policy"}
     if set(item)-allowed: raise BindingError("host resource has unsupported keys")
-    path=str(item.get("path") or "")
-    p=Path(path)
-    if not p.is_absolute() or len(p.parts)<3 or p.parts[1]!="mnt":
+    path=item.get("path")
+    if not isinstance(path,str) or not path.startswith("/mnt/"):
         raise BindingError("host resource path must be beneath /mnt")
+    p=Path(path)
+    # Normalize nothing silently: dot segments, duplicate separators and
+    # traversal must not be accepted by a declarative host-resource authority.
+    if (not p.is_absolute() or len(p.parts)<3 or p.parts[0]!="/"
+        or p.parts[1]!="mnt" or ".." in path.split("/")
+        or str(p)!=path or any(ord(ch)<32 or ord(ch)==127 for ch in path)):
+        raise BindingError("host resource path must be canonical beneath /mnt")
     kind=item.get("kind")
     if kind not in {"directory","file"}: raise BindingError("host resource kind must be directory|file")
     uid=item.get("uid"); gid=item.get("gid")
