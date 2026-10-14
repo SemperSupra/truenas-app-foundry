@@ -176,9 +176,57 @@ def resolve(
     return dict(matches[0])
 
 
+def show(rows: list[dict[str, Any]], package_id: str) -> list[dict[str, Any]]:
+    """Return all pinned versions for one exact publisher-scoped package."""
+    if not isinstance(package_id, str) or not package_id:
+        raise CatalogIdentityError("show requires exact package identity")
+    matches = [row for row in rows if row["package_id"] == package_id]
+    if not matches:
+        raise CatalogIdentityError("package not found in registered sources")
+    return sorted((dict(x) for x in matches), key=lambda r: (r["version"], r["source_revision"]))
+
+
+def query(
+    rows: list[dict[str, Any]], operation: str, *,
+    package_id: str | None = None, version: str | None = None,
+    revision: str | None = None, digest: str | None = None,
+) -> dict[str, Any]:
+    """One read-only contract for thin CLI/API/agent clients.
+
+    Qualified source resolution is *not* target resolution or apply authorization.
+    This function cannot claim installation compatibility.
+    """
+    if operation == "list":
+        if any(x is not None for x in (package_id, version, revision, digest)):
+            raise CatalogIdentityError("list does not accept selection parameters")
+        return {"schema": "truenas-foundry-catalog-query/v0", "operation": "list",
+                "count": len(rows), "apps": [dict(row) for row in rows]}
+    if operation == "show":
+        if package_id is None or any(x is not None for x in (version, revision, digest)):
+            raise CatalogIdentityError("show requires only --package-id")
+        matches = show(rows, package_id)
+        return {"schema": "truenas-foundry-catalog-query/v0", "operation": "show",
+                "count": len(matches), "apps": matches}
+    if operation == "resolve":
+        if not all(isinstance(x, str) and x for x in (package_id, version, revision, digest)):
+            raise CatalogIdentityError(
+                "resolve requires --package-id, --version, --revision, --digest"
+            )
+        result = resolve(rows, package_id, version, revision, digest)
+        return {"schema": "truenas-foundry-catalog-query/v0", "operation": "resolve",
+                "app": result, "mutation_eligible": False,
+                "note": "source identity selection only; requires independent target and ownership gates"}
+    raise CatalogIdentityError("unsupported read-only catalog operation")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="+", help="local pinned index JSON")
+    parser.add_argument("--operation", choices=("list", "show", "resolve"), default="list")
+    parser.add_argument("--package-id")
+    parser.add_argument("--version")
+    parser.add_argument("--revision")
+    parser.add_argument("--digest")
     args = parser.parse_args(argv)
     try:
         indexes = []
@@ -189,11 +237,12 @@ def main(argv: list[str] | None = None) -> int:
                 raise CatalogIdentityError("source index exceeds size limit")
             indexes.append(json.loads(payload.decode("utf-8")))
         rows = federate(indexes)
+        result = query(rows, args.operation, package_id=args.package_id,
+                       version=args.version, revision=args.revision, digest=args.digest)
     except (CatalogIdentityError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         print(f"catalog federation blocked: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps({"schema": "truenas-foundry-catalog-discovery/v0", "apps": rows},
-                     indent=2, sort_keys=True))
+    print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 
