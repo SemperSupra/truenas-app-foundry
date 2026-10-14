@@ -99,5 +99,8 @@ questions:
               - variable: memory
                 label: Memory limit (MiB)
                 schema:
-                  type: dict
-                  attrs: []
+                  type: int
+                  default: 1024
+                  min: 512
+                  unit: MiB
+                  required: true
