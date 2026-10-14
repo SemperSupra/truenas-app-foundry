@@ -1,0 +1,91 @@
+name: Takeout synthetic pre-catalog iX source-render qualification
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/takeout-synthetic-app/**'
+      - '.github/workflows/qualify-takeout-synthetic-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precat-takeout-synthetic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  official-source-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact public synthetic source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Pin native YAML parser for renderer
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+      - name: Prove no unpublished artifact is treated as deployment authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          profile=json.loads(Path('.foundry/truenas-compatibility/25.04.2.6-materialization.json').read_text())
+          assert candidate['source_only'] is True and candidate['public_safe'] is True
+          assert candidate['product_image'] == 'UNPUBLISHED'
+          assert candidate['claims']['native_terminal_observer'] == 'BLOCKED'
+          assert candidate['claims']['physical_apply'] == 'HOLD'
+          assert candidate['claims']['disposable_truenas'] == 'NOT_RUN'
+          assert candidate['source_materializer']['commit'] == '532236882212e8c5e51d5b49cfe2c6ce3dd5675e'
+          assert profile['middleware']['commit'] == '244b717370fe35fb9eefc3096acfbc25f12b57b6'
+          print('PINNED_SOURCE_HOLD_PASS')
+          PY
+      - name: Render using already qualified generic Foundry source renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/takeout-synthetic-app/candidate.json \
+            --values candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic/templates/test_values/basic-values.yaml \
+            --output-compose "$RUNNER_TEMP/takeout-rendered-private.json"
+      - name: Independently inspect normalized Compose for zero ingress and rootless one-shot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-rendered-private.json'
+          d=json.loads(p.read_text())
+          services=d.get('services') or {}
+          worker=services['takeoutsynthetic']
+          assert worker.get('read_only') is True
+          assert str(worker.get('user')) in ('10001:10001','10001')
+          assert worker.get('ports') in (None, [], {})
+          assert not worker.get('privileged')
+          assert worker.get('network_mode') != 'host'
+          assert not any('docker.sock' in str(v) for v in worker.get('volumes', []))
+          assert 'UNPUBLISHED' in worker.get('image','')
+          assert any('/archive' in str(v) for v in worker.get('volumes', []))
+          assert any('/state' in str(v) for v in worker.get('volumes', []))
+          assert worker.get('healthcheck',{}).get('disable') is True
+          for service in services.values():
+              assert service.get('ports') in (None, [], {})
+              assert not service.get('privileged')
+          out={'classification':'SOURCE_RENDER_ONLY',
+               'official_pinned_library':'2.3.4',
+               'trueNAS':'25.04.2.6',
+               'source_sha':os.environ['GITHUB_SHA'],
+               'compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+               'services':sorted(services),
+               'private_source':'NOT_PRESENT',
+               'real_takeout':'NOT_RUN',
+               'job_completion_observer':'NOT_QUALIFIED',
+               'guest':'NOT_RUN',
+               'physical_apply':'HOLD'}
+          print(json.dumps(out,sort_keys=True))
+          PY
