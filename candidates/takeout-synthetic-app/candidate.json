@@ -41,6 +41,10 @@
     "disposable_guest_import": "NOT_RUN",
     "registry_image": "UNPUBLISHED",
     "expiry": "2026-10-21T16:30:51Z",
-    "qualification": "TRANSFER_ONLY"
+    "qualification": "TRANSFER_ONLY",
+    "loaded_image_config_sha256": "sha256:86de81f4401811f145c0569a210482a559746aa337f28554bb751ece08f77b7c",
+    "docker_transport_sha256": "sha256:d42d5341ad329a739bfa6488a6455298ebca58cf395b5f3d2494aed88042db10",
+    "independent_latest_zip_blob_audit": "PASS",
+    "docker_config_identity_matches_oci": "PASS"
   }
 }
