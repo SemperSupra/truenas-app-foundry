@@ -155,3 +155,64 @@ jobs:
                             'target_guest':'NOT_RUN',
                             'physical_apply':'HOLD'},sort_keys=True))
           PY
+
+      - name: Prepare a guest-only external ZFS host-path source fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,yaml
+          from pathlib import Path
+          original=Path('candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic/templates/test_values/basic-values.yaml')
+          values=yaml.safe_load(original.read_text())
+          # These are synthetic paths in a disposable guest, not host creation.
+          for role in ('archives','state'):
+              values['storage'][role]={'type':'host_path',
+                  'host_path_config':{'path':f'/mnt/rdtepool/takeout-synthetic/{role}',
+                                      'auto_permissions':False,'acl_enable':False}}
+          values.pop('ix_volumes',None)
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-hostpath-values.yaml'
+          p.write_text(yaml.safe_dump(values,sort_keys=False))
+          p.chmod(0o600)
+          print('GUEST_EXTERNAL_DATASET_VALUES_PREPARED_NO_CREATION')
+          PY
+      - name: Qualify official iX source render for external archive retention shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/takeout-synthetic-app/candidate.json \
+            --values "$RUNNER_TEMP/takeout-guest-hostpath-values.yaml" \
+            --output-compose "$RUNNER_TEMP/takeout-guest-hostpath-rendered-private.json"
+      - name: Prove external archive roles and permission helper elimination without apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-hostpath-rendered-private.json'
+          document=json.loads(p.read_text())
+          services=document.get('services') or {}
+          assert set(services)=={'takeoutsynthetic'}, sorted(services)
+          worker=services['takeoutsynthetic']
+          assert worker['read_only'] is True
+          assert str(worker['user']) in ('10001:10001','10001')
+          assert not worker.get('ports') and not worker.get('privileged')
+          serialized=json.dumps(worker.get('volumes',[]))
+          for role in ('archives','state'):
+              assert '/mnt/rdtepool/takeout-synthetic/'+role in serialized
+          assert '/archive' in serialized and '/state' in serialized
+          manifest=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          assert manifest['source_only'] is True
+          assert manifest['claims']['physical_apply']=='HOLD'
+          print(json.dumps({'classification':'EXTERNAL_HOST_PATH_SOURCE_RENDER_ONLY',
+                            'services':sorted(services),
+                            'host_path_roles':['archive','state'],
+                            'preexisting_guest_datasets_required':True,
+                            'permission_helper_skipped':True,
+                            'compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+                            'zfs_retention':'NOT_RUN',
+                            'guest':'NOT_RUN',
+                            'physical_apply':'HOLD'},sort_keys=True))
+          PY
