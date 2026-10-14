@@ -1,0 +1,156 @@
+{
+  "schema": "truenas-foundry-official-catalog-upgrade-fixture/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#281",
+  "app": {
+    "id": "ntfy",
+    "train": "community"
+  },
+  "from": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "c751f183ab5203ae06aae0573f5484fc5cff5a40",
+    "generated_path": "trains/community/ntfy/app_versions.json",
+    "generated_blob_sha": "2534b330a8b70eb5a75c2afd7a4ec3b2b8d4da35",
+    "catalog_version": "1.1.20",
+    "human_version": "v2.28.0_1.1.20",
+    "app_version": "v2.28.0",
+    "lib_version": "2.3.4",
+    "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "to": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "c60d966e198721ab1e84cf815d969acf8bb11a0b",
+    "generated_path": "trains/community/ntfy/app_versions.json",
+    "generated_blob_sha": "4b37e81949d84a2d491de8685022bea7c8ade9de",
+    "catalog_version": "1.1.21",
+    "human_version": "v2.28.0_1.1.21",
+    "app_version": "v2.28.0",
+    "lib_version": "2.3.4",
+    "lib_version_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "target_versions": [
+    "25.04.1",
+    "25.04.2.6",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "runtime_qualified_targets": [],
+  "executed_upgrade_qualified": false,
+  "policy": {
+    "native_catalog_semantics_required": true,
+    "custom_app_fallback_allowed": false,
+    "from_and_to_must_share_app_lineage": true,
+    "generated_catalog_source_required": true,
+    "runtime_claim_requires_observed_upgrade_available": true,
+    "runtime_claim_requires_app_upgrade_execution": true,
+    "runtime_claim_requires_post_upgrade_identity": true
+  },
+  "claim_boundary": "source fixture only; no target runtime or executed native-upgrade qualification implied",
+  "runtime_adapters": {
+    "25.04.1": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "24467b692f4e6667d61c8b02043e239c6ded2d81"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "7e38b58e2568a2a5e0c945fdb6ca9e7f7bc8756e"
+      }
+    },
+    "25.04.2.6": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "24467b692f4e6667d61c8b02043e239c6ded2d81"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "2cacd1e46378cba506fa1c99ec5cc117220a53a8"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "7e38b58e2568a2a5e0c945fdb6ca9e7f7bc8756e"
+      }
+    },
+    "25.10.7": {
+      "status": "SOURCE_BOUND",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "switch_method": "catalog.update_git_repository",
+      "switch_arguments": "location-repository-branch",
+      "switch_visibility": "private-callable",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "07502a36a181f8b87e82aca40779a9dbcbc0cef7"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "fc94ebe24a5b246bcfa087d82433f936c18f832d"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "81ed20cb87c4015419f53070a7ecbc09804c6e5b"
+      }
+    },
+    "26.0.0-BETA.3": {
+      "status": "GAP",
+      "catalog_location": "/mnt/.ix-apps/truenas_catalog",
+      "reason": "catalog.update_git_repository was refactored into an internal async function and is no longer the same callable service actuator; no exact fixture-injection method has been qualified.",
+      "switch_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/sync.py",
+        "blob_sha": "f37dd79deac67d8faaec06275c8dea2795c404f1"
+      },
+      "mapping_method": "catalog.train_to_apps_version_mapping",
+      "mapping_semantics": "cache-only",
+      "cache_refresh_method": "catalog.apps",
+      "cache_refresh_arguments": {
+        "cache": false,
+        "cache_only": false,
+        "retrieve_all_trains": true
+      },
+      "apps_details_source": {
+        "path": "src/middlewared/middlewared/plugins/catalog/apps_details.py",
+        "blob_sha": "e1930b7e5ffc553f44ce818c9fa8ce5287c388db"
+      },
+      "location_source": {
+        "path": "src/middlewared/middlewared/plugins/docker/state_utils.py",
+        "blob_sha": "bfcaac5937229b4d3755df29f7ce91a13394fd80"
+      }
+    }
+  }
+}
