@@ -146,5 +146,16 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(catalog.CatalogIdentityError):
             catalog.query(catalog.federate([sample()]), "apply")
 
+    def test_duplicate_json_keys_fail_closed(self):
+        import json
+        text = '{"schema":"a","schema":"b"}'
+        with self.assertRaises(catalog.CatalogIdentityError):
+            json.loads(text, object_pairs_hook=catalog._no_duplicate_json_keys)
+
+    def test_federation_source_budget_refuses_unbounded_inputs(self):
+        source = sample()
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.federate([source] * (catalog.MAX_CATALOG_SOURCES + 1))
+
 if __name__ == "__main__":
     unittest.main()
