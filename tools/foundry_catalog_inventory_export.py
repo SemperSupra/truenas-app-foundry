@@ -8,13 +8,21 @@ The result is a *discovery index*, not a deployment/artifact permission.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
-import foundry_app_inventory as inventory
+# Load the existing canonical sibling module independent of current PYTHONPATH.
+HERE = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_file_location(
+    "foundry_app_inventory", HERE / "foundry_app_inventory.py"
+)
+inventory = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(inventory)
 
 SCHEMA = "truenas-foundry-catalog-source/v0"
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
