@@ -42,6 +42,11 @@ jobs:
           assert transport['artifact_id'] == 11912326284
           assert transport['artifact_zip_sha256'] == 'sha256:eb485e980c480649c3de88708df165094d77df47211002eaceea5aed79022306'
           assert transport['oci_manifest_sha256'] == 'sha256:40a3b5b98939a2ae7d37099b1996a91e92a0877db1a1d91d09f403f88bd97fb5'
+          assert transport['loaded_image_config_sha256'] == 'sha256:86de81f4401811f145c0569a210482a559746aa337f28554bb751ece08f77b7c'
+          assert transport['docker_transport_sha256'] == 'sha256:d42d5341ad329a739bfa6488a6455298ebca58cf395b5f3d2494aed88042db10'
+          assert transport['independent_latest_zip_blob_audit'] == 'PASS'
+          assert transport['docker_config_identity_matches_oci'] == 'PASS'
+          assert transport['oci_manifest_sha256'] != transport['loaded_image_config_sha256']
           assert transport['public_runner_offline_import'] == 'PASS'
           assert transport['qualification'] == 'TRANSFER_ONLY'
           assert transport['disposable_guest_import'] == 'NOT_RUN'
