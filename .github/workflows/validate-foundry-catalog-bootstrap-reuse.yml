@@ -22,5 +22,5 @@ jobs:
           persist-credentials: false
       - name: Test generic binder and artifact builder plus Catalog rehearsal
         run: |
-          python3 -m unittest -v tools/test_bind_truenas_site.py
+          python3 -m unittest discover -s tools -p 'test_bind_truenas_site.py' -v
           python3 -m unittest discover -s tests -p 'test_foundry_catalog_bootstrap_rehearsal.py' -v
