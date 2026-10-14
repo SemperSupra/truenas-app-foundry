@@ -51,4 +51,20 @@ class Tests(unittest.TestCase):
     s=spec(); s["host_resources"][1]["content_policy"]["value"]="secret"
     with self.assertRaises(MOD.BindingError): MOD.bind(BASE,s)
 
+  def test_resource_path_traversal_or_noncanonical_form_rejected(self):
+    for attack in (
+      "/mnt/tank/../../etc/shadow",
+      "/mnt/tank/../other",
+      "/mnt/tank//apps/probe",
+      "/mnt/tank/./apps/probe",
+      "/mnt/tank/apps/probe/",
+      "//mnt/tank/apps/probe",
+      "/mnt/tank/apps/probe\\nspoof",
+      "/etc/probe",
+    ):
+      with self.subTest(path=attack):
+        s=spec(); s["host_resources"][0]["path"]=attack
+        with self.assertRaises(MOD.BindingError):
+          MOD.bind(BASE,s)
+
 if __name__=="__main__": unittest.main()
