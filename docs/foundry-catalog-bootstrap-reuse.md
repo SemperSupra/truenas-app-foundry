@@ -72,3 +72,22 @@ deployment acceptance gate, not a reason to make the test-only gateway public.
 We will not introduce an extra scheduler, database, IaC-owned app installer,
 second lifecycle engine or a permanent controller merely to bootstrap the
 catalog.
+
+## Strictly declared host-mount coverage
+
+Site-binding schema v1 now optionally admits `strict_host_bind_sources: true`.
+When selected, the existing generic binder checks the **bound** (post-patch)
+Compose services: every long-form host bind source must match an exact admitted
+`host_resources[].path`. It refuses short-form volume mounts,
+`volumes_from`, unregistered host paths and ambiguous named-volume paths.
+The Catalog bootstrap rehearsal selects this strict mode. Existing consumers
+without the flag keep their previous behavior, avoiding unrelated breakage.
+
+This is a static artifact gate. Actual filesystem `realpath`, symlink
+non-substitution, stable ownership and race-safe app execution must still be
+proved by the authorized host operator; a declarative path check does **not**
+create a dataset, authorize privileged container features or establish that
+a token/certificate is securely provisioned.
+
+The strict flag is a targeted additional oracle, **not** a separate authority
+or policy engine. It is evaluated within the already-existing site binder.
