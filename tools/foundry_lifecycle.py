@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ SPEC.loader.exec_module(target)
 SCHEMA = "truenas-foundry-lifecycle-intent/v2"
 ADAPTERS = {"foundry-custom", "official-catalog"}
 OPERATIONS = {
+    "ENSURE_COMPLETED",
     "ENSURE_RUNNING",
     "ENSURE_STOPPED",
     "ENSURE_ABSENT",
@@ -79,6 +81,7 @@ def parse_intent(intent: dict[str, Any]) -> dict[str, Any]:
         "delete_policy": intent.get("delete_policy"),
         "operation_token": intent.get("operation_token"),
         "desired_catalog_version": intent.get("desired_catalog_version"),
+        "job_services": intent.get("job_services"),
     }
 
     if operation in {"ENSURE_ABSENT", "REINSTALL"}:
@@ -89,14 +92,25 @@ def parse_intent(intent: dict[str, Any]) -> dict[str, Any]:
     elif parsed["delete_policy"] is not None:
         raise LifecycleError("delete_policy is valid only for ENSURE_ABSENT/REINSTALL")
 
-    if operation in {"REDEPLOY", "REINSTALL"}:
+    if operation in {"REDEPLOY", "REINSTALL", "ENSURE_COMPLETED"}:
         parsed["operation_token"] = require_text(
             parsed["operation_token"], "operation_token"
         )
     elif parsed["operation_token"] is not None:
         raise LifecycleError(
-            "operation_token is valid only for REDEPLOY/REINSTALL"
+            "operation_token is valid only for REDEPLOY/REINSTALL/ENSURE_COMPLETED"
         )
+
+    if operation == "ENSURE_COMPLETED":
+        services = parsed["job_services"]
+        if adapter != "foundry-custom" or not isinstance(services, dict) or not services:
+            raise LifecycleError("completion requires foundry-custom and exact job_services")
+        if not all(isinstance(name, str) and name and isinstance(digest, str)
+                   and re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+                   for name, digest in services.items()):
+            raise LifecycleError("job_services must bind service names to image digests")
+    elif parsed["job_services"] is not None:
+        raise LifecycleError("job_services is valid only for ENSURE_COMPLETED")
 
     if operation == "UPGRADE":
         if adapter != "official-catalog":
@@ -166,6 +180,40 @@ def _stable_owned(
     return blockers
 
 
+def _completion_failures(app: dict[str, Any], intent: dict[str, Any]) -> list[str]:
+    """Consume independent readback, never app logs or a self-reported success file.
+
+    A target adapter must qualify this projection from native runtime observations.
+    This planner neither supplies that adapter nor authorizes starting/retrying jobs.
+    """
+    job = app.get("job")
+    if not isinstance(job, dict):
+        return ["independent terminal job readback is missing"]
+    if (job.get("operation_token") != intent["operation_token"] or
+            job.get("materialization_identity") != intent["materialization_identity"]):
+        return ["terminal job readback does not match exact operation/materialization"]
+    if type(app.get("active_workloads")) is not int or app["active_workloads"] != 0:
+        return ["completion requires independently observed zero active workloads"]
+    containers = job.get("containers")
+    if not isinstance(containers, list) or len(containers) != len(intent["job_services"]):
+        return ["terminal job service inventory does not match intent"]
+    seen, ids = set(), set()
+    for container in containers:
+        if not isinstance(container, dict):
+            return ["terminal container observation is malformed"]
+        service, cid = container.get("service"), container.get("id")
+        if (not isinstance(service, str) or service not in intent["job_services"] or
+                service in seen or not isinstance(cid, str) or not cid or cid in ids):
+            return ["terminal container identity/service inventory is ambiguous"]
+        seen.add(service)
+        ids.add(cid)
+        if (container.get("image_digest") != intent["job_services"][service] or
+                container.get("state") != "exited" or
+                type(container.get("exit_code")) is not int or container["exit_code"] != 0):
+            return ["job service lacks exact-image successful terminal observation"]
+    return []
+
+
 def plan(
     observation: dict[str, Any],
     raw_intent: dict[str, Any],
@@ -210,7 +258,12 @@ def plan(
         workloads = int(app.get("active_workloads", 0) or 0)
         ownership_state = str(ownership.get("state", ""))
 
-        if operation == "ENSURE_ABSENT":
+        if operation == "ENSURE_COMPLETED":
+            blockers.extend(_stable_owned(app, ownership, intent))
+            blockers.extend(_completion_failures(app, intent))
+            # Observation-only: absence, failure and ambiguity never become START.
+            action = "NOOP" if not blockers else "BLOCKED"
+        elif operation == "ENSURE_ABSENT":
             if not present and ownership_state == "absent":
                 action = "NOOP"
             else:
@@ -312,6 +365,8 @@ def plan(
             "delete_owned_storage_allowed": False,
         },
     }
+    if intent["operation"] == "ENSURE_COMPLETED":
+        result["job_services"] = intent["job_services"]
     result["plan_sha256"] = target.canonical_sha256(result)
     return result
 
@@ -357,7 +412,10 @@ def verify(
         if present and not _adapter_matches(intent["adapter"], app):
             failures.append("App origin no longer matches lifecycle adapter")
 
-        if operation == "ENSURE_STOPPED":
+        if operation == "ENSURE_COMPLETED":
+            failures.extend(_stable_owned(app, ownership, intent))
+            failures.extend(_completion_failures(app, intent))
+        elif operation == "ENSURE_STOPPED":
             if state != "STOPPED":
                 failures.append("App is not STOPPED")
         elif operation in {"ENSURE_RUNNING", "REDEPLOY", "REINSTALL"}:
@@ -385,6 +443,8 @@ def verify(
         "profile_identity_sha256": discovery.get("profile_identity_sha256"),
         "failures": failures,
     }
+    if intent["operation"] == "ENSURE_COMPLETED":
+        result["job_services"] = intent["job_services"]
     result["verification_sha256"] = target.canonical_sha256(result)
     return result
 
