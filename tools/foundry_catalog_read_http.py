@@ -8,16 +8,22 @@ Serves precomputed/pinned local indexes with a private bearer token file.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import hmac
 import json
-import os
 import stat
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
-import foundry_catalog_federation as federation
+HERE = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_file_location(
+    "foundry_catalog_federation", HERE / "foundry_catalog_federation.py"
+)
+federation = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader
+SPEC.loader.exec_module(federation)
 
 SCHEMA = "truenas-foundry-catalog-query/v0"
 PATHS = {
