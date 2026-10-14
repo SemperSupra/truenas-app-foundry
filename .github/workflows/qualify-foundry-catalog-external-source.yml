@@ -1,0 +1,43 @@
+name: Qualify registered external TrueNAS catalog source
+
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_catalog_external_adapter.py'
+      - 'tests/test_foundry_catalog_external_adapter.py'
+      - 'fixtures/catalog-source-registrations/codefuturist-jellyfin.json'
+      - '.github/workflows/qualify-foundry-catalog-external-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-catalog-external-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  external-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test external registration refusal cases
+        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog_external_adapter.py' -v
+      - name: Checkout SHA-pinned third-party catalog fork
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: codefuturist/truenas-apps
+          ref: 040a69450ff07f6b1ba92ea11e2f07f222f9fc4e
+          path: external-apps
+          sparse-checkout: ix-dev/community/jellyfin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Derive third-party Jellyfin source identity without installing
+        run: |
+          python3 tools/foundry_catalog_external_adapter.py --registration fixtures/catalog-source-registrations/codefuturist-jellyfin.json --checkout external-apps > /tmp/foundry-external-source.json
+          python3 tools/foundry_catalog_federation.py --operation list /tmp/foundry-external-source.json > /tmp/foundry-external-discovery.json
+          python3 -c 'import json; j=json.load(open("/tmp/foundry-external-discovery.json")); assert j["count"] == 1; a=j["apps"][0]; assert a["package_id"] == "github.com/codefuturist.truenas-apps/community/jellyfin"; assert a["version"] == "1.3.3"; assert a["admission"] == "DISCOVERED_ONLY"; assert len(a["source_tree_sha256"]) == 71'
