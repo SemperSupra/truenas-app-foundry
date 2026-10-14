@@ -108,11 +108,20 @@ class ReadHTTPTests(unittest.TestCase):
                 self.assertEqual(self.request("GET", uri)[0], 400)
 
     def test_no_mutating_method_is_available(self):
-        for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"):
+        for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
             with self.subTest(method=method):
                 code, result, _ = self.request(method, "/v0/catalog/apps")
                 self.assertEqual(code, 405)
                 self.assertEqual(result["error"], "read-only endpoint")
+
+    def test_head_cannot_access_data(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=3)
+        conn.request("HEAD", "/v0/catalog/apps", headers={
+            "Authorization": "Bearer " + self.token
+        })
+        response = conn.getresponse()
+        self.assertEqual(response.status, 405)
+        conn.close()
 
     def test_no_general_file_or_command_surface(self):
         for uri in ("/etc/passwd", "/v0/exec", "/v0/install", "/v0/catalog/../../secret"):
