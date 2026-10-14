@@ -412,6 +412,21 @@ class OneShotCompletionTests(unittest.TestCase):
             observed["ownership"]["state"] = ownership
             self.assert_blocked(observed, desired)
 
+    def test_nonterminal_or_unknown_app_state_blocks_even_with_zero_exit(self):
+        # The apparently successful independent job record is deliberately
+        # kept intact; the native app state must independently be terminal.
+        for state in ("RUNNING", "CRASHED", "DEPLOYING", "STOPPING", "", None):
+            with self.subTest(app_state=state):
+                observed, desired = self.fixture()
+                observed["app"]["state"] = state
+                self.assert_blocked(observed, desired)
+
+    def test_stopped_app_still_requires_independent_terminal_job_readback(self):
+        observed, desired = self.fixture()
+        self.assertEqual(observed["app"]["state"], "STOPPED")
+        observed["app"]["job"]["containers"][0]["exit_code"] = 17
+        self.assert_blocked(observed, desired)
+
     def test_ambiguous_operation_never_retries(self):
         for state in ("ambiguous", "in-flight"):
             observed, desired = self.fixture()

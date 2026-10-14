@@ -186,6 +186,11 @@ def _completion_failures(app: dict[str, Any], intent: dict[str, Any]) -> list[st
     A target adapter must qualify this projection from native runtime observations.
     This planner neither supplies that adapter nor authorizes starting/retrying jobs.
     """
+    # An exited-container record alone is insufficient when the native app
+    # lifecycle is still RUNNING, CRASHED, DEPLOYING, or unobserved. In
+    # particular, CRASHED and a stale success record must not become NOOP.
+    if app.get("state") != "STOPPED":
+        return ["one-shot completion requires an observed STOPPED app state"]
     job = app.get("job")
     if not isinstance(job, dict):
         return ["independent terminal job readback is missing"]
