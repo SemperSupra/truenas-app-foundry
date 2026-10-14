@@ -1,0 +1,284 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Foundry Catalog Read-Only Discovery Contract",
+    "version": "0.1.0",
+    "description": "Product HTTP adapter contract for public-safe discovery. This specification documents an implementation target, not an already running server. Strictly no install/plan/apply privileges."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v0/catalog/apps": {
+      "get": {
+        "operationId": "listCatalogApps",
+        "summary": "Read-only listCatalogApps",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Read-only catalog query; cannot grant deployment authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          },
+          "404": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          }
+        }
+      }
+    },
+    "/v0/catalog/show": {
+      "get": {
+        "operationId": "showCatalogApp",
+        "summary": "Read-only showCatalogApp",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read-only catalog query; cannot grant deployment authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          },
+          "404": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          }
+        }
+      }
+    },
+    "/v0/catalog/resolve": {
+      "get": {
+        "operationId": "resolveCatalogSource",
+        "summary": "Read-only resolveCatalogSource",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "digest",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read-only catalog query; cannot grant deployment authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          },
+          "404": {
+            "description": "Selection invalid, unavailable, or ambiguous"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Read-only application session credential, not TrueNAS mutation authority"
+      }
+    },
+    "schemas": {
+      "SourceApp": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "package_id",
+          "version",
+          "source_revision",
+          "source_uri",
+          "path",
+          "source_tree_sha256",
+          "admission"
+        ],
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_revision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "source_uri": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_tree_sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "admission": {
+            "const": "DISCOVERED_ONLY"
+          }
+        }
+      },
+      "ListResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "operation",
+          "count",
+          "apps"
+        ],
+        "properties": {
+          "schema": {
+            "const": "truenas-foundry-catalog-query/v0"
+          },
+          "operation": {
+            "const": "list"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceApp"
+            }
+          }
+        }
+      },
+      "ShowResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "operation",
+          "count",
+          "apps"
+        ],
+        "properties": {
+          "schema": {
+            "const": "truenas-foundry-catalog-query/v0"
+          },
+          "operation": {
+            "const": "show"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceApp"
+            }
+          }
+        }
+      },
+      "ResolveResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "operation",
+          "app",
+          "mutation_eligible",
+          "note"
+        ],
+        "properties": {
+          "schema": {
+            "const": "truenas-foundry-catalog-query/v0"
+          },
+          "operation": {
+            "const": "resolve"
+          },
+          "app": {
+            "$ref": "#/components/schemas/SourceApp"
+          },
+          "mutation_eligible": {
+            "const": false
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

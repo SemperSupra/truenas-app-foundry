@@ -1,0 +1,44 @@
+name: Qualify pinned official TrueNAS catalog source adapter
+
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_catalog_official_adapter.py'
+      - 'tests/test_foundry_catalog_official_adapter.py'
+      - '.foundry/truenas-apps-upstream.json'
+      - '.github/workflows/qualify-foundry-catalog-official-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-catalog-official-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Qualify mocked upstream Git identity and negative cases
+        run: python3 -m unittest -v tests/test_foundry_catalog_official_adapter.py
+      - name: Checkout exact pinned upstream official TrueNAS apps
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: truenas/apps
+          ref: 532236882212e8c5e51d5b49cfe2c6ce3dd5675e
+          path: official-apps
+          sparse-checkout: ix-dev/community/ntfy
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Source-derived ntfy index from real upstream checkout
+        run: |
+          python3 tools/foundry_catalog_official_adapter.py --pin .foundry/truenas-apps-upstream.json --checkout official-apps --app ntfy > /tmp/foundry-official-source.json
+          python3 -m json.tool /tmp/foundry-official-source.json > /dev/null
+          python3 tools/foundry_catalog_federation.py --operation list /tmp/foundry-official-source.json > /tmp/foundry-official-discovery.json
+          python3 -c 'import json; j=json.load(open("/tmp/foundry-official-discovery.json")); assert j["count"] == 1; a=j["apps"][0]; assert a["package_id"] == "github.com/truenas-apps/community/ntfy"; assert a["version"] == "1.1.19"; assert a["admission"] == "DISCOVERED_ONLY"; assert len(a["source_tree_sha256"]) == 71'

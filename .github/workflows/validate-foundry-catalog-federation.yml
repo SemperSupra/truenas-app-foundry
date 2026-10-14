@@ -1,0 +1,36 @@
+name: Foundry Catalog federation contract
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_catalog_federation.py'
+      - 'tests/test_foundry_catalog_federation.py'
+      - 'tests/test_foundry_catalog_api_contract.py'
+      - 'schemas/foundry-catalog-read-api-v0.openapi.json'
+      - '.github/workflows/validate-foundry-catalog-federation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/foundry_catalog_federation.py'
+      - 'tests/test_foundry_catalog_federation.py'
+      - '.github/workflows/validate-foundry-catalog-federation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-catalog-federation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile offline contract
+        run: python3 -m py_compile tools/foundry_catalog_federation.py tests/test_foundry_catalog_federation.py
+      - name: Test source federation refusal cases
+        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog*.py' -v

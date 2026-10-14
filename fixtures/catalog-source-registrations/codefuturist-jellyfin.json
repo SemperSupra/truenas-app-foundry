@@ -1,0 +1,9 @@
+{
+  "schema": "truenas-foundry-external-source/v0",
+  "uri": "https://github.com/codefuturist/truenas-apps.git",
+  "revision": "040a69450ff07f6b1ba92ea11e2f07f222f9fc4e",
+  "train": "community",
+  "apps": [
+    "jellyfin"
+  ]
+}
