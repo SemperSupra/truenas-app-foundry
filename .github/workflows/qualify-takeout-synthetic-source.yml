@@ -84,6 +84,7 @@ jobs:
           services=d.get('services') or {}
           worker=services['takeoutsynthetic']
           assert worker.get('read_only') is True
+          assert worker.get('restart') == 'no', 'one-shot restart policy must disable auto restart'
           assert str(worker.get('user')) in ('10001:10001','10001')
           assert worker.get('ports') in (None, [], {})
           assert not worker.get('privileged')
@@ -138,6 +139,7 @@ jobs:
           assert reversible==source, 'More than one normalized Compose value changed'
           assert planned['services']['permissions']==source['services']['permissions']
           assert planned['services']['takeoutsynthetic']['read_only'] is True
+          assert planned['services']['takeoutsynthetic'].get('restart') == 'no'
           assert str(planned['services']['takeoutsynthetic']['user']) in ('10001:10001','10001')
           assert all(not v.get('ports') and not v.get('privileged')
                      for v in planned['services'].values())
@@ -227,6 +229,7 @@ jobs:
           assert set(services)=={'takeoutsynthetic'}, sorted(services)
           worker=services['takeoutsynthetic']
           assert worker['read_only'] is True
+          assert worker.get('restart') == 'no', 'retained exited one-shot must not restart'
           assert str(worker['user']) in ('10001:10001','10001')
           assert not worker.get('ports') and not worker.get('privileged')
           serialized=json.dumps(worker.get('volumes',[]))
