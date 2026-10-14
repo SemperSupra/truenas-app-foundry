@@ -129,7 +129,14 @@ class ReadHandler(BaseHTTPRequestHandler):
     do_PATCH = reject_write
     do_DELETE = reject_write
     do_OPTIONS = reject_write
-    do_HEAD = reject_write
+
+    def do_HEAD(self):
+        # A HEAD response must not include a body, even when method is refused.
+        self.send_response(405)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
 
 
 def main(argv=None) -> int:
