@@ -65,8 +65,8 @@ def project(registration: dict, checkout: Path) -> dict:
     if train not in {"community", "stable", "enterprise", "test"}:
         raise ExternalSourceError("unknown TrueNAS app train")
     if (not isinstance(apps, list) or not apps or len(apps) > official.MAX_APPS
-            or len(set(apps)) != len(apps)
-            or not all(isinstance(a, str) and APP_ID.fullmatch(a) for a in apps)):
+            or not all(isinstance(a, str) and APP_ID.fullmatch(a) for a in apps)
+            or len(set(apps)) != len(apps)):
         raise ExternalSourceError("external app selection is invalid or unbounded")
     # The remote URL check prevents labeling an arbitrary local checkout as a
     # different publisher. Git object IDs still bind exact content.
