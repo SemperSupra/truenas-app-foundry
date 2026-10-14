@@ -53,6 +53,7 @@ class OfficialAdapterTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.tmp.name)
         self.ref, self.source = setup_repo(self.root)
+        cmd(self.root, "remote", "add", "origin", "https://github.com/truenas/apps.git")
     def tearDown(self):
         self.tmp.cleanup()
 
@@ -64,6 +65,12 @@ class OfficialAdapterTests(unittest.TestCase):
         self.assertTrue(manifest["apps"][0]["source_tree_sha256"].startswith("sha256:"))
         records = mod.federation.normalize(manifest)
         self.assertEqual(records[0]["admission"], "DISCOVERED_ONLY")
+
+    def test_official_source_must_have_correct_git_remote(self):
+        cmd(self.root, "remote", "set-url", "origin",
+            "https://github.com/untrusted/mirror.git")
+        with self.assertRaises(mod.OfficialCatalogError):
+            mod.project(pin(self.ref), self.root, ["ntfy"])
 
     def test_ref_mismatch_denied(self):
         with self.assertRaises(mod.OfficialCatalogError):
