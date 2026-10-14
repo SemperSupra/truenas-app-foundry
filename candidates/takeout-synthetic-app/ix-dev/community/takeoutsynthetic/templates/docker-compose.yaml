@@ -9,6 +9,8 @@
 {% endif %}
 {% do worker.set_user(values.consts.runtime_uid, values.consts.runtime_gid) %}
 {% do worker.set_init(true) %}
+{# A one-shot job must remain EXITED for independent post-run observation. #}
+{% do worker.restart.set_policy("no") %}
 {% do worker.set_read_only(true) %}
 {% do worker.set_grace_period(60) %}
 {% do worker.healthcheck.disable() %}
