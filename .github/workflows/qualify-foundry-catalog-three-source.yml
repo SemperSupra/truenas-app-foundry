@@ -1,0 +1,51 @@
+name: Qualify actual three-source Foundry Catalog discovery
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_catalog_real_three_source.py'
+      - 'tools/foundry_catalog_official_adapter.py'
+      - 'tools/foundry_catalog_external_adapter.py'
+      - 'tools/foundry_catalog_inventory_export.py'
+      - 'tools/foundry_catalog_federation.py'
+      - 'fixtures/catalog-source-registrations/codefuturist-jellyfin.json'
+      - '.foundry/bootstrap/foundry-rdte-probe.json'
+      - '.foundry/truenas-apps-upstream.json'
+      - '.github/workflows/qualify-foundry-catalog-three-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-catalog-real-three-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  actual-source-read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Pinned official TrueNAS Apps Jellyfin source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: truenas/apps
+          ref: 532236882212e8c5e51d5b49cfe2c6ce3dd5675e
+          path: official-apps
+          sparse-checkout: ix-dev/community/jellyfin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Pinned third-party Jellyfin source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: codefuturist/truenas-apps
+          ref: 040a69450ff07f6b1ba92ea11e2f07f222f9fc4e
+          path: external-apps
+          sparse-checkout: ix-dev/community/jellyfin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Prove three-source immutable read path
+        run: |
+          python3 tools/foundry_catalog_real_three_source.py --official-checkout official-apps --external-checkout external-apps --registration fixtures/catalog-source-registrations/codefuturist-jellyfin.json > /tmp/three-source-proof.json
+          python3 -m json.tool /tmp/three-source-proof.json > /dev/null
+          python3 -c 'import json; p=json.load(open("/tmp/three-source-proof.json")); assert p["status"]=="PASS"; assert p["provider_count"]==3; assert p["same_name_jellyfin_variants"]==2; assert not p["target_mutation_performed"]; assert all(x["admission"]=="DISCOVERED_ONLY" for x in p["apps"])'
+          python3 -c 'import json; p=json.load(open("/tmp/three-source-proof.json")); print(json.dumps({"status":p["status"], "providers":p["provider_count"], "sources":p["source_count"], "same_name_jellyfin":p["same_name_jellyfin_variants"], "limitations":p["limitations"]}, sort_keys=True))'
