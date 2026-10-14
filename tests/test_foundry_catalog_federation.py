@@ -95,5 +95,41 @@ class CatalogTests(unittest.TestCase):
             path.write_bytes(b"x" * (catalog.MAX_INDEX_BYTES + 1))
             self.assertEqual(catalog.main([str(path)]), 2)
 
+    def test_query_list_preserves_sources_and_has_no_authority(self):
+        rows = catalog.federate([sample("official.example"), sample("external.example")])
+        result = catalog.query(rows, "list")
+        self.assertEqual(result["count"], 2)
+        self.assertTrue(all(row["admission"] == "DISCOVERED_ONLY" for row in result["apps"]))
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.query(rows, "list", package_id="official.example/main/community/sample")
+
+    def test_query_show_does_not_silently_cross_publishers(self):
+        rows = catalog.federate([sample("official.example"), sample("external.example")])
+        show = catalog.query(rows, "show", package_id="official.example/main/community/sample")
+        self.assertEqual(show["count"], 1)
+        self.assertEqual(show["apps"][0]["provider_id"], "official.example/main")
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.query(rows, "show", package_id="community/sample")
+
+    def test_query_resolve_requires_all_exact_identity_and_no_apply(self):
+        rows = catalog.federate([sample()])
+        kwargs = dict(package_id="foundry.example/main/community/sample",
+                      version="1.0.0", revision="a" * 40, digest="sha256:" + "b" * 64)
+        resolved = catalog.query(rows, "resolve", **kwargs)
+        self.assertFalse(resolved["mutation_eligible"])
+        self.assertEqual(resolved["app"]["manifest_sha256"], kwargs["digest"])
+        for missing in kwargs:
+            args = dict(kwargs)
+            args.pop(missing)
+            with self.subTest(missing=missing):
+                with self.assertRaises(catalog.CatalogIdentityError):
+                    catalog.query(rows, "resolve", **args)
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.query(rows, "resolve", **dict(kwargs, digest="sha256:" + "c" * 64))
+
+    def test_query_refuses_unrecognized_commands(self):
+        with self.assertRaises(catalog.CatalogIdentityError):
+            catalog.query(catalog.federate([sample()]), "apply")
+
 if __name__ == "__main__":
     unittest.main()
