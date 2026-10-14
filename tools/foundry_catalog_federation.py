@@ -77,14 +77,12 @@ def _source_uri(uri: Any) -> str:
     return uri
 
 
-def _path(path: Any, train: str, name: str) -> str:
+def _path(path: Any) -> str:
     if not isinstance(path, str) or not path or len(path) > MAX_PATH_LENGTH or "\\" in path or "%" in path:
         raise CatalogIdentityError("app.path: invalid path")
     parts = path.split("/")
     if any(not SLUG.fullmatch(x) or x in {".", ".."} for x in parts):
         raise CatalogIdentityError("app.path: unsafe path segment")
-    if len(parts) < 2 or parts[0] != train or parts[1] != name:
-        raise CatalogIdentityError("app.path: must start train/app")
     return path
 
 
@@ -110,15 +108,15 @@ def normalize(catalog: Any) -> list[dict[str, Any]]:
     for index, entry in enumerate(source["apps"]):
         app = _obj(
             entry, f"apps[{index}]",
-            {"train", "name", "version", "path", "manifest_sha256"},
+            {"train", "name", "version", "path", "source_tree_sha256"},
         )
         train = _str(app["train"], SLUG, "app.train")
         if train not in ALLOWED_TRAINS:
             raise CatalogIdentityError("app.train: unknown train")
         name = _str(app["name"], SLUG, "app.name")
         version = _str(app["version"], VERSION, "app.version")
-        path = _path(app["path"], train, name)
-        digest = _str(app["manifest_sha256"], DIGEST, "app.manifest_sha256")
+        path = _path(app["path"])
+        digest = _str(app["source_tree_sha256"], DIGEST, "app.source_tree_sha256")
         provider_id = f"{publisher}/{source_id}"
         package_id = f"{provider_id}/{train}/{name}"
         rows.append({
@@ -128,7 +126,7 @@ def normalize(catalog: Any) -> list[dict[str, Any]]:
             "source_revision": revision,
             "source_uri": uri,
             "path": path,
-            "manifest_sha256": digest,
+            "source_tree_sha256": digest,
             "admission": "DISCOVERED_ONLY",
         })
     return rows
@@ -162,14 +160,14 @@ def federate(catalogs: list[Any]) -> list[dict[str, Any]]:
 
 def resolve(
     rows: list[dict[str, Any]], package_id: str, version: str,
-    source_revision: str, manifest_sha256: str,
+    source_revision: str, source_tree_sha256: str,
 ) -> dict[str, Any]:
     """Require exact publisher-qualified package AND immutable revision/digest."""
     matches = [
         row for row in rows
         if row["package_id"] == package_id and row["version"] == version
         and row["source_revision"] == source_revision
-        and row["manifest_sha256"] == manifest_sha256
+        and row["source_tree_sha256"] == source_tree_sha256
     ]
     if len(matches) != 1:
         raise CatalogIdentityError("source selection missing or ambiguous")
