@@ -1,5 +1,6 @@
 """Source-index projection uses canonical Foundry inventory validation."""
 import importlib.util
+import json
 import pathlib
 import unittest
 
@@ -56,6 +57,28 @@ class InventoryBridgeTests(unittest.TestCase):
         self.assertEqual(result["apps"][0]["path"], "fixtures/foundry-rdte-probe")
         self.assertEqual(result["apps"][0]["source_tree_sha256"], TREE)
         self.assertNotIn("mutation_eligible", result)
+
+    def test_real_foundry_probe_bootstrap_to_discovery(self):
+        root = HERE.parent
+        seed = json.loads((root / ".foundry/bootstrap/foundry-rdte-probe.json").read_text())
+        targets = json.loads((root / ".foundry/truenas-target-tracks.json").read_text())
+        base = {"schema": export.inventory.INVENTORY_SCHEMA, "apps": []}
+        receipt, proposed = export.inventory.bootstrap_candidate(
+            base, targets, seed, root / "fixtures/foundry-rdte-probe"
+        )
+        self.assertEqual(receipt["status"], "READY_FOR_GIT_REVIEW")
+        source = seed["entry"]["source"]
+        projected = export.project(
+            proposed, publisher="github.com",
+            source_id="sempersupra-truenas-app-foundry",
+            repository=source["repository"], revision=source["ref"]
+        )
+        self.assertEqual(len(projected["apps"]), 1)
+        app = projected["apps"][0]
+        self.assertEqual(app["name"], "foundry-rdte-probe")
+        self.assertEqual(app["path"], source["path"])
+        self.assertEqual(app["source_tree_sha256"], receipt["source_contract"]["source_tree_sha256"])
+        self.assertEqual(base["apps"], [])
 
     def test_unrelated_revision_not_projected(self):
         result = project(doc(entry(), entry("other", "c" * 40)))
