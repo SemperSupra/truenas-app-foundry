@@ -121,6 +121,8 @@ class ReadHTTPTests(unittest.TestCase):
         })
         response = conn.getresponse()
         self.assertEqual(response.status, 405)
+        self.assertEqual(response.getheader("Content-Length"), "0")
+        self.assertEqual(response.read(), b"")
         conn.close()
 
     def test_no_general_file_or_command_surface(self):
