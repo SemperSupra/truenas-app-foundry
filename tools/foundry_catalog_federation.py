@@ -24,6 +24,10 @@ VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,95}\Z")
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 ALLOWED_TRAINS = {"test", "community", "stable", "enterprise"}
+MAX_SOURCE_APPS = 4096
+MAX_INDEX_BYTES = 4 * 1024 * 1024
+MAX_URI_LENGTH = 2048
+MAX_PATH_LENGTH = 512
 
 
 class CatalogIdentityError(ValueError):
@@ -43,8 +47,8 @@ def _str(value: Any, pattern: re.Pattern[str], where: str) -> str:
 
 
 def _source_uri(uri: Any) -> str:
-    if not isinstance(uri, str):
-        raise CatalogIdentityError("source.uri must be an HTTPS URL")
+    if not isinstance(uri, str) or len(uri) > MAX_URI_LENGTH:
+        raise CatalogIdentityError("source.uri must be a bounded HTTPS URL")
     try:
         parsed = urlsplit(uri)
         # Forbid credentials, parameters, fragments, ambiguous backslashes,
@@ -62,6 +66,7 @@ def _source_uri(uri: Any) -> str:
             or "%" in uri
             or any(c.isspace() for c in uri)
             or parsed.path.endswith("/")
+            or any(segment in {".", ".."} for segment in parsed.path.split("/"))
         ):
             raise CatalogIdentityError("source.uri: untrusted or ambiguous URL")
         host = parsed.hostname
@@ -73,7 +78,7 @@ def _source_uri(uri: Any) -> str:
 
 
 def _path(path: Any, train: str, name: str) -> str:
-    if not isinstance(path, str) or not path or "\\" in path or "%" in path:
+    if not isinstance(path, str) or not path or len(path) > MAX_PATH_LENGTH or "\\" in path or "%" in path:
         raise CatalogIdentityError("app.path: invalid path")
     parts = path.split("/")
     if any(not SLUG.fullmatch(x) or x in {".", ".."} for x in parts):
@@ -99,8 +104,8 @@ def normalize(catalog: Any) -> list[dict[str, Any]]:
     source_id = _str(source["source"], SLUG, "source")
     revision = _str(source["revision"], SHA40, "revision")
     uri = _source_uri(source["uri"])
-    if not isinstance(source["apps"], list):
-        raise CatalogIdentityError("source.apps must be an array")
+    if not isinstance(source["apps"], list) or len(source["apps"]) > MAX_SOURCE_APPS:
+        raise CatalogIdentityError("source.apps must be a bounded array")
     rows: list[dict[str, Any]] = []
     for index, entry in enumerate(source["apps"]):
         app = _obj(
@@ -176,9 +181,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", type=Path, nargs="+", help="local pinned index JSON")
     args = parser.parse_args(argv)
     try:
-        indexes = [json.loads(path.read_text(encoding="utf-8")) for path in args.source]
+        indexes = []
+        for path in args.source:
+            with path.open("rb") as handle:
+                payload = handle.read(MAX_INDEX_BYTES + 1)
+            if len(payload) > MAX_INDEX_BYTES:
+                raise CatalogIdentityError("source index exceeds size limit")
+            indexes.append(json.loads(payload.decode("utf-8")))
         rows = federate(indexes)
-    except (CatalogIdentityError, OSError, json.JSONDecodeError) as exc:
+    except (CatalogIdentityError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         print(f"catalog federation blocked: {exc}", file=sys.stderr)
         return 2
     print(json.dumps({"schema": "truenas-foundry-catalog-discovery/v0", "apps": rows},
