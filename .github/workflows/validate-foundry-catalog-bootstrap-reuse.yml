@@ -1,0 +1,26 @@
+name: Foundry Catalog generic bootstrap contract
+on:
+  pull_request:
+    paths:
+      - 'tests/test_foundry_catalog_bootstrap_rehearsal.py'
+      - 'tools/bind_truenas_site.py'
+      - 'tools/package_truenas_deployment_artifact.py'
+      - '.github/workflows/validate-foundry-catalog-bootstrap-reuse.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-catalog-bootstrap-reuse-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  generic-bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test generic binder and artifact builder plus Catalog rehearsal
+        run: |
+          python3 -m unittest -v tools/test_bind_truenas_site.py
+          python3 -m unittest discover -s tests -p 'test_foundry_catalog_bootstrap_rehearsal.py' -v
