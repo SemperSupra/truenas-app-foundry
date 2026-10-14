@@ -28,5 +28,19 @@
     "native_terminal_observer": "BLOCKED",
     "disposable_truenas": "NOT_RUN",
     "physical_apply": "HOLD"
+  },
+  "synthetic_transport_evidence": {
+    "schema": "takeout-synthetic-transfer-evidence/v1",
+    "producer": "SemperSupra/agent-dispatch#455",
+    "source_commit": "144aa93eb93fe1fab4a08f780506a1d77f0d5d09",
+    "workflow_run_id": 38598643105,
+    "artifact_id": 11912326284,
+    "artifact_zip_sha256": "sha256:eb485e980c480649c3de88708df165094d77df47211002eaceea5aed79022306",
+    "oci_manifest_sha256": "sha256:40a3b5b98939a2ae7d37099b1996a91e92a0877db1a1d91d09f403f88bd97fb5",
+    "public_runner_offline_import": "PASS",
+    "disposable_guest_import": "NOT_RUN",
+    "registry_image": "UNPUBLISHED",
+    "expiry": "2026-10-21T16:30:51Z",
+    "qualification": "TRANSFER_ONLY"
   }
 }
