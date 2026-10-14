@@ -79,7 +79,8 @@ def validate_resource(item:Any)->dict[str,Any]:
     # traversal must not be accepted by a declarative host-resource authority.
     if (not p.is_absolute() or len(p.parts)<3 or p.parts[0]!="/"
         or p.parts[1]!="mnt" or ".." in path.split("/")
-        or str(p)!=path or any(ord(ch)<32 or ord(ch)==127 for ch in path)):
+        or str(p)!=path or "\\" in path
+        or any(ord(ch)<32 or ord(ch)==127 for ch in path)):
         raise BindingError("host resource path must be canonical beneath /mnt")
     kind=item.get("kind")
     if kind not in {"directory","file"}: raise BindingError("host resource kind must be directory|file")
