@@ -85,7 +85,8 @@ class GenericCatalogBootstrapRehearsal(unittest.TestCase):
         self.assertTrue(bound["services"]["catalog"]["read_only"])
         self.assertTrue(bound["services"]["catalog"]["image"].startswith(
             "registry.invalid/"))
-        self.assertNotIn("secrets", str(artifact).lower().replace("catalog-read", ""))
+        self.assertNotIn("generated-random-base64", str(artifact))
+        self.assertNotIn("plaintext", str(artifact).lower())
         self.assertEqual(
             package.canonical_sha256(bound), artifact["compose_sha256"]
         )
