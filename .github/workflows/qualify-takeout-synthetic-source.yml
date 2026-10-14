@@ -88,7 +88,7 @@ jobs:
           assert str(worker.get('user')) in ('10001:10001','10001')
           assert worker.get('ports') in (None, [], {})
           assert not worker.get('privileged')
-          assert worker.get('network_mode') != 'host'
+          assert worker.get('network_mode') == 'none'
           assert not any('docker.sock' in str(v) for v in worker.get('volumes', []))
           assert 'UNPUBLISHED' in worker.get('image','')
           assert any('/archive' in str(v) for v in worker.get('volumes', []))
@@ -232,6 +232,7 @@ jobs:
           assert worker.get('restart') == 'no', 'retained exited one-shot must not restart'
           assert str(worker['user']) in ('10001:10001','10001')
           assert not worker.get('ports') and not worker.get('privileged')
+          assert worker.get('network_mode') == 'none'
           serialized=json.dumps(worker.get('volumes',[]))
           for role in ('archives','state'):
               assert '/mnt/rdtepool/takeout-synthetic/'+role in serialized
