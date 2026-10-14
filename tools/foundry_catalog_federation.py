@@ -25,6 +25,8 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 ALLOWED_TRAINS = {"test", "community", "stable", "enterprise"}
 MAX_SOURCE_APPS = 4096
+MAX_CATALOG_SOURCES = 128
+MAX_FEDERATED_APPS = 32768
 MAX_INDEX_BYTES = 4 * 1024 * 1024
 MAX_URI_LENGTH = 2048
 MAX_PATH_LENGTH = 512
@@ -32,6 +34,16 @@ MAX_PATH_LENGTH = 512
 
 class CatalogIdentityError(ValueError):
     """Source catalog has ambiguous, mutable, or unsafe identity."""
+
+
+def _no_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject JSON object-member ambiguity instead of silently using last-wins."""
+    parsed: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in parsed:
+            raise CatalogIdentityError(f"duplicate JSON member {key!r}")
+        parsed[key] = value
+    return parsed
 
 
 def _obj(value: Any, where: str, required: set[str]) -> dict[str, Any]:
@@ -134,8 +146,8 @@ def normalize(catalog: Any) -> list[dict[str, Any]]:
 
 def federate(catalogs: list[Any]) -> list[dict[str, Any]]:
     """Preserve different providers; refuse conflicting duplicates from one."""
-    if not isinstance(catalogs, list):
-        raise CatalogIdentityError("catalogs must be an array")
+    if not isinstance(catalogs, list) or len(catalogs) > MAX_CATALOG_SOURCES:
+        raise CatalogIdentityError("catalogs must be a bounded array")
     providers: dict[str, tuple[str, str]] = {}
     entries: dict[tuple[str, str], dict[str, Any]] = {}
     for catalog in catalogs:
@@ -153,6 +165,8 @@ def federate(catalogs: list[Any]) -> list[dict[str, Any]]:
                 raise CatalogIdentityError(
                     f"{row['package_id']}@{row['version']}: conflicting release identity"
                 )
+    if len(entries) > MAX_FEDERATED_APPS:
+        raise CatalogIdentityError("federated catalog exceeds total app limit")
     return sorted(entries.values(), key=lambda row: (
         row["package_id"], row["version"], row["source_revision"]
     ))
@@ -233,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
                 payload = handle.read(MAX_INDEX_BYTES + 1)
             if len(payload) > MAX_INDEX_BYTES:
                 raise CatalogIdentityError("source index exceeds size limit")
-            indexes.append(json.loads(payload.decode("utf-8")))
+            indexes.append(json.loads(payload.decode("utf-8"), object_pairs_hook=_no_duplicate_json_keys))
         rows = federate(indexes)
         result = query(rows, args.operation, package_id=args.package_id,
                        version=args.version, revision=args.revision, digest=args.digest)
