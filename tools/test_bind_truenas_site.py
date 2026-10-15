@@ -51,4 +51,54 @@ class Tests(unittest.TestCase):
     s=spec(); s["host_resources"][1]["content_policy"]["value"]="secret"
     with self.assertRaises(MOD.BindingError): MOD.bind(BASE,s)
 
+  def test_resource_path_traversal_or_noncanonical_form_rejected(self):
+    for attack in (
+      "/mnt/tank/../../etc/shadow",
+      "/mnt/tank/../other",
+      "/mnt/tank//apps/probe",
+      "/mnt/tank/./apps/probe",
+      "/mnt/tank/apps/probe/",
+      "//mnt/tank/apps/probe",
+      "/mnt/tank/apps/probe\\nspoof",
+      "/etc/probe",
+    ):
+      with self.subTest(path=attack):
+        s=spec(); s["host_resources"][0]["path"]=attack
+        with self.assertRaises(MOD.BindingError):
+          MOD.bind(BASE,s)
+
+  def test_strict_host_mount_resource_coverage_positive(self):
+    s=spec(); s["strict_host_bind_sources"]=True
+    bound,resources=MOD.bind(BASE,s)
+    self.assertEqual(bound["services"]["app"]["volumes"][0]["source"],
+                     "/mnt/tank/apps/probe")
+    self.assertEqual(len(resources),2)
+
+  def test_strict_host_mount_refuses_undeclared_or_short_form(self):
+    for attack in (
+      [{"type":"bind","source":"/mnt/other/secret","target":"/data"}],
+      ["/mnt/other/secret:/data:ro"],
+      [{"type":"bind","source":"/etc/shadow","target":"/secret"}],
+      [{"type":"volume","source":"/mnt/secret","target":"/data"}],
+      [{"type":"bind","source":"/mnt/tank/apps/probe","target":"relative"}],
+    ):
+      with self.subTest(volumes=attack):
+        s=spec(); s["strict_host_bind_sources"]=True
+        s["patches"]=[]
+        base=copy.deepcopy(BASE)
+        base["services"]["app"]["volumes"]=attack
+        s["expected_base_compose_sha256"]=MOD.canonical_sha256(base)
+        with self.assertRaises(MOD.BindingError): MOD.bind(base,s)
+
+  def test_strict_host_mount_rejects_volumes_from(self):
+    s=spec(); s["strict_host_bind_sources"]=True
+    base=copy.deepcopy(BASE); base["services"]["app"]["volumes_from"]=["foreign"]
+    s["expected_base_compose_sha256"]=MOD.canonical_sha256(base)
+    s["patches"]=[]
+    with self.assertRaises(MOD.BindingError): MOD.bind(base,s)
+
+  def test_strict_host_mount_flag_is_boolean(self):
+    s=spec(); s["strict_host_bind_sources"]="false"
+    with self.assertRaises(MOD.BindingError): MOD.bind(BASE,s)
+
 if __name__=="__main__": unittest.main()

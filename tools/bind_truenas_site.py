@@ -71,10 +71,17 @@ def validate_resource(item:Any)->dict[str,Any]:
     if not isinstance(item,dict): raise BindingError("host resource must be an object")
     allowed={"path","kind","uid","gid","mode","ownership","retain_on_remove","content_policy"}
     if set(item)-allowed: raise BindingError("host resource has unsupported keys")
-    path=str(item.get("path") or "")
-    p=Path(path)
-    if not p.is_absolute() or len(p.parts)<3 or p.parts[1]!="mnt":
+    path=item.get("path")
+    if not isinstance(path,str) or not path.startswith("/mnt/"):
         raise BindingError("host resource path must be beneath /mnt")
+    p=Path(path)
+    # Normalize nothing silently: dot segments, duplicate separators and
+    # traversal must not be accepted by a declarative host-resource authority.
+    if (not p.is_absolute() or len(p.parts)<3 or p.parts[0]!="/"
+        or p.parts[1]!="mnt" or ".." in path.split("/")
+        or str(p)!=path or "\\" in path
+        or any(ord(ch)<32 or ord(ch)==127 for ch in path)):
+        raise BindingError("host resource path must be canonical beneath /mnt")
     kind=item.get("kind")
     if kind not in {"directory","file"}: raise BindingError("host resource kind must be directory|file")
     uid=item.get("uid"); gid=item.get("gid")
@@ -105,6 +112,42 @@ def validate_resource(item:Any)->dict[str,Any]:
             raise BindingError("unsupported file content_policy")
     return copy.deepcopy(item)
 
+def validate_host_bind_coverage(compose:dict[str,Any],resources:list[dict[str,Any]])->None:
+    """Strict opt-in: every Compose host bind must match an admitted site resource.
+
+    Long form only removes source/target delimiter ambiguity. No filesystem
+    probing or authorization happens here; the operator still owns realpath,
+    mount type, ownership and TOCTOU controls at apply.
+    """
+    services=compose.get("services")
+    if not isinstance(services,dict) or not services:
+        raise BindingError("strict host bind coverage requires Compose services")
+    admitted={item["path"] for item in resources}
+    for service_name,service in services.items():
+        if not isinstance(service,dict):
+            raise BindingError("service must be an object in strict bind coverage")
+        if service.get("volumes_from"):
+            raise BindingError("volumes_from bypasses strict host resource binding")
+        volumes=service.get("volumes",[])
+        if not isinstance(volumes,list):
+            raise BindingError("service volumes must be an array")
+        for volume in volumes:
+            if not isinstance(volume,dict) or volume.get("type") not in {"bind","volume","tmpfs"}:
+                raise BindingError("strict host bind coverage requires typed long-form mounts")
+            kind=volume["type"]
+            if kind=="bind":
+                source=volume.get("source")
+                target=volume.get("target")
+                if not isinstance(source,str) or source not in admitted:
+                    raise BindingError("host bind source is not an admitted site resource")
+                if not isinstance(target,str) or not target.startswith("/"):
+                    raise BindingError("host bind target must be absolute")
+            elif kind=="volume":
+                name=volume.get("source")
+                if name is not None and (not isinstance(name,str) or not name or "/" in name):
+                    raise BindingError("named volume must not masquerade as a host path")
+
+
 def bind(compose:dict[str,Any],spec:dict[str,Any])->tuple[dict[str,Any],list[dict[str,Any]]]:
     if spec.get("schema")!=SCHEMA: raise BindingError("unsupported site-binding schema")
     expected=str(spec.get("expected_base_compose_sha256") or "")
@@ -126,6 +169,9 @@ def bind(compose:dict[str,Any],spec:dict[str,Any])->tuple[dict[str,Any],list[dic
     checked=[validate_resource(x) for x in resources]
     resource_paths=[x["path"] for x in checked]
     if len(resource_paths)!=len(set(resource_paths)): raise BindingError("duplicate host resource path")
+    strict=spec.get("strict_host_bind_sources",False)
+    if not isinstance(strict,bool): raise BindingError("strict_host_bind_sources must be boolean")
+    if strict: validate_host_bind_coverage(out,checked)
     return out,checked
 
 def main()->int:
