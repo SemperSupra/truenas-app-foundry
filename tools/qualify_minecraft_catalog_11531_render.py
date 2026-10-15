@@ -9,8 +9,12 @@ from __future__ import annotations
 import json
 import sys
 
-from validate_minecraft_world_control import (
-    VANILLA_PIN, VANILLA_11531_PIN, VANILLA_VALUES, validate, ValidationError)
+try:
+    from tools.validate_minecraft_world_control import (
+        VANILLA_PIN, VANILLA_11531_PIN, VANILLA_VALUES, validate, ValidationError)
+except ModuleNotFoundError:
+    from validate_minecraft_world_control import (
+        VANILLA_PIN, VANILLA_11531_PIN, VANILLA_VALUES, validate, ValidationError)
 
 OLD = "559b9fe85212c800bc6770f152a65211df137a44"
 NEW = "95b0cc78e75fcd4b128f4ef2f8428034d981f7c2"
