@@ -1,0 +1,30 @@
+images:
+  image:
+    repository: ghcr.io/shelfmark-bindery/book2epub
+    tag: 0.1.0-candidate-UNPUBLISHED
+  container_utils_image:
+    repository: ixsystems/container-utils@sha256
+    tag: 46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992
+consts:
+  worker_container_name: book2epub
+  perms_container_name: permissions
+  runtime_uid: 568
+  runtime_gid: 568
+  state_path: /data
+network:
+  web_port:
+    bind_mode: published
+    port_number: 18787
+    container_port: 8080
+    host_ips:
+      - 127.0.0.1
+storage:
+  state:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: book2epub-state
+      acl_enable: false
+resources:
+  limits:
+    cpus: 4.0
+    memory: 12288

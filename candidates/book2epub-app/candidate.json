@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "candidate": "book2epub-source-render-rdte",
+  "phase": "unpublished-image-render-only",
+  "source_path": "candidates/book2epub-app/ix-dev/community/book2epub",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "library_sha": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "runtime_target": "TrueNAS SCALE Apps",
+  "target_profile": "truenas-scale-25.04.2.6-materialization",
+  "product_image": "UNPUBLISHED",
+  "source_only": true,
+  "public_safe": true,
+  "claims": {
+    "official_render": "NOT_RUN",
+    "normalized_compose": "NOT_RUN",
+    "immutable_image": "NOT_PUBLISHED",
+    "private_reintake": "NOT_ACCEPTED",
+    "disposable_truenas": "NOT_RUN",
+    "physical_apply": "HOLD"
+  }
+}
