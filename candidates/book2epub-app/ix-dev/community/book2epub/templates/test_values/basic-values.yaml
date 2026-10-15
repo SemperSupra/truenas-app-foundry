@@ -11,6 +11,8 @@ consts:
   runtime_uid: 568
   runtime_gid: 568
   state_path: /data
+mode:
+  operating_mode: research
 network:
   web_port:
     bind_mode: published
