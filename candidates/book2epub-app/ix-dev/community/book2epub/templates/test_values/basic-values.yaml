@@ -13,6 +13,7 @@ consts:
   state_path: /data
 mode:
   operating_mode: research
+  production_admission_digest: ''
 network:
   web_port:
     bind_mode: published
