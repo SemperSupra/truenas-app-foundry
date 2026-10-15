@@ -1,11 +1,31 @@
 groups:
   - name: Network
     description: HTTP browser bind settings (a site-local LAN IP is mandatory before any physical APPLY)
+  - name: Operating Mode
+    description: Persistent research or production request; production is held until independently approved
   - name: Storage
     description: Durable jobs, inputs, models, and results
   - name: Resources
     description: CPU-only conversion worker limits
 questions:
+  - variable: mode
+    label: Operating Mode
+    group: Operating Mode
+    schema:
+      type: dict
+      attrs:
+        - variable: operating_mode
+          label: Operating mode
+          description: Research is the qualified default; Production can be selected but conversion is blocked until model/software rights and release admission are approved.
+          schema:
+            type: string
+            default: research
+            required: true
+            enum:
+              - value: research
+                description: Research-only (preverified offline models, restricted outputs)
+              - value: production
+                description: Production requested (conversion HOLD until independent rights and deployment approval)
   - variable: network
     label: Network
     group: Network
