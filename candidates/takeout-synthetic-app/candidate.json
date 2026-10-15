@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "candidate": "takeout-synthetic-source-render-rdte",
+  "phase": "unpublished-image-render-only",
+  "source_path": "candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "library_sha": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "runtime_target": "TrueNAS SCALE Apps",
+  "target_profile": "truenas-scale-25.04.2.6-materialization",
+  "product_image": "UNPUBLISHED",
+  "source_only": true,
+  "public_safe": true,
+  "authority": {
+    "generic_foundry": "SemperSupra/truenas-app-foundry-private#327",
+    "executor": "SemperSupra/agent-dispatch-private#642",
+    "source": "SemperSupra/agent-dispatch#426"
+  },
+  "claims": {
+    "official_render": "NOT_RUN",
+    "normalized_compose": "NOT_RUN",
+    "immutable_image": "NOT_PUBLISHED",
+    "retained_zfs_archive": "NOT_QUALIFIED",
+    "native_terminal_observer": "BLOCKED",
+    "disposable_truenas": "NOT_RUN",
+    "physical_apply": "HOLD"
+  },
+  "synthetic_transport_evidence": {
+    "schema": "takeout-synthetic-transfer-evidence/v1",
+    "producer": "SemperSupra/agent-dispatch#455",
+    "source_commit": "144aa93eb93fe1fab4a08f780506a1d77f0d5d09",
+    "workflow_run_id": 38598643105,
+    "artifact_id": 11912326284,
+    "artifact_zip_sha256": "sha256:eb485e980c480649c3de88708df165094d77df47211002eaceea5aed79022306",
+    "oci_manifest_sha256": "sha256:40a3b5b98939a2ae7d37099b1996a91e92a0877db1a1d91d09f403f88bd97fb5",
+    "public_runner_offline_import": "PASS",
+    "disposable_guest_import": "NOT_RUN",
+    "registry_image": "UNPUBLISHED",
+    "expiry": "2026-10-21T16:30:51Z",
+    "qualification": "TRANSFER_ONLY",
+    "loaded_image_config_sha256": "sha256:86de81f4401811f145c0569a210482a559746aa337f28554bb751ece08f77b7c",
+    "docker_transport_sha256": "sha256:d42d5341ad329a739bfa6488a6455298ebca58cf395b5f3d2494aed88042db10",
+    "independent_latest_zip_blob_audit": "PASS",
+    "docker_config_identity_matches_oci": "PASS"
+  }
+}

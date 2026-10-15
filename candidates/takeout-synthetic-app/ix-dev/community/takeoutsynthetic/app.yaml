@@ -1,0 +1,34 @@
+app_version: 0.0.0-UNPUBLISHED
+capabilities: []
+categories:
+  - productivity
+changelog_url: https://github.com/SemperSupra/agent-dispatch
+date_added: '2026-10-14'
+description: >-
+  Synthetic-only, offline Takeout one-shot download lifecycle test for disposable TrueNAS.
+home: https://github.com/SemperSupra/agent-dispatch
+host_mounts: []
+icon: https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/icon-transparent.svg
+keywords:
+  - synthetic
+  - takeout
+  - testing
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+  - name: SemperSupra
+    url: https://github.com/SemperSupra
+name: takeoutsynthetic
+run_as_context:
+  - description: Non-root offline fixture worker
+    uid: 10001
+    gid: 10001
+    user_name: takeoutsynthetic
+    group_name: takeoutsynthetic
+screenshots: []
+sources:
+  - https://github.com/SemperSupra/agent-dispatch
+  - https://github.com/SemperSupra/truenas-app-foundry
+title: Takeout Synthetic RDTE
+train: community
+version: 0.0.0
