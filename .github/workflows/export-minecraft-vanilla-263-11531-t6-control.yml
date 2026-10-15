@@ -1,0 +1,81 @@
+name: Export NEW native vanilla263 1.15.31 source-only candidate
+on:
+  pull_request:
+    paths:
+      - 'tools/export_minecraft_vanilla_263_11531_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11531_t6_control.py'
+      - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
+      - 'tools/qualify_minecraft_catalog_11531_render.py'
+      - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/export_minecraft_vanilla_263_11531_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11531_t6_control.py'
+      - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
+      - 'tools/qualify_minecraft_catalog_11531_render.py'
+      - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-11531-export:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 29
+    steps:
+      - name: Checkout exact public Foundry source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Test new versioned export policy independently
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/export_minecraft_vanilla_263_11531_t6_control.py
+          python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_11531_t6_control.py' -v
+      - name: First qualify actual 1.15.30 and 1.15.31 vendor render parity
+        run: |
+          set -euo pipefail
+          python3 tools/qualify_minecraft_catalog_11531_render.py > "$RUNNER_TEMP/minecraft-11531-render-parity.json"
+          python3 - "$RUNNER_TEMP/minecraft-11531-render-parity.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert r["classification"]=="SOURCE_RENDER_CANONICAL_COMPOSE_IDENTICAL"
+          assert r["runtime_guest_qualified"] is False
+          PY
+      - name: Re-render new exact source and export source control without guest
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_world_control.py --product vanilla-263 --catalog-profile 1.15.31 --target-version 25.04.2.6 > "$RUNNER_TEMP/minecraft-11531-source.json"
+          test -f "$RUNNER_TEMP/minecraft-11531-source.json"
+          ref="$(git rev-parse HEAD)"
+          test "$ref" = "$GITHUB_SHA"
+          python3 tools/export_minecraft_vanilla_263_11531_t6_control.py --foundry-ref "$ref" --target-version 25.04.2.6 --source-evidence "$RUNNER_TEMP/minecraft-11531-source.json" --out "$RUNNER_TEMP/native-11531-control.json"
+          python3 - "$RUNNER_TEMP/native-11531-control.json" "$ref" <<'PY'
+          import json,hashlib,sys
+          c=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert c["foundry_ref"]==sys.argv[2]
+          assert c["source"]["catalog_version"]=="1.15.31"
+          assert c["source"]["library_version"]=="2.3.16"
+          assert c["runtime"]["catalog_version_candidate"]=="1.15.31"
+          assert c["source"]["image_reference"].endswith("@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")
+          assert not c["evidence"]["native_guest_created"]
+          assert c["physical_truenas_apply"]=="HOLD"
+          declared=c.pop("control_sha256")
+          assert hashlib.sha256(json.dumps(c,sort_keys=True,separators=(",",":")).encode()).hexdigest()==declared
+          PY
+      - name: Upload independent pinned source-only export
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minecraft-vanilla263-truenas-250426-11531-signed-source-candidate
+          path: |
+            ${{ runner.temp }}/native-11531-control.json
+            ${{ runner.temp }}/minecraft-11531-render-parity.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Preserve nonclaim
+        if: always()
+        run: echo 'SOURCE-only, immutable public 1.15.31 exporter candidate. No guest acceptance, COLLAGE mutation authorization or physical TrueNAS APPLY.' >> "$GITHUB_STEP_SUMMARY"
