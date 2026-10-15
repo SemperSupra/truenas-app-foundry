@@ -25,7 +25,14 @@ questions:
               - value: research
                 description: Research-only (preverified offline models, restricted outputs)
               - value: production
-                description: Production requested (conversion HOLD until independent rights and deployment approval)
+                description: Production, subject to pinned independent admission and verified model assets
+        - variable: production_admission_digest
+          label: Approved production admission SHA256
+          description: Paste the independently reviewed SHA256 digest of the site production-admission.json receipt; not the digest from the same unverified receipt. Required for production conversion.
+          schema:
+            type: string
+            default: ''
+            show_if: [["operating_mode", "=", "production"]]
   - variable: network
     label: Network
     group: Network
