@@ -96,3 +96,60 @@ jobs:
           }
           print(json.dumps(out, sort_keys=True))
           PY
+
+      - name: Verify persisted research and production source-mode rendering (no runtime)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import yaml
+          p=Path("/tmp/book2epub-test-values.yaml")
+          values=yaml.safe_load(p.read_text())
+          assert values["mode"]["operating_mode"]=="research"
+          source=json.loads(Path("/tmp/book2epub-rendered-private.json").read_text())
+          env=source["services"]["book2epub"]["environment"]
+          assert env["BOOK2EPUB_OPERATION_MODE"]=="research",env
+          assert env["BOOK2EPUB_MODEL_ADMISSION_POLICY"]=="preverified"
+          assert env["BOOK2EPUB_RESEARCH_ONLY"]=="1"
+          assert env.get("BOOK2EPUB_PRODUCTION_ADMISSION_SHA256","")==""
+          assert all(env[name]=="1" for name in (
+              "HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE","HF_DATASETS_OFFLINE"))
+          values["mode"]["operating_mode"]="production"
+          # Synthetic placeholder only: never a real rights/release acceptance.
+          values["mode"]["production_admission_digest"]="sha256:"+"a"*64
+          Path("/tmp/book2epub-production-values.yaml").write_text(yaml.safe_dump(values))
+          print("RESEARCH_SOURCE_MODE_PASS")
+          PY
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/book2epub-app/candidate.json \
+            --values /tmp/book2epub-production-values.yaml \
+            --output-compose /tmp/book2epub-production-render.json
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path("/tmp/book2epub-production-render.json")
+          prod=json.loads(p.read_text())["services"]["book2epub"]
+          env=prod["environment"]
+          assert env["BOOK2EPUB_OPERATION_MODE"]=="production",env
+          assert env["BOOK2EPUB_RESEARCH_ONLY"]=="0"
+          assert env["BOOK2EPUB_MODEL_ADMISSION_POLICY"]=="preverified"
+          assert env["BOOK2EPUB_PRODUCTION_ADMISSION_SHA256"]=="sha256:"+"a"*64
+          assert all(env[name]=="1" for name in (
+              "HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE","HF_DATASETS_OFFLINE"))
+          assert "BOOK2EPUB_ALLOW_MODEL_BOOTSTRAP" not in env
+          assert prod.get("read_only") is True
+          assert str(prod.get("user")) in {"568:568","568"}
+          ports=prod["ports"]
+          assert len(ports)==1 and ports[0]["host_ip"]=="127.0.0.1"
+          print(json.dumps({
+            "claim":"official-catalog-source-mode-toggle-only",
+            "production_persistent_selection":"PASS",
+            "release_rights_claim":"NOT_PROVEN_BY_SYNTHETIC_SHA",
+            "production_compose_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),
+            "registry_pull":"NOT_RUN",
+            "guest_apply":"NOT_RUN",
+            "physical_apply":"HOLD",
+          },sort_keys=True))
+          PY
