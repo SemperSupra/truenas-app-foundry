@@ -7,6 +7,15 @@ on:
       - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
       - 'tools/qualify_minecraft_catalog_11531_render.py'
       - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/export_minecraft_vanilla_263_11531_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11531_t6_control.py'
+      - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
+      - 'tools/qualify_minecraft_catalog_11531_render.py'
+      - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
   workflow_dispatch:
 permissions:
   contents: read
