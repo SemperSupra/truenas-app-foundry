@@ -12,6 +12,7 @@ on:
     paths:
       - 'tools/export_minecraft_vanilla_263_11531_t6_control.py'
       - 'tests/test_export_minecraft_vanilla_263_11531_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11531_callable.py'
       - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
       - 'tools/qualify_minecraft_catalog_11531_render.py'
       - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
@@ -21,6 +22,7 @@ on:
     paths:
       - 'tools/export_minecraft_vanilla_263_11531_t6_control.py'
       - 'tests/test_export_minecraft_vanilla_263_11531_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11531_callable.py'
       - '.foundry/controls/minecraft-vanilla-263-11531-upstream.json'
       - 'tools/qualify_minecraft_catalog_11531_render.py'
       - '.github/workflows/export-minecraft-vanilla-263-11531-t6-control.yml'
@@ -62,6 +64,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile tools/export_minecraft_vanilla_263_11531_t6_control.py
           python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_11531_t6_control.py' -v
+          python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_11531_callable.py' -v
       - name: First qualify actual 1.15.30 and 1.15.31 vendor render parity
         run: |
           set -euo pipefail
