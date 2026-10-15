@@ -1,0 +1,50 @@
+name: Qualify immutable Minecraft catalog 1.15.31 source delta
+on:
+  pull_request:
+    paths:
+      - 'tools/qualify_minecraft_catalog_11531_delta.py'
+      - 'tests/test_minecraft_catalog_11531_delta.py'
+      - '.github/workflows/qualify-minecraft-catalog-11531-delta.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frozen-source-delta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Qualify strictly bounded source comparison and falsifications
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/qualify_minecraft_catalog_11531_delta.py tests/test_minecraft_catalog_11531_delta.py
+          python3 -m unittest discover -s tests -p 'test_minecraft_catalog_11531_delta.py' -v
+      - name: Fetch exact vendor revisions only; no Minecraft process
+        run: |
+          set -euo pipefail
+          python3 tools/qualify_minecraft_catalog_11531_delta.py > "$RUNNER_TEMP/catalog-11531.json"
+          python3 - "$RUNNER_TEMP/catalog-11531.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1], encoding="utf-8"))
+          assert r["classification"]=="EXACT_UPSTREAM_SOURCE_DELTA_ONLY"
+          assert r["old_source"]=="559b9fe85212c800bc6770f152a65211df137a44"
+          assert r["new_source"]=="95b0cc78e75fcd4b128f4ef2f8428034d981f7c2"
+          assert r["unchanged_runtime_input_and_compose_source"]
+          assert r["changed_shared_library_requires_render_qualification"]
+          for key in ("rendered_compose_semantics_qualified", "signed_foundry_11531_control_qualified", "native_guest_catalog_verified", "backend_world_qualified"):
+              assert r[key] is False
+          assert r["physical_true_nas_apply"]=="HOLD"
+          PY
+      - name: Retain source-only hash ledger
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minecraft-catalog-11531-source-delta
+          path: ${{ runner.temp }}/catalog-11531.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve qualifier boundary
+        run: |
+          echo 'SOURCE DELTA ONLY: shared library 2.3.16 requires independent rendered Compose qualification. No TrueNAS guest, signed exporter promotion, game or physical APPLY.' >> "$GITHUB_STEP_SUMMARY"
