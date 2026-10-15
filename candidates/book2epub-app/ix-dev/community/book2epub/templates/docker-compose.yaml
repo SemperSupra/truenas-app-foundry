@@ -18,6 +18,13 @@
 {% do worker.environment.add_env("HF_HOME", values.consts.state_path ~ "/cache/huggingface") %}
 {% do worker.environment.add_env("TORCH_HOME", values.consts.state_path ~ "/cache/torch") %}
 {% do worker.environment.add_env("TMPDIR", "/tmp") %}
+{# Persistent, editable TrueNAS app configuration; NEVER expose a bootstrap option. #}
+{% do worker.environment.add_env("BOOK2EPUB_OPERATION_MODE", values.mode.operating_mode) %}
+{% do worker.environment.add_env("BOOK2EPUB_MODEL_ADMISSION_POLICY", "preverified") %}
+{% do worker.environment.add_env("BOOK2EPUB_RESEARCH_ONLY", "1" if values.mode.operating_mode == "research" else "0") %}
+{% do worker.environment.add_env("HF_HUB_OFFLINE", "1") %}
+{% do worker.environment.add_env("TRANSFORMERS_OFFLINE", "1") %}
+{% do worker.environment.add_env("HF_DATASETS_OFFLINE", "1") %}
 {% do worker.add_port(values.network.web_port) %}
 {% if perms.has_actions() %}
   {% do worker.depends.add_dependency(values.consts.perms_container_name, "service_completed_successfully") %}
