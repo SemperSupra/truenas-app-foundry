@@ -24,4 +24,4 @@ jobs:
           python3 tools/validate_gitlab_runner_catalog_seed.py
           python3 tools/test_gitlab_runner_catalog_seed.py
       - name: Pinned upstream TrueNAS native source render (no deployment)
-        run: python3 tools/qualify_gitlab_runner_catalog_render.py
+        run: sudo -n python3 tools/qualify_gitlab_runner_catalog_render.py
