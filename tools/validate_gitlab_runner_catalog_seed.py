@@ -44,6 +44,14 @@ def check(root: Path = ROOT) -> dict:
     digest = m["manager_image"]["reference"]
     if not re.fullmatch(r"[a-z0-9][a-z0-9/._-]*@sha256:[0-9a-f]{64}", digest):
         raise SourceContractError("manager image is not digest pinned")
+    # Fleeting plugin packaging was introduced in 16.11; prevent the prior
+    # digest-compatible but obsolete GitLab Runner 14.4 regression.
+    from packaging.version import Version
+    image_version = m["manager_image"].get("version")
+    if not isinstance(image_version, str) or Version(image_version) < Version("16.11.0"):
+        raise SourceContractError("manager GitLab Runner predates Fleeting OCI support")
+    if m["manager_image"].get("state") != "PUBLIC_GHA_EXACT_DIGEST_PULL_AND_OFFLINE_CLI_PASS_ONLY":
+        raise SourceContractError("OCI provenance state is not independently verified")
     vimage = vals["images"]["image"]
     if digest != vimage["repository"] + ":" + vimage["tag"]:
         raise SourceContractError("manager image digest does not match candidate manifest")

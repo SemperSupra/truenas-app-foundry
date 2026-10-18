@@ -42,6 +42,13 @@ class GitLabRunnerSeedTests(unittest.TestCase):
         path.write_text(data)
         with self.assertRaises(SourceContractError):
             check(self.root)
+    def test_reject_obsolete_gitlab_runner(self):
+        path = self.root / "candidates/gitlab-runner-app/candidate.json"
+        m = json.loads(path.read_text())
+        m["manager_image"]["version"] = "14.4.0"
+        path.write_text(json.dumps(m))
+        with self.assertRaises(SourceContractError):
+            check(self.root)
     def test_reject_host_docker_socket(self):
         path = self.root / "candidates/gitlab-runner-app/ix-dev/community/gitlab-runner/templates/docker-compose.yaml"
         path.write_text(path.read_text() + "\n# /var/run/docker.sock\n")

@@ -1,7 +1,7 @@
 images:
   image:
     repository: gitlab/gitlab-runner@sha256
-    tag: 4a18a80f5be5df44cb7575f6b89d1fdda343297c6fd666c015c0e778b276e726
+    tag: b7dead3b57cd9e5e5d6aedc6c0736c43972af9a24aa19875c2802bc8afcd3978
 
 consts:
   runner_container_name: gitlab-runner
