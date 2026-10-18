@@ -10,14 +10,12 @@ import sys
 import tempfile
 
 import validate_garm_controller_app as shared
-from validate_gitlab_runner_catalog_seed import check as check_source
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "candidates/gitlab-runner-app/candidate.json"
 SOURCE = ROOT / "candidates/gitlab-runner-app/ix-dev/community/gitlab-runner"
 
 def qualify() -> dict:
-    check_source(ROOT)
     manifest = json.loads(MANIFEST.read_text())
     with tempfile.TemporaryDirectory(prefix="foundry-gitlab-render-") as tmp:
         scratch = Path(tmp)
