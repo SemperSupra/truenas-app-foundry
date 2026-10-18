@@ -1,0 +1,34 @@
+app_version: unqualified-source-seed
+capabilities: []
+categories:
+  - development
+changelog_url: https://gitlab.com/gitlab-org/gitlab-runner/-/releases
+date_added: '2026-10-18'
+description: Foundry-managed, unregistered GitLab Runner manager candidate; optional TrueNAS Fleeting backend pending separate qualification.
+home: https://docs.gitlab.com/runner/
+host_mounts: []
+icon: https://raw.githubusercontent.com/github/explore/main/topics/gitlab/gitlab.png
+keywords:
+  - gitlab
+  - ci
+  - runner
+  - truenas
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+  - name: SemperSupra
+    url: https://github.com/SemperSupra
+name: gitlab-runner
+run_as_context:
+  - description: Initial stock image requires root-in-container compatibility review; no host mounts, Docker socket, or elevated privileges are permitted. Non-root migration is separately gated.
+    uid: 0
+    gid: 0
+    user_name: root
+    group_name: root
+screenshots: []
+sources:
+  - https://gitlab.com/gitlab-org/gitlab-runner
+  - https://github.com/SemperSupra/truenas-app-foundry
+title: GitLab Runner (Foundry candidate)
+train: community
+version: 0.1.0

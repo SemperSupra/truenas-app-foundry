@@ -1,0 +1,17 @@
+runner:
+  concurrent: 1
+
+storage:
+  config:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: gitlab-runner-config
+      create_host_path: true
+
+ix_volumes:
+  gitlab-runner-config: /opt/tests/mnt/gitlab-runner/config
+
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
