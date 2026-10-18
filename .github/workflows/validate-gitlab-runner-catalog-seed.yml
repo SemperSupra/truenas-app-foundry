@@ -14,7 +14,7 @@ permissions:
 jobs:
   source-shape:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install public-safe YAML parser
@@ -25,3 +25,19 @@ jobs:
           python3 tools/test_gitlab_runner_catalog_seed.py
       - name: Pinned upstream TrueNAS native source render (no deployment)
         run: sudo -n python3 tools/qualify_gitlab_runner_catalog_render.py
+      - name: Verify manager image digest is registry-pullable (no GitLab or TrueNAS connection)
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(python3 - <<'PY'
+          import json
+          print(json.load(open('candidates/gitlab-runner-app/candidate.json'))['manager_image']['reference'])
+          PY
+          )"
+          case "$image" in
+            gitlab/gitlab-runner@sha256:*) ;;
+            *) echo "Reject non-digest manager image identity" >&2; exit 2 ;;
+          esac
+          docker pull "$image"
+          docker image inspect "$image" --format '{{.Id}} {{.Os}}/{{.Architecture}}'
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges=true "$image" --version
