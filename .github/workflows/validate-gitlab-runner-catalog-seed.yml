@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install public-safe YAML parser
         run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
       - name: Source-only qualification (no runner registration, no TrueNAS)
