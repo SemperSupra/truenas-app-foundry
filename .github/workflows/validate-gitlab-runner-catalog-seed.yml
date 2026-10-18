@@ -41,3 +41,18 @@ jobs:
           docker pull "$image"
           docker image inspect "$image" --format '{{.Id}} {{.Os}}/{{.Architecture}}'
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges=true "$image" --version
+
+  resolve-modern-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Resolve versioned GitLab Runner 19.5.0 image (no installation or credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="gitlab/gitlab-runner:alpine-v19.5.0"
+          docker pull "$image"
+          docker image inspect "$image" --format '{{json .RepoDigests}}'
+          docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}'
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges=true "$image" --version
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges=true "$image" fleeting --help
