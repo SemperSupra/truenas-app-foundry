@@ -54,7 +54,8 @@ class Tests(unittest.TestCase):
   def test_resource_paths_reject_traversal_and_noncanonical_spelling(self):
     for path in ("/mnt/tank/../../tmp/escape", "/mnt/tank/apps/../other",
                  "/mnt/tank//apps/probe", "/mnt/tank/./apps/probe",
-                 "/mnt/tank/apps/probe/", "/mnt/tank"):
+                 "/mnt/tank/apps/probe/", "/mnt/tank",
+                 "//mnt/tank/apps/probe", "/mnt/tank/apps/probe\x00suffix"):
       with self.subTest(path=path):
         s=spec(); s["host_resources"][0]["path"]=path
         with self.assertRaises(MOD.BindingError): MOD.bind(BASE,s)

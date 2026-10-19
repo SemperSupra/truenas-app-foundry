@@ -76,7 +76,7 @@ def validate_resource(item:Any)->dict[str,Any]:
     # Path.parts preserves '..' but silently drops '.' and repeated separators.
     # Require the supplied spelling itself to be canonical before an artifact
     # can carry it into a privileged target executor.
-    if (not p.is_absolute() or len(p.parts)<4 or p.parts[1]!="mnt"
+    if (not path.startswith("/mnt/") or not p.is_absolute() or len(p.parts)<4 or p.parts[1]!="mnt"
             or path != os.path.normpath(path) or "\x00" in path):
         raise BindingError("host resource path must be canonical beneath /mnt/<dataset>")
     kind=item.get("kind")
