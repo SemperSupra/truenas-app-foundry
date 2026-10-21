@@ -14,9 +14,9 @@
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "14535745dc3aa3c0b5466da7c704bca4d23dcec5",
+    "sha": "9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90",
     "interface_version": "v0.1.1",
-    "qualification_note": "Post-C5 realized-profile adoption hardening: public provider PR #25 merged as 14535745dc3aa3c0b5466da7c704bca4d23dcec5 after Public provider CI run 36020361192 PASS. This revision revalidates the full returned Compose/runtime profile during Get/List/adoption and classifies managed drift fail-closed before delete authority. Capacity remains one pending private HIL."
+    "qualification_note": "Runner image reuse recovery: public provider PR #50 merged as 9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90 after Public provider CI run 39543838777 PASS. Reuses image-resident /home/runner tree when version matches GARM_RUNNER_FILENAME to eliminate ~215 MB WAN download timeout, and hardens prestaged_runner_matches with [ ! -e ] and [ ! -L ] guards across credential targets to reject dangling symlinks."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -28,12 +28,12 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "911f076ba9421f7bb2a1ea72acc927327d799a5ad6265bffe2d869b2cbf5ecc2",
+    "garm_provider_truenas_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "controller_observations": []
   },
   "publication": {
-    "immutable_tag_prefix": "controller-59eeda11-provider-14535745",
+    "immutable_tag_prefix": "controller-59eeda11-provider-9b42592f",
     "mutable_alias": "mvp"
   },
-  "claim_boundary": "Qualified main source tree and appliance assembly only. Exact GARM fork main 59eeda11e81eb6247c75751521dec7a61db17f4b and accepted TrueNAS provider head 14535745dc3aa3c0b5466da7c704bca4d23dcec5. No live capacity-one recovery, physical TrueNAS promotion, capacity-two, or HIL claim. Deploy only by state-preserving TrueNAS App lifecycle against an immutable published digest and exact rollback contract."
+  "claim_boundary": "Qualified main source tree and appliance assembly only. Exact GARM fork main 59eeda11e81eb6247c75751521dec7a61db17f4b and accepted TrueNAS provider head 9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90. No live capacity-one recovery, physical TrueNAS promotion, capacity-two, or HIL claim. Deploy only by state-preserving TrueNAS App lifecycle against an immutable published digest and exact rollback contract."
 }
