@@ -73,8 +73,12 @@ def validate_resource(item:Any)->dict[str,Any]:
     if set(item)-allowed: raise BindingError("host resource has unsupported keys")
     path=str(item.get("path") or "")
     p=Path(path)
-    if not p.is_absolute() or len(p.parts)<3 or p.parts[1]!="mnt":
-        raise BindingError("host resource path must be beneath /mnt")
+    # Path.parts preserves '..' but silently drops '.' and repeated separators.
+    # Require the supplied spelling itself to be canonical before an artifact
+    # can carry it into a privileged target executor.
+    if (not path.startswith("/mnt/") or not p.is_absolute() or len(p.parts)<4 or p.parts[1]!="mnt"
+            or path != os.path.normpath(path) or "\x00" in path):
+        raise BindingError("host resource path must be canonical beneath /mnt/<dataset>")
     kind=item.get("kind")
     if kind not in {"directory","file"}: raise BindingError("host resource kind must be directory|file")
     uid=item.get("uid"); gid=item.get("gid")
