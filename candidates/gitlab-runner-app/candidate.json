@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "candidate": "gitlab-runner-truenas-app",
+  "phase": "SOURCE_SEED_NOT_ADMITTED",
+  "source_path": "candidates/gitlab-runner-app/ix-dev/community/gitlab-runner",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "manager_image": {
+    "reference": "gitlab/gitlab-runner@sha256:b7dead3b57cd9e5e5d6aedc6c0736c43972af9a24aa19875c2802bc8afcd3978",
+    "source": "https://gitlab.com/gitlab-org/gitlab-runner/-/tags/v19.5.0",
+    "state": "PUBLIC_GHA_EXACT_DIGEST_PULL_AND_OFFLINE_CLI_PASS_ONLY",
+    "version": "19.5.0",
+    "git_revision": "70f5c12d",
+    "version_floor_for_fleeting": "16.11.0",
+    "proof": "https://github.com/SemperSupra/truenas-app-foundry/actions/runs/39136278207"
+  },
+  "plugin": {
+    "name": "fleeting-plugin-truenas",
+    "source_authority": "NOT_YET_CREATED",
+    "binary_image": "NOT_BUILT",
+    "runtime_ready": false
+  },
+  "backend": {
+    "name": "truenas-apps",
+    "status": "NOT_IMPLEMENTED",
+    "max_instances": 1
+  },
+  "authority": {
+    "catalog_policy": "UPSTREAM_MANAGEMENT_API_CONFLICT",
+    "distribution": "FOUNDRY_CUSTOM_APP_ONLY_UNTIL_SEPARATELY_APPROVED",
+    "existing_garm_untouched": true
+  },
+  "gates": {
+    "source_shape": "OPEN",
+    "official_renderer": "OPEN",
+    "manager_image_pulled": "PASS",
+    "fleeting_plugin": "OPEN",
+    "foundry_lifecycle": "OPEN",
+    "gitlab_functional": "OPEN",
+    "physical_host": "NOT_AUTHORIZED",
+    "official_catalog": "NOT_ADMITTED",
+    "offline_cli_fleeting": "PASS",
+    "image_runtime_in_guest": "OPEN"
+  },
+  "claim_boundary": "Catalog-shaped, disarmed unregistered manager source seed only. No actual worker-provisioning, source-render PASS, image pull, native catalog inclusion, or TrueNAS HIL claimed."
+}

@@ -1,0 +1,11 @@
+images:
+  image:
+    repository: gitlab/gitlab-runner@sha256
+    tag: b7dead3b57cd9e5e5d6aedc6c0736c43972af9a24aa19875c2802bc8afcd3978
+
+consts:
+  runner_container_name: gitlab-runner
+  seed_container_name: gitlab-runner-config-seed
+  config_path: /etc/gitlab-runner
+  config_file: /etc/gitlab-runner/config.toml
+  seed_config_path: /seed/config.toml
