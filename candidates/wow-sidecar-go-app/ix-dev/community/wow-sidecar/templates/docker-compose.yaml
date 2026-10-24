@@ -1,0 +1,71 @@
+{% set tpl = ix_lib.base.render.Render(values) %}
+{% set perms = tpl.deps.perms(values.consts.perms_container_name) %}
+{% set worker = tpl.add_container(values.consts.worker_container_name, "image") %}
+
+{% set perms_config = {
+  "uid": values.consts.runtime_uid,
+  "gid": values.consts.runtime_gid,
+  "mode": "check",
+  "chmod": "0750"
+} %}
+{% do perms.add_or_skip_action("state", values.storage.state, perms_config) %}
+{% if perms.has_actions() %}
+  {% do perms.activate() %}
+{% endif %}
+
+{% do worker.set_user(values.consts.runtime_uid, values.consts.runtime_gid) %}
+{% do worker.set_read_only(true) %}
+{% do worker.set_init(true) %}
+{% do worker.set_grace_period(30) %}
+{% do worker.healthcheck.disable() %}
+
+{% do worker.add_storage(values.consts.state_path, values.storage.state) %}
+{% do worker.add_storage("/tmp", {"type": "tmpfs", "tmpfs_config": {"size": 64, "mode": "0700", "uid": values.consts.runtime_uid, "gid": values.consts.runtime_gid}}) %}
+
+{% do worker.environment.add_env("WOW_NODE_ID", values.wow.node_id) %}
+{% do worker.environment.add_env("WOW_LOCALITY", "sovereign") %}
+{% do worker.environment.add_env("WOW_GENERATION_STATE_FILE", values.consts.state_path ~ "/generation.json") %}
+{% do worker.environment.add_env("WOW_LISTEN_ADDR", "0.0.0.0:8080") %}
+
+{% do worker.environment.add_env("GITHUB_APP_ID", values.wow.github_app_id) %}
+{% do worker.environment.add_env("GITHUB_APP_PRIVATE_KEY_FILE", values.consts.github_app_secret_path) %}
+{% do worker.configs.add("wow-github-app-private-key", values.wow.github_app_private_key, values.consts.github_app_secret_path, "0400") %}
+
+{% do worker.environment.add_env("WOW_CONTROL_REPOSITORY", values.control.repository) %}
+{% do worker.environment.add_env("WOW_CONTROL_PROFILE", values.control.profile) %}
+{% do worker.environment.add_env("WOW_CONTROL_CAPABILITY", values.control.capability) %}
+{% do worker.environment.add_env("WOW_CONTROL_AUTHORITY_RECORD", values.control.authority_record) %}
+{% do worker.environment.add_env("WOW_CONTROL_AUTHORITY_REVISION", values.control.authority_revision) %}
+{% do worker.environment.add_env("WOW_CONTROL_POLL_SECONDS", values.control.poll_seconds) %}
+
+{% if values.rendezvous.enabled %}
+  {% do worker.environment.add_env("WOW_RENDEZVOUS_WORKSET_REF", values.rendezvous.workset_ref) %}
+  {% do worker.environment.add_env("WOW_RENDEZVOUS_DELEGATION_ID", values.rendezvous.delegation_id) %}
+  {% do worker.environment.add_env("WOW_RENDEZVOUS_LEASE_SECONDS", values.rendezvous.lease_seconds) %}
+{% endif %}
+
+{% if values.peer.urls %}
+  {% do worker.environment.add_env("WOW_PEER_URLS", values.peer.urls) %}
+  {% do worker.environment.add_env("WOW_PEER_POLL_SECONDS", values.peer.poll_seconds) %}
+{% endif %}
+
+{% set peer_rendezvous_enabled = false %}
+{% if values.peer_rendezvous.enabled and values.peer_rendezvous.credentials_json and values.peer_rendezvous.credentials_json | trim != "" %}
+  {% set peer_rendezvous_enabled = true %}
+{% endif %}
+
+{% if peer_rendezvous_enabled %}
+  {% do worker.environment.add_env("WOW_PEER_RENDEZVOUS_ENABLED", "true") %}
+  {% do worker.environment.add_env("WOW_PEER_CREDENTIALS_FILE", values.consts.peer_credentials_secret_path) %}
+  {% do worker.configs.add("wow-peer-credentials", values.peer_rendezvous.credentials_json, values.consts.peer_credentials_secret_path, "0400") %}
+  {% do worker.environment.add_env("WOW_PEER_MAX_SKEW_SECONDS", values.peer_rendezvous.max_skew_seconds) %}
+  {% do worker.environment.add_env("WOW_PEER_REPLAY_TTL_SECONDS", values.peer_rendezvous.replay_ttl_seconds) %}
+{% endif %}
+
+{% do worker.add_port(values.network.web_port) %}
+
+{% if perms.has_actions() %}
+  {% do worker.depends.add_dependency(values.consts.perms_container_name, "service_completed_successfully") %}
+{% endif %}
+
+{{ tpl.render() | tojson }}

@@ -1,0 +1,36 @@
+{
+  "result": "PASS",
+  "qualification_run": 37458833914,
+  "qualification_head": "bcb20a3915e2d01f47f31b9a5fc8f0fe1b61b637",
+  "candidate": "wow-sidecar-go-truenas-app",
+  "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d",
+  "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992",
+  "compose_sha256": "c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926",
+  "ghcr_anonymous_pull": true,
+  "services": ["permissions", "wow-sidecar"],
+  "materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "security": {
+    "wow_runtime_uid_gid": "10001:10001",
+    "wow_cap_drop_all": true,
+    "wow_no_new_privileges": true,
+    "wow_rootfs_read_only": true,
+    "github_app_secret_file_backed": true,
+    "peer_mutation_default_absent": true,
+    "host_network": false,
+    "privileged": false,
+    "runtime_socket_allowed": false,
+    "permissions_helper_scope": "ixVolume state ownership only"
+  },
+  "non_claims": [
+    "no TrueNAS runtime realization",
+    "no production credential use",
+    "no live cutover",
+    "no state migration"
+  ]
+}
