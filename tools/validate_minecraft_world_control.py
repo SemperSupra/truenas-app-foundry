@@ -16,6 +16,7 @@ PIN = ROOT / ".foundry" / "controls" / "minecraft-paper-upstream.json"
 VALUES = ROOT / ".foundry" / "controls" / "minecraft-paper-world-hostpath-values.yaml"
 VANILLA_PIN = ROOT / ".foundry/controls/minecraft-vanilla-263-11530-upstream.json"
 VANILLA_11531_PIN = ROOT / ".foundry/controls/minecraft-vanilla-263-11531-upstream.json"
+VANILLA_11533_PIN = ROOT / ".foundry/controls/minecraft-vanilla-263-11533-upstream.json"
 VANILLA_VALUES = ROOT / ".foundry/controls/minecraft-vanilla-263-world-hostpath-values.yaml"
 WORLD_SOURCE = "/opt/tests/collage-world-only"
 OWNERSHIP_ENV = {
@@ -75,9 +76,9 @@ def validate(*, pin_path=PIN, values_path=VALUES, expected_type="PAPER",
         if not shutil.which(tool):
             raise ValidationError("missing tool: "+tool)
 
-    if pin_path not in (PIN, ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json', VANILLA_PIN, VANILLA_11531_PIN):
+    if pin_path not in (PIN, ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json', VANILLA_PIN, VANILLA_11531_PIN, VANILLA_11533_PIN):
         raise ValidationError('Unadmitted pinned Minecraft catalog profile')
-    if pin_path in (VANILLA_PIN, VANILLA_11531_PIN):
+    if pin_path in (VANILLA_PIN, VANILLA_11531_PIN, VANILLA_11533_PIN):
         if (values_path != VANILLA_VALUES or expected_type != 'VANILLA'
                 or expected_version != '26.3' or expected_selector != 'j25_image'
                 or expected_world_path != '/opt/tests/collage-vanilla-263-world'):
@@ -239,20 +240,25 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--product", choices=["paper-legacy", "vanilla-263"], default="paper-legacy")
     parser.add_argument("--target-version", default="25.04.1")
-    parser.add_argument("--catalog-profile", choices=["1.15.29", "1.15.30", "1.15.31"],
+    parser.add_argument("--catalog-profile", choices=["1.15.29", "1.15.30", "1.15.31", "1.15.33"],
                         default="1.15.29")
     args=parser.parse_args()
     pin_path=(PIN if args.catalog_profile=="1.15.29" else
               ROOT / '.foundry/controls/minecraft-paper-11530-upstream.json')
     try:
         if args.product == "vanilla-263":
-            if args.target_version != "25.04.2.6" or args.catalog_profile not in ("1.15.30", "1.15.31"):
+            if args.target_version != "25.04.2.6" or args.catalog_profile not in ("1.15.30", "1.15.31", "1.15.33"):
                 raise ValidationError("vanilla 26.3 requires exact 25.04.2.6 target and pinned native catalog")
             target=json.loads((ROOT/".foundry/truenas-compatibility/25.04.2.6-materialization.json").read_text())
             if (target.get("truenas_version") != "25.04.2.6" or
                     target.get("middleware",{}).get("commit") != "244b717370fe35fb9eefc3096acfbc25f12b57b6"):
                 raise ValidationError("exact target profile drift")
-            evidence=validate(pin_path=(VANILLA_PIN if args.catalog_profile == "1.15.30" else VANILLA_11531_PIN),values_path=VANILLA_VALUES,
+            vanilla_pins = {
+                "1.15.30": VANILLA_PIN,
+                "1.15.31": VANILLA_11531_PIN,
+                "1.15.33": VANILLA_11533_PIN,
+            }
+            evidence=validate(pin_path=vanilla_pins[args.catalog_profile],values_path=VANILLA_VALUES,
                 expected_type="VANILLA", expected_version="26.3",
                 expected_selector="j25_image",
                 expected_world_path="/opt/tests/collage-vanilla-263-world",
