@@ -45,7 +45,6 @@
     "config_mount_read_only_for_worker": true,
     "state_storage": "ix_volume",
     "state_mount": "/var/lib/wow-sidecar",
-    "root_filesystem_read_only": true,
     "temporary_filesystem": "/tmp",
     "runtime_uid": 10001,
     "runtime_gid": 10001,
@@ -59,7 +58,13 @@
     "host_paths_allowed": false,
     "container_runtime_socket_allowed": false,
     "config_seed": "create-once; preserve initialized config; fail on partial state",
-    "permissions_helper_scope": "ixVolume ownership only"
+    "permissions_helper_scope": "ixVolume ownership only",
+    "worker_root_filesystem_read_only": true,
+    "seed_root_filesystem_writable_for_inline_configs": true,
+    "seed_rootfs_exception_scope": "one-shot non-root network-disabled cap-drop-all no-new-privileges helper only",
+    "seed_inline_config_mode": "0444",
+    "persisted_managed_config_mode": "0400",
+    "seed_inline_config_scope": "ephemeral one-shot network-disabled seed inputs only"
   },
   "gates": {
     "public_source_qualified": true,
@@ -69,8 +74,8 @@
     "state_preserving_cutover_qualified": false,
     "hil_eligible": true
   },
-  "claim_boundary": "Published image plus public TrueNAS App render/runtime qualification are accepted. Private TrueNAS HIL, state-preserving migration/cutover, rollback, and the separately privileged GARM integration remain outside this claim.",
-  "public_render_evidence": {
+  "claim_boundary": "Published WOW image plus corrected public TrueNAS App render/runtime qualification are accepted. Private TrueNAS HIL, state-preserving migration/cutover, rollback, and privileged GARM integration remain outside this claim.",
+  "superseded_public_render_evidence": {
     "result": "PASS",
     "run": 36550143870,
     "qualified_head": "c5aa14ac85482cc093c1e1283b7c8e969d805f0e",
@@ -80,5 +85,38 @@
     "materializer_commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
     "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376",
     "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
+  },
+  "render_falsification": {
+    "result": "FAIL",
+    "run": 36791533322,
+    "boundary": "full-compose-orchestration",
+    "detail": "Docker Compose rejects inline-content configs on read_only seed service; previous seed-script replay did not exercise this full-graph constraint."
+  },
+  "render_falsification_followup": {
+    "result": "FAIL",
+    "run": 36792356264,
+    "boundary": "full-compose-seed-input-permissions",
+    "detail": "After correcting the read-only seed rootfs, Docker Compose materialized inline configs root-owned mode 0400; non-root UID 10001 seed could not read /seed/github-app.pem. Ephemeral seed input configs require 0444; persisted managed copies remain 0400."
+  },
+  "public_render_evidence": {
+    "schema": "wow-sidecar-public-app-qualification/v2",
+    "result": "PASS",
+    "run": 36793252392,
+    "qualified_head": "6c4c20efe98048bc496e68894f249a2a227b92c6",
+    "compose_sha256": "dbf3820f5e06e738f27a31f795dfa025054345f9bf26c97c20778eed436e5ef3",
+    "ghcr_anonymous_pull": true,
+    "seed_behavior": "PASS:create-once/preserve/fail-partial",
+    "full_compose_behavior": "PASS:permissions/seed/worker",
+    "materializer_commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "wow_image": "ghcr.io/sempersupra/wow-sidecar@sha256:6b700ce7ba5ae44116b240ccbb54fb3b60dc952a9b4072ca1314b6f311bc5376",
+    "permissions_helper": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992",
+    "worker_rootfs_read_only": true,
+    "seed_rootfs_read_only": false,
+    "seed_inline_config_mode": "0444",
+    "persisted_managed_config_mode": "0400",
+    "corrects_falsifier_runs": [
+      36791533322,
+      36792356264
+    ]
   }
 }
