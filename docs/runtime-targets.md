@@ -82,6 +82,10 @@ Future work should remain demand-driven, but the likely cost/benefit order is:
 3. **k3s/Kubernetes** — high-value if a concrete cluster consumer emerges, but requires a real semantic adapter rather than syntax conversion.
 4. **Nomad or nerdctl/containerd** — only when a concrete deployment need justifies the maintenance burden.
 
+## Shared identity integration
+
+The proposed shared TrueNAS local-account source is specified in [truenas-identity-source.md](truenas-identity-source.md). It is a TrueNAS target-profile capability to qualify, not a portable core dependency or a current runtime claim. Other runtime targets use standard OIDC until their own host-account adapter is qualified.
+
 ## Non-claims
 
 The presence of a runtime in this roadmap does not mean it is supported.
