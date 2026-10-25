@@ -6,9 +6,9 @@ Status: source architecture for qualification. No TrueNAS local-account federati
 
 Several Foundry source applications need to let named TrueNAS accounts sign in without giving ordinary application users NAS administration rights. A reusable TrueNAS account source should authenticate the account once through a qualified TrueNAS mechanism and supply identity to an established IdM. Each application consumes a standard OIDC identity and owns its own roles, object permissions and accounting. The Foundry does not become a password database, a token issuer or a universal authorization service.
 
-TrueNAS 25.04 is a client of Active Directory or LDAP. It does not expose its local user database as a general OIDC or LDAP identity provider. Middleware `auth.login_ex` is suitable for accounts granted middleware privileges, but its privilege gate prevents using it as a general local SMB-user verifier. An ordinary application's user must never receive TrueNAS WebUI/API privileges as a login workaround. The official TrueNAS Apps catalog offers Authentik and Authelia on its Community train as OIDC IdM candidates; neither automatically verifies TrueNAS local accounts. A `pam_authelia` module authenticates a host *against* Authelia and does not solve this source direction.
+TrueNAS 25.04 is a client of Active Directory or LDAP. It does not expose its local user database as a general OIDC or LDAP identity provider. Middleware `auth.login_ex` is suitable for accounts granted middleware privileges, but its privilege gate prevents using it as a general local SMB-user verifier. An ordinary application's user must never receive TrueNAS WebUI/API privileges as a login workaround. The official TrueNAS Apps catalog offers Keycloak, Authentik and Authelia on its Community train as OIDC IdM candidates; none automatically verifies TrueNAS local accounts. Keycloak documents a User Storage SPI for external user and credential stores, making it the first extension point to evaluate. This is a candidate, not a ready TrueNAS provider. A `pam_authelia` module authenticates a host *against* Authelia and does not solve this source direction.
 
-Authentik's documented Password stage supports its own database, LDAP-backed passwords and Kerberos-backed passwords; a generic host-PAM source is not listed. Therefore Authentik must not be described as a ready TrueNAS-local-account bridge. Its exact extensibility and maintenance burden are part of source discovery.
+Keycloak provider packaging in the exact catalog App and its User Storage SPI compatibility must be proved before implementation. Authentik's documented Password stage supports its own database, LDAP-backed passwords and Kerberos-backed passwords; a generic host-PAM source is not listed. Therefore Authentik must not be described as a ready TrueNAS-local-account bridge. Its exact extensibility and maintenance burden are part of source discovery.
 
 A site already using an external AD/LDAP identity authority can connect its established OIDC IdM to that authority. That is a distinct route from verifying TrueNAS-local accounts. TrueNAS 25.04 LDAP clients cannot use LDAP authentication for SMB.
 
@@ -24,7 +24,7 @@ flowchart LR
   App --> Audit[Application audit journal]
 ```
 
-The verifier is a target-specific adapter, not an OIDC issuer. Before any implementation is chosen, prove that the selected IdM has a maintained integration point that can consume an external credential verdict. If it does not, evaluate another established IdM or a separately qualified minimal bridge. Do not silently substitute a new bespoke IdM.
+The verifier is a target-specific adapter, not an OIDC issuer. Before any implementation is chosen, prove that the selected IdM has a maintained integration point that can consume an external credential verdict. If it does not, evaluate another established IdM or a separately qualified minimal bridge. The initial candidate is a Keycloak User Storage SPI provider that delegates only credential/account verification to a protected TrueNAS-local mechanism; Keycloak remains the OIDC issuer. Do not silently substitute a new bespoke IdM.
 
 Minimum verifier output, only after successful authentication and account-status checks:
 
@@ -56,6 +56,8 @@ FolioRelay and other apps must keep OIDC integration independent of TrueNAS. Doc
 
 - [TrueNAS 25.04 directory services](https://www.truenas.com/docs/scale/25.04/scaletutorials/credentials/directoryservices/)
 - [TrueNAS 25.04 LDAP and SMB limitation](https://www.truenas.com/docs/scale/25.04/scaletutorials/credentials/directoryservices/configldapscale/)
+- [TrueNAS Apps Market: Keycloak](https://apps.truenas.com/catalog/keycloak_community/)
+- [Keycloak User Storage SPI](https://www.keycloak.org/docs/26.4.7/server_development/#_user-storage-spi)
 - [TrueNAS Apps Market: Authentik](https://apps.truenas.com/catalog/authentik_community/)
 - [TrueNAS Apps Market: Authelia](https://apps.truenas.com/catalog/authelia_community/)
 - [Authelia PAM integration direction](https://www.authelia.com/integration/guides/pam-authelia/)
