@@ -1,0 +1,211 @@
+name: Qualify LiteLLM MVP
+
+on:
+  pull_request:
+    paths:
+      - 'appliances/litellm/**'
+      - 'contracts/litellm/**'
+      - 'candidates/litellm-app/**'
+      - 'docs/litellm-score-fit-gap.md'
+      - 'tools/validate_litellm_candidate.py'
+      - 'tests/test_litellm_candidate.py'
+      - '.github/workflows/qualify-litellm-mvp.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'appliances/litellm/**'
+      - 'contracts/litellm/**'
+      - 'candidates/litellm-app/**'
+      - 'docs/litellm-score-fit-gap.md'
+      - 'tools/validate_litellm_candidate.py'
+      - 'tests/test_litellm_candidate.py'
+      - '.github/workflows/qualify-litellm-mvp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRUENAS_APPS_COMMIT: 4df7498747aad81b1049135539c65c383e42df95
+  TRUENAS_VALIDATOR: ghcr.io/truenas/apps_validation@sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c
+
+jobs:
+  source:
+    name: Source and runtime qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact public source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Validate authoritative source consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_litellm_candidate.py
+          python3 -m unittest -v tests.test_litellm_candidate
+          bash -n appliances/litellm/semper-entrypoint.sh
+
+      - name: Build exact public-source appliance
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -t semper-litellm:source-ci appliances/litellm
+
+      - name: Runtime smoke and secret-boundary check
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cid=""
+          cleanup() {
+            [[ -z "$cid" ]] || docker rm -f "$cid" >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+          }
+          trap cleanup EXIT
+          mkdir -p "$tmp/config" "$tmp/secrets"
+          cat >"$tmp/config/proxy_server_config.yaml" <<'YAML'
+          model_list:
+            - model_name: fixture
+              litellm_params:
+                model: openai/gpt-4o-mini
+                api_key: os.environ/TEST_PROVIDER_KEY
+          litellm_settings:
+            drop_params: true
+          YAML
+          printf '%s\n' fixture-provider-token >"$tmp/secrets/TEST_PROVIDER_KEY"
+          chmod 0400 "$tmp/secrets/TEST_PROVIDER_KEY"
+
+          cid="$(docker run -d \
+            -p 127.0.0.1:14000:4000 \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            semper-litellm:source-ci)"
+
+          ready=false
+          for _ in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:14000/health/liveliness >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            if ! docker inspect "$cid" --format '{{.State.Running}}' | grep -qx true; then
+              docker logs "$cid"
+              exit 1
+            fi
+            sleep 2
+          done
+          [[ "$ready" == true ]]
+          docker exec "$cid" python -c "data=open('/proc/1/environ','rb').read().split(b'\\0'); assert b'TEST_PROVIDER_KEY=fixture-provider-token' in data"
+          ! docker inspect "$cid" | grep -q 'fixture-provider-token'
+          ! docker history --no-trunc semper-litellm:source-ci | grep -q 'fixture-provider-token'
+
+  truenas:
+    name: Official TrueNAS source/render qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact public source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Reconcile candidate target identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=candidates/litellm-app/candidate.json
+          [[ "$(jq -r '.source_materializer.commit' "$candidate")" == "$TRUENAS_APPS_COMMIT" ]]
+          [[ "$(jq -r '.qualification.truenas_validator_digest' "$candidate")" == "${TRUENAS_VALIDATOR##*@}" ]]
+          echo "APPLIANCE_IMAGE=$(jq -r '.appliance.reference' "$candidate")" >> "$GITHUB_ENV"
+
+      - name: Materialize pinned TrueNAS Apps source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init /tmp/apps
+          git -C /tmp/apps remote add origin https://github.com/truenas/apps.git
+          git -C /tmp/apps fetch --depth=1 origin "$TRUENAS_APPS_COMMIT"
+          git -C /tmp/apps checkout -b master FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$TRUENAS_APPS_COMMIT" ]]
+          mkdir -p /tmp/apps/ix-dev/community/litellm
+          cp -a candidates/litellm-app/ix-dev/community/litellm/. /tmp/apps/ix-dev/community/litellm/
+
+          app_yaml=/tmp/apps/ix-dev/community/litellm/app.yaml
+          lib_version="$(awk '$1 == "lib_version:" {print $2; exit}' "$app_yaml")"
+          lib_hash="$(awk '$1 == "lib_version_hash:" {print $2; exit}' "$app_yaml")"
+          base_dir="base_v${lib_version//./_}"
+          dest="/tmp/apps/ix-dev/community/litellm/templates/library/$base_dir"
+
+          if [[ ! -d "$dest" ]]; then
+            source_dir=""
+            while IFS= read -r candidate_dir; do
+              candidate_hash="$(find "$candidate_dir" -type f -exec sha256sum {} + | sort | awk '{print $1}' | sha256sum | awk '{print $1}')"
+              [[ "$candidate_hash" == "$lib_hash" ]] || continue
+              source_dir="$candidate_dir"
+              break
+            done < <(find /tmp/apps/ix-dev -type d -path "*/templates/library/$base_dir" | sort)
+            [[ -n "$source_dir" ]]
+            mkdir -p "$(dirname "$dest")"
+            cp -a "$source_dir" "$dest"
+          fi
+
+          actual_lib_hash="$(find "$dest" -type f -exec sha256sum {} + | sort | awk '{print $1}' | sha256sum | awk '{print $1}')"
+          [[ "$actual_lib_hash" == "$lib_hash" ]]
+          git -C /tmp/apps add -N ix-dev/community/litellm
+          git -C /tmp/apps diff --name-only master | grep -q '^ix-dev/community/litellm/'
+
+      - name: Run pinned official TrueNAS validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$TRUENAS_VALIDATOR"
+          ref="$(docker image inspect "$TRUENAS_VALIDATOR" --format '{{index .RepoDigests 0}}')"
+          [[ "${ref##*@}" == "${TRUENAS_VALIDATOR##*@}" ]]
+          mkdir -p /tmp/validator-home
+          printf '[safe]\n\tdirectory = /workspace\n' > /tmp/validator-home/.gitconfig
+          docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
+            -e HOME=/validator-home \
+            -v /tmp/validator-home:/validator-home:ro \
+            -v /tmp/apps:/workspace \
+            "$TRUENAS_VALIDATOR" \
+            apps_dev_charts_validate validate --path /workspace --base_branch master
+
+      - name: Run official render path and assert result
+        working-directory: /tmp/apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$TRUENAS_VALIDATOR" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path('.github/scripts/ci.py')
+          s=p.read_text(encoding='utf-8')
+          old='CONTAINER_IMAGE = "ghcr.io/truenas/apps_validation:latest"'
+          new='CONTAINER_IMAGE = ' + repr(sys.argv[1])
+          if old not in s:
+              raise SystemExit('official ci.py validator constant changed')
+          p.write_text(s.replace(old,new),encoding='utf-8')
+          PY
+          python3 ./.github/scripts/ci.py \
+            --train community \
+            --app litellm \
+            --test-file basic-values.yaml \
+            --render-only=true > /tmp/rendered.yaml
+          docker compose -f /tmp/rendered.yaml config --format json >/tmp/rendered.json
+          python3 - "$APPLIANCE_IMAGE" <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/rendered.json',encoding='utf-8'))
+          services=data.get('services') or {}
+          assert len(services)==1, services.keys()
+          service=next(iter(services.values()))
+          assert service.get('image') == sys.argv[1], service.get('image')
+          vols=service.get('volumes') or []
+          assert any(v.get('target') == '/config' and v.get('read_only') is True for v in vols), vols
+          assert any(v.get('target') == '/run/secrets/semper-env' and v.get('read_only') is True for v in vols), vols
+          env=service.get('environment') or {}
+          assert env.get('SEMPER_SECRET_DIR') == '/run/secrets/semper-env', env
+          assert 'OPENROUTER_MANAGEMENT_KEY' not in json.dumps(data)
+          PY

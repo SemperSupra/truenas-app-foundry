@@ -1,0 +1,86 @@
+name: Materialize TrueNAS catalog candidate
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/**'
+      - 'tools/materialize_truenas_catalog_app.sh'
+      - '.github/workflows/materialize-truenas-catalog-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/**'
+      - 'tools/materialize_truenas_catalog_app.sh'
+      - '.github/workflows/materialize-truenas-catalog-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRUENAS_APPS_COMMIT: 4df7498747aad81b1049135539c65c383e42df95
+  TRUENAS_VALIDATOR: ghcr.io/truenas/apps_validation@sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact public source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Validate wrapper syntax
+        run: bash -n tools/materialize_truenas_catalog_app.sh
+
+      - name: Materialize twice
+        id: materialize
+        shell: bash
+        run: |
+          set -euo pipefail
+          epoch="$(git show -s --format=%ct HEAD)"
+          for n in 1 2; do
+            bash tools/materialize_truenas_catalog_app.sh \
+              --source candidates/litellm-app/ix-dev/community/litellm \
+              --train community \
+              --app litellm \
+              --apps-commit "$TRUENAS_APPS_COMMIT" \
+              --validator "$TRUENAS_VALIDATOR" \
+              --source-date-epoch "$epoch" \
+              --output "/tmp/materialized-$n"
+          done
+          diff -ruN /tmp/materialized-1 /tmp/materialized-2
+          cp -a /tmp/materialized-1 ./litellm-runtime-catalog
+          echo "source_date_epoch=$epoch" >> "$GITHUB_OUTPUT"
+
+      - name: Verify bounded runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt=litellm-runtime-catalog/materialization.json
+          jq -e '.status == "PASS"' "$receipt" >/dev/null
+          jq -e '.app == "litellm" and .train == "community" and .version == "0.1.0"' "$receipt" >/dev/null
+          jq -e '.lib_version == "2.3.11"' "$receipt" >/dev/null
+          jq -e '.lib_version_hash == "874636814efb275e5276ea9d709b7cd665fed42bb1d50328e853d9253a2e1229"' "$receipt" >/dev/null
+          jq -e '.secrets_captured == false' "$receipt" >/dev/null
+          test -f litellm-runtime-catalog/catalog-entry.json
+          test -d litellm-runtime-catalog/trains/community/litellm/0.1.0
+          ! grep -R -E 'sk-or-(v1|mgmt)-|OPENROUTER_MANAGEMENT_KEY=' litellm-runtime-catalog
+
+      - name: Emit receipt
+        shell: bash
+        run: |
+          {
+            echo '### TrueNAS runtime catalog materialization'
+            echo
+            cat litellm-runtime-catalog/materialization.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain generated runtime artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: litellm-runtime-catalog
+          path: litellm-runtime-catalog
+          if-no-files-found: error
+          retention-days: 14
