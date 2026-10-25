@@ -1,0 +1,24 @@
+schema_version: 1
+profile: gateway-minimal
+image_policy:
+  moving_tags_allowed: false
+  upstream_signature_required: true
+  derivative_digest_required: true
+secret_policy:
+  minimum_tier: S1
+  management_credentials_allowed: false
+  durable_plaintext_in_generated_artifacts_allowed: false
+health:
+  liveness: /health/liveliness
+  readiness: /health/readiness
+rollback:
+  previous_app_retained_until_post_cutover_acceptance: true
+  config_snapshot_required_before_cutover: true
+qualification:
+  required_before_local_canary:
+    - contract
+    - catalog-static-render
+    - disposable-runtime
+  required_before_semper_catalog_ready:
+    - local-truenas-hil
+  repeat_apply_must_be_noop: true
