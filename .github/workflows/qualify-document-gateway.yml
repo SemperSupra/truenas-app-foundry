@@ -1,0 +1,67 @@
+name: Qualify Document Gateway
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/document-gateway-app/**'
+      - 'tools/validate_document_gateway_app.py'
+      - '.github/workflows/qualify-document-gateway.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/document-gateway-app/**'
+      - 'tools/validate_document_gateway_app.py'
+      - '.github/workflows/qualify-document-gateway.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: document-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Source render + runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout public Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify free-tier runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+
+      - name: Install validator dependency
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+
+      - name: Render and qualify Document Gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/validate_document_gateway_app.py \
+            --evidence document-gateway-evidence.json
+
+      - name: Publish sanitized qualification summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Document Gateway public qualification'
+            if [[ -f document-gateway-evidence.json ]]; then
+              echo '```json'
+              cat document-gateway-evidence.json
+              echo '```'
+            else
+              echo 'No PASS evidence file was produced; inspect the failed validation step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
