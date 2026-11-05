@@ -1,0 +1,45 @@
+name: Foundry Catalog real-source authenticated HTTP integration
+on:
+  pull_request:
+    paths:
+      - 'tests/test_foundry_catalog_http_real_sources.py'
+      - 'tools/foundry_catalog_read_http.py'
+      - 'tools/foundry_catalog_real_three_source.py'
+      - '.github/workflows/qualify-foundry-catalog-http-real-sources.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-catalog-http-real-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live-read-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exact TrueNAS official source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: truenas/apps
+          ref: 532236882212e8c5e51d5b49cfe2c6ce3dd5675e
+          path: official-apps
+          sparse-checkout: ix-dev/community/jellyfin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Exact independent third-party source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: codefuturist/truenas-apps
+          ref: 040a69450ff07f6b1ba92ea11e2f07f222f9fc4e
+          path: external-apps
+          sparse-checkout: ix-dev/community/jellyfin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Run live authenticated API against all three pinned source trees
+        env:
+          FOUNDRY_OFFICIAL_CHECKOUT: official-apps
+          FOUNDRY_EXTERNAL_CHECKOUT: external-apps
+        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog_http_real_sources.py' -v
