@@ -6,16 +6,17 @@
   },
   "controller": {
     "repository": "https://github.com/SemperSupra/garm.git",
-    "sha": "8a72cb23deacc712786945ac5e7ee63f8b4976d6",
-    "version_label": "v0.2.1-semper.8a72cb23",
-    "qualification_run": 35420114185,
-    "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names"
+    "sha": "59eeda11e81eb6247c75751521dec7a61db17f4b",
+    "version_label": "v0.2.1-semper.59eeda11",
+    "qualification_run": null,
+    "byte_reproducibility": "deferred to Foundry issue #18 because the pinned SvelteKit build emits different content-hashed asset names",
+    "qualification_note": "GARM fork PR #15 merged to main as 59eeda11e81eb6247c75751521dec7a61db17f4b; merge tree equals race-tested PR #14 head c2186af1f8bd5df0d9e2888f5f42f0728e26d60c. Full local Go race suite and isolated appliance validation PASS on that exact tree. Hosted Foundry qualification, published digest, physical HIL and capacity-one recovery remain separate gates."
   },
   "truenas_provider": {
     "repository": "https://github.com/SemperSupra/garm-provider-truenas.git",
-    "sha": "6a28ea5c614dce67efb16ca004271ff01e9bff61",
+    "sha": "9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90",
     "interface_version": "v0.1.1",
-    "qualification_note": "Stage 5 C5 Compose-interpolation remediation candidate: public provider PR #24 qualified exact source 87cd5bf72c2ba8b29c786f7733a8eb0161cf2d70 in Public provider CI run 35308305880 PASS and merged as 6a28ea5c614dce67efb16ca004271ff01e9bff61; escapes Compose-layer dollars so the unchanged bootstrap shell program expands runner variables only inside the container; Foundry discovery build run 35308872538 established deterministic provider binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935."
+    "qualification_note": "Runner image reuse recovery: public provider PR #50 merged as 9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90 after Public provider CI run 39543838777 PASS. Reuses image-resident /home/runner tree when version matches GARM_RUNNER_FILENAME to eliminate ~215 MB WAN download timeout, and hardens prestaged_runner_matches with [ ! -e ] and [ ! -L ] guards across credential targets to reject dangling symlinks."
   },
   "stock_provider_artifact": {
     "profile": ".foundry/garm-appliance/upstream-v0.2.1.json",
@@ -27,12 +28,12 @@
     "golang": "docker.io/golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1"
   },
   "expected_binaries": {
-    "garm_provider_truenas_sha256": "3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935",
+    "garm_provider_truenas_sha256": "de850cf071213f955844f0dc1fb978a7e33094534e6328fb2f05539a6a49f07b",
     "controller_observations": []
   },
   "publication": {
-    "immutable_tag_prefix": "controller-8a72cb23-provider-6a28ea5c",
+    "immutable_tag_prefix": "controller-59eeda11-provider-9b42592f",
     "mutable_alias": "mvp"
   },
-  "claim_boundary": "MVP controller image assembly only. Controller identity is exact qualified merged source/build inputs plus published image digest/provenance, not byte-reproducible /bin/garm. TrueNAS provider remains exact source 6a28ea5c614dce67efb16ca004271ff01e9bff61 with reproducible binary SHA-256 3f6de996ef4f0509ccb64ae3b5406219cdd705747b6ce2b6382cba6d0d6dd935. Stock provider binaries are inherited from an immutable upstream artifact for speed, not adopted as a permanent byte-identity requirement. No TrueNAS catalog or HIL claim."
+  "claim_boundary": "Qualified main source tree and appliance assembly only. Exact GARM fork main 59eeda11e81eb6247c75751521dec7a61db17f4b and accepted TrueNAS provider head 9b42592fdf9b1d9b9b9a4f153805b0dfea5bbb90. No live capacity-one recovery, physical TrueNAS promotion, capacity-two, or HIL claim. Deploy only by state-preserving TrueNAS App lifecycle against an immutable published digest and exact rollback contract."
 }

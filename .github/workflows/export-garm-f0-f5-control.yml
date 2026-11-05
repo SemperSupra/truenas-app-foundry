@@ -1,0 +1,140 @@
+name: Export GARM TrueNAS F0-F5 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+      target_version:
+        description: Exact admitted TrueNAS target version
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact Foundry commit; blank uses this workflow commit
+        required: false
+        type: string
+      target_version:
+        description: Exact admitted TrueNAS target version
+        required: true
+        type: choice
+        options:
+          - "25.04.1"
+          - "25.04.2.6"
+          - "25.10.7"
+          - "26.0.0-BETA.3"
+  pull_request:
+    paths:
+      - ".github/workflows/export-garm-f0-f5-control.yml"
+      - "tools/export_garm_f0_f5_control.py"
+      - "tests/test_export_garm_f0_f5_control.py"
+      - "candidates/garm-controller-app/**"
+      - ".foundry/truenas-compatibility/*-materialization.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: garm-f0-f5-control-${{ github.ref }}-${{ inputs.target_version || '26.0.0-BETA.3' }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Resolve exact inputs
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+          REQUESTED_TARGET: ${{ inputs.target_version }}
+          EVENT_TARGET: ${{ github.event.inputs.target_version }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          [[ -n "$ref" ]] || ref="$GITHUB_SHA"
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          target="${REQUESTED_TARGET:-${EVENT_TARGET:-26.0.0-BETA.3}}"
+          case "$target" in
+            25.04.1|25.04.2.6|25.10.7|26.0.0-BETA.3) ;;
+            *) echo "unsupported target: $target" >&2; exit 2 ;;
+          esac
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact Foundry source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Validate producer contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tests/test_export_garm_f0_f5_control.py
+          python3 -m py_compile tools/export_garm_f0_f5_control.py
+
+      - name: Resolve exact GARM appliance identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(jq -r '.appliance.reference' candidates/garm-controller-app/candidate.json)"
+          [[ "$image" == ghcr.io/sempersupra/garm-appliance@sha256:* ]]
+          docker pull "$image" >/dev/null
+
+      - name: Export exact-target public-safe control
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/export_garm_f0_f5_control.py             --foundry-ref "${{ steps.source.outputs.ref }}"             --target-version "${{ steps.source.outputs.target }}"             --output /tmp/garm-f0-f5-control             | tee /tmp/garm-f0-f5-export.json
+
+          jq -e --arg target "${{ steps.source.outputs.target }}" '
+            .schema == "semper-supra.garm-truenas-f0-f5-control/1" and
+            .target.truenas_version == $target and
+            .target.expected_system_version == ("TrueNAS-" + $target) and
+            .private_secrets_captured == false and
+            .fixture_secret_values_retained == false and
+            .github_credentials_present == false and
+            .runtime.app_name == "rdte-t6-garm" and
+            .runtime.config_root == "/mnt/rdtepool/garm-t6/config"
+          ' /tmp/garm-f0-f5-control/control.json >/dev/null
+
+          test -s /tmp/garm-f0-f5-control/compose.json
+          test -s /tmp/garm-f0-f5-control/deployment.json
+          ! grep -R -q -- 'BEGIN PRIVATE KEY\|PRIVATE-QUALIFICATION-FIXTURE\|PUBLIC-QUALIFICATION-FIXTURE' /tmp/garm-f0-f5-control
+          grep -q '__EPHEMERAL_NESTED_GARM_CONFIG__' /tmp/garm-f0-f5-control/compose.json
+          grep -q '__EPHEMERAL_NESTED_TLS__' /tmp/garm-f0-f5-control/compose.json
+
+      - name: Upload exact GARM F0-F5 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: garm-truenas-f0-f5-control
+          path: /tmp/garm-f0-f5-control/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record public-safe export evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### GARM TrueNAS F0-F5 control export"
+            echo
+            echo "Foundry source: ${{ steps.source.outputs.ref }}"
+            echo "TrueNAS target: ${{ steps.source.outputs.target }}"
+            if [[ -f /tmp/garm-f0-f5-control/control.json ]]; then
+              echo "Profile: $(jq -r '.target.profile_id' /tmp/garm-f0-f5-control/control.json)"
+              echo "Profile blob: $(jq -r '.target.profile_git_blob_sha' /tmp/garm-f0-f5-control/control.json)"
+              echo "Appliance: $(jq -r '.appliance_reference' /tmp/garm-f0-f5-control/control.json)"
+              echo "Private secrets captured: $(jq -r '.private_secrets_captured' /tmp/garm-f0-f5-control/control.json)"
+            else
+              echo "Control bundle: not produced"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

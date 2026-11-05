@@ -20,6 +20,15 @@
       "app": "ntfy",
       "test_file": "https-values.yaml",
       "primary_service": "ntfy"
+    },
+    {
+      "app": "element-web",
+      "test_file": "basic-values.yaml",
+      "primary_service": "element-web",
+      "runtime_safe": true,
+      "qualification_role": "t6-live-stateless-control",
+      "runtime_app_name": "rdte-t6-element-web",
+      "runtime_host_port": 32080
     }
   ]
 }

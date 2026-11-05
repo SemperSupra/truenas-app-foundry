@@ -1,0 +1,109 @@
+name: Export NEW native vanilla263 1.15.33 source-only candidate
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        type: string
+        required: true
+      target_version:
+        type: string
+        required: true
+  pull_request:
+    paths:
+      - 'tools/export_minecraft_vanilla_263_11533_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11533_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11533_callable.py'
+      - '.foundry/controls/minecraft-vanilla-263-11533-upstream.json'
+      - 'tools/qualify_minecraft_catalog_11533_render.py'
+      - '.github/workflows/export-minecraft-vanilla-263-11533-t6-control.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/export_minecraft_vanilla_263_11533_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11533_t6_control.py'
+      - 'tests/test_export_minecraft_vanilla_263_11533_callable.py'
+      - '.foundry/controls/minecraft-vanilla-263-11533-upstream.json'
+      - 'tools/qualify_minecraft_catalog_11533_render.py'
+      - '.github/workflows/export-minecraft-vanilla-263-11533-t6-control.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-11533-export:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 29
+    steps:
+      - name: Bind immutable qualified Foundry source
+        id: src
+        env:
+          REQUEST_REF: ${{ inputs.foundry_ref }}
+          REQUEST_TARGET: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          ref="${REQUEST_REF:-$GITHUB_SHA}"
+          target="${REQUEST_TARGET:-25.04.2.6}"
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          test "$target" = '25.04.2.6'
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout exact public Foundry source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.src.outputs.ref }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Refuse unpinned reusable-source checkout
+        env:
+          EXPECTED_REF: ${{ steps.src.outputs.ref }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
+      - name: Test new versioned export policy independently
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/export_minecraft_vanilla_263_11533_t6_control.py
+          python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_11533_t6_control.py' -v
+          python3 -m unittest discover -s tests -p 'test_export_minecraft_vanilla_263_11533_callable.py' -v
+      - name: First qualify actual 1.15.31 and 1.15.33 vendor render parity
+        run: |
+          set -euo pipefail
+          python3 tools/qualify_minecraft_catalog_11533_render.py > "$RUNNER_TEMP/minecraft-11533-render-parity.json"
+          python3 - "$RUNNER_TEMP/minecraft-11533-render-parity.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert r["classification"]=="SOURCE_RENDER_CANONICAL_COMPOSE_IDENTICAL"
+          assert r["runtime_guest_qualified"] is False
+          PY
+      - name: Re-render new exact source and export source control without guest
+        run: |
+          set -euo pipefail
+          python3 tools/validate_minecraft_world_control.py --product vanilla-263 --catalog-profile 1.15.33 --target-version 25.04.2.6 > "$RUNNER_TEMP/minecraft-11533-source.json"
+          test -f "$RUNNER_TEMP/minecraft-11533-source.json"
+          ref="$(git rev-parse HEAD)"
+          test "$ref" = "${{ steps.src.outputs.ref }}"
+          mkdir -p "$RUNNER_TEMP/native-11533-control"
+          python3 tools/export_minecraft_vanilla_263_11533_t6_control.py --foundry-ref "$ref" --target-version 25.04.2.6 --source-evidence "$RUNNER_TEMP/minecraft-11533-source.json" --out "$RUNNER_TEMP/native-11533-control/control.json"
+          python3 - "$RUNNER_TEMP/native-11533-control/control.json" "$ref" <<'PY'
+          import json,hashlib,sys
+          c=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert c["foundry_ref"]==sys.argv[2]
+          assert c["source"]["catalog_version"]=="1.15.33"
+          assert c["source"]["library_version"]=="2.3.17"
+          assert c["runtime"]["catalog_version_candidate"]=="1.15.33"
+          assert c["source"]["image_reference"].endswith("@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da")
+          assert not c["evidence"]["native_guest_created"]
+          assert c["physical_truenas_apply"]=="HOLD"
+          declared=c.pop("control_sha256")
+          assert hashlib.sha256(json.dumps(c,sort_keys=True,separators=(",",":")).encode()).hexdigest()==declared
+          PY
+      - name: Upload exact Foundry source-bound consumer control.json
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minecraft-vanilla263-truenas-250426-11533-signed-source-candidate
+          path: ${{ runner.temp }}/native-11533-control/control.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve nonclaim
+        if: always()
+        run: echo 'SOURCE-only, immutable public 1.15.33 exporter candidate. No guest acceptance, COLLAGE mutation authorization or physical TrueNAS APPLY.' >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,33 @@
+name: Validate generic TrueNAS site binding
+on:
+  pull_request:
+    paths:
+      - "tools/bind_truenas_site.py"
+      - "tools/test_bind_truenas_site.py"
+      - "tools/package_truenas_deployment_artifact.py"
+      - ".github/workflows/validate-generic-site-binding.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/bind_truenas_site.py"
+      - "tools/test_bind_truenas_site.py"
+      - "tools/package_truenas_deployment_artifact.py"
+      - ".github/workflows/validate-generic-site-binding.yml"
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python3 -m unittest -v tools/test_bind_truenas_site.py
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("tools/bind_truenas_site.py").read_text()
+          assert "truenas_api_client" not in s
+          assert "subprocess" not in s
+          assert "/var/run/docker.sock" not in s
+          assert "secrets_captured" in s
+          assert "mutation_performed" in s
+          PY

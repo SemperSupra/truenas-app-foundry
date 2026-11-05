@@ -1,0 +1,11 @@
+{
+  "schema": "minecraft-vanilla-263-native-catalog-pin/v1",
+  "repository": "https://github.com/truenas/apps.git",
+  "ref": "95b0cc78e75fcd4b128f4ef2f8428034d981f7c2",
+  "train": "community",
+  "app": "minecraft",
+  "catalog_version": "1.15.31",
+  "library_version": "2.3.16",
+  "library_hash": "724ad72dada54c4b4fc478e8545dc6023d5c16a4aee09d3d5ef67f1f02c418ff",
+  "image": "ghcr.io/itzg/minecraft-server:2026.10.0-java25@sha256:5a2ab74ae179c11e2dbbce67f307cdcf2c1257b3abb0f654d3a310b3d8ea57da"
+}

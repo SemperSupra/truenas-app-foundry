@@ -1,0 +1,28 @@
+name: Validate profile-driven Foundry lifecycle
+
+on:
+  pull_request:
+    paths:
+      - ".foundry/truenas-target-tracks.json"
+      - "tools/truenas_target_profile.py"
+      - "tools/foundry_lifecycle.py"
+      - "tools/test_foundry_lifecycle.py"
+      - "docs/foundry-lifecycle.md"
+      - ".github/workflows/validate-foundry-lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise profile-driven lifecycle contract
+        run: python3 -m unittest -v tools/test_foundry_lifecycle.py
+      - name: Emit machine-readable F0-F5 recipe
+        run: python3 tools/foundry_lifecycle.py recipe

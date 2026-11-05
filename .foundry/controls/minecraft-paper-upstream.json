@@ -1,0 +1,11 @@
+{
+  "schema": "minecraft-paper-catalog-pin/v1",
+  "repository": "https://github.com/truenas/apps.git",
+  "ref": "bb96ef6fd8c2708765012a4a3ca3739370a4f92c",
+  "train": "community",
+  "app": "minecraft",
+  "catalog_version": "1.15.29",
+  "library_version": "2.3.4",
+  "library_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+  "image": "ghcr.io/itzg/minecraft-server:2026.9.2-java21@sha256:edf50d431ddc6f73929368e82f4334a405796874f7b0ae11f1edcbb267d670aa"
+}

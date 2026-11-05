@@ -1,0 +1,52 @@
+name: Qualify pinned Minecraft catalog 1.15.30 source delta
+
+on:
+  pull_request:
+    paths:
+      - 'tools/qualify_minecraft_catalog_11530_delta.py'
+      - 'tests/test_minecraft_catalog_11530_delta.py'
+      - '.github/workflows/qualify-minecraft-catalog-11530-delta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-public-source-delta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout immutable code under test
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Adversarial immutable catalog source policy tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/qualify_minecraft_catalog_11530_delta.py
+          python3 -m unittest discover -s tests -p 'test_minecraft_catalog_11530_delta.py' -v
+      - name: Fetch two exact upstream commits and observe source/image changes
+        run: |
+          set -euo pipefail
+          python3 tools/qualify_minecraft_catalog_11530_delta.py > "$RUNNER_TEMP/catalog-delta.json"
+          python3 - "$RUNNER_TEMP/catalog-delta.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert r["schema"]=="supracraft.minecraft-paper-catalog-source-delta/1"
+          assert r["classification"]=="SOURCE_DELTA_OBSERVED"
+          assert r["questions_bytes_identical"] and r["compose_template_bytes_identical"]
+          assert r["image_digest_changed"]
+          assert not r["guest_catalog_verified"]
+          assert not r["native_app_materialized"]
+          assert not r["paper_gameplay_verified"]
+          PY
+      - name: Preserve exact public upstream commit comparison
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: immutable-minecraft-paper-11530-source-delta
+          path: ${{ runner.temp }}/catalog-delta.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: State source-only evidence
+        run: |
+          echo 'SOURCE_DELTA_OBSERVED only: no new TrueNAS, OCI image runtime, Paper or CloudNet qualification; historical 1.15.29 PASS remains unchanged.' >> "$GITHUB_STEP_SUMMARY"
