@@ -77,7 +77,7 @@ def before():
     status, unauth = http("/api/app/get_events/v1")
     ok(status in (401,403) or unauth.get("code") != 0, "unauthenticated event reads denied",
        {"http":status,"code":unauth.get("code")})
-    status, unauth = http("/api/app/create_event/v1", {"title":"not authorized","plugin":"shellplug"})
+    status, unauth = http("/api/app/create_event/v1", {"title":"not authorized", "enabled":True, "category":"general", "targets":["main"], "algo":"random", "plugin":"shellplug", "params":{"script":"printf never-run"}, "triggers":[{"type":"manual","enabled":True}]})
     ok(status in (401,403) or unauth.get("code") != 0, "unauthenticated event writes denied",
        {"http":status,"code":unauth.get("code")})
     login()
