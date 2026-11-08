@@ -6,6 +6,7 @@ The only shell operation the test scheduler can launch is the fixed public liter
 'printf xyops-rdte-marker'; it has no host bind mounts, host networking, or secrets.
 """
 import argparse
+import gzip
 import http.cookiejar
 import json
 import os
@@ -71,6 +72,24 @@ def login():
 def search(event_id):
     return call("/api/app/search_jobs/v1?" + urllib.parse.urlencode({"query":"event:"+event_id,"limit":50})).get("rows", [])
 
+def wait_job_marker(job_id, marker, seconds=22):
+    deadline=time.monotonic()+seconds
+    while time.monotonic()<deadline:
+        try:
+            url=ROOT+"/api/app/get_job_log/v1?id="+urllib.parse.quote(job_id)
+            req=urllib.request.Request(url,headers={"X-Session-ID":session_id or ""})
+            with opener.open(req,timeout=15) as res:
+                if res.status==200:
+                    data=res.read(500_000)
+                    if res.headers.get("Content-Encoding","").lower()=="gzip":
+                        data=gzip.decompress(data)
+                    if marker in data.decode("utf-8","replace"):
+                        return True
+        except (urllib.error.HTTPError,urllib.error.URLError,OSError,EOFError):
+            pass
+        time.sleep(2)
+    return False
+
 def before():
     status, raw = http("/")
     ok(status == 200, "human WebUI root serves HTTP", {"http":status})
@@ -123,6 +142,8 @@ def before():
         time.sleep(2)
     ok(bool(rec.get("complete") or rec.get("state") in ("complete","completed")), "manual job reached terminal state",
        {"state":rec.get("state"),"complete":rec.get("complete"),"code":rec.get("code")})
+    ok(rec.get("code")==0,"manual terminal job succeeded with zero exit code",{"code":rec.get("code")})
+    ok(wait_job_marker(job_id,"xyops-rdte-marker"),"manual job emitted independently readable marker")
     # Do not infer scheduled wake from manual success.
     scheduled=[]
     schedule_observation_start=time.monotonic()
@@ -143,7 +164,7 @@ def before():
     single_spec={
         "title":"Cloud RDTE single-shot proof","enabled":True,
         "category":"general","targets":["main"],"algo":"random",
-        "plugin":"shellplug","params":{"script":"#!/bin/sh\\nprintf 'single-shot-marker\\n'"},
+        "plugin":"shellplug","params":{"script":"#!/bin/sh\nprintf 'single-shot-marker\\n'"},
         "triggers":[{"type":"single","enabled":True,"epoch":due},
                     {"type":"catchup","enabled":True}]
     }
@@ -160,6 +181,8 @@ def before():
         single_observed=[x for x in search(once_id) if x.get("source")=="scheduler"]
         if single_observed: break
         time.sleep(3)
+    ok(bool(single_observed and single_observed[0].get("id")),"single-shot execution has durable job ID")
+    ok(wait_job_marker(single_observed[0]["id"],"single-shot-marker"),"single-shot produced expected job log marker")
     ok(len(single_observed)==1,"single-shot fired exactly once (first observation)",
        {"observed":len(single_observed)})
     # Observe across another tick: unexpected duplicates must fail.
