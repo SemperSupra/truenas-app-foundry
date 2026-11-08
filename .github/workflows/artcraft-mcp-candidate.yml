@@ -1,0 +1,57 @@
+name: ArtCraft PhotoCraft MCP candidate cloud RDTE
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/artcraft-mcp-candidate.yml'
+      - 'tools/artcraft-mcp-probe.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artcraft-mcp-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  photocraft-mcp:
+    name: PhotoCraft released stdio MCP protocol
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Download exact upstream release and verify GitHub asset digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence /tmp/artcraft-bin
+          version=0.21.0
+          file="photocraft-${version}-linux-x86_64.tar.gz"
+          curl -fsSL --retry 3 -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/storytold/photocraft/releases/tags/v${version}" > evidence/upstream-release.json
+          digest="$(jq -r --arg n "$file" '.assets[] | select(.name == $n) | .digest' evidence/upstream-release.json)"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then echo "missing explicit upstream digest for $file"; exit 1; fi
+          curl -fsSL --retry 3 -o /tmp/artcraft-bin/photocraft.tar.gz "https://github.com/storytold/photocraft/releases/download/v${version}/$file"
+          printf '%s  %s\n' "${digest#sha256:}" /tmp/artcraft-bin/photocraft.tar.gz | sha256sum -c -
+          echo "$digest" > evidence/release-digest.txt
+          tar -xzf /tmp/artcraft-bin/photocraft.tar.gz -C /tmp/artcraft-bin
+          find /tmp/artcraft-bin -type f -name photocraft-cli -print > evidence/cli-candidates.txt
+          test -s evidence/cli-candidates.txt
+      - name: Qualify MCP stdio initialize and tool listing
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli="$(head -n1 evidence/cli-candidates.txt)"
+          chmod +x "$cli"
+          ARTCRAFT_EVIDENCE_DIR=evidence python3 tools/artcraft-mcp-probe.py "$cli"
+      - name: Publish public-safe CI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: artcraft-mcp-public-rdte
+          path: |
+            evidence/release-digest.txt
+            evidence/cli-candidates.txt
+            evidence/photocraft-mcp-evidence.json
+          if-no-files-found: warn
+          retention-days: 7
