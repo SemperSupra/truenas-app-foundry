@@ -137,7 +137,40 @@ def before():
     # Keep the event but pause it so restart tests examine durable state.
     changed=call("/api/app/update_event/v1",{"id":event_id,"enabled":False})
     ok(changed.get("event",{}).get("enabled") is False,"schedule disabled without deleting history")
-    evidence={"phase":"before","event_id":event_id,"checks":checks,
+    # Separate real one-shot test: align to a *future* scheduler minute.
+    # Retain a catch-up trigger so the evidence can identify a missed occurrence.
+    due=((int(time.time())+85)//60)*60
+    single_spec={
+        "title":"Cloud RDTE single-shot proof","enabled":True,
+        "category":"general","targets":["main"],"algo":"random",
+        "plugin":"shellplug","params":{"script":"#!/bin/sh\\nprintf 'single-shot-marker\\n'"},
+        "triggers":[{"type":"single","enabled":True,"epoch":due},
+                    {"type":"catchup","enabled":True}]
+    }
+    once=call("/api/app/create_event/v1",single_spec).get("event",{})
+    once_id=once.get("id")
+    ok(bool(once_id),"single-shot event created via REST")
+    loaded=call("/api/app/get_event/v1?id="+urllib.parse.quote(once_id)).get("event",{})
+    persisted=next((t.get("epoch") for t in loaded.get("triggers",[]) if t.get("type")=="single"),None)
+    ok(persisted==due,"single-shot epoch survives normalization",
+       {"due_epoch":due,"actual_epoch":persisted})
+    single_observed=[]
+    deadline=time.monotonic()+145
+    while time.monotonic()<deadline:
+        single_observed=[x for x in search(once_id) if x.get("source")=="scheduler"]
+        if single_observed: break
+        time.sleep(3)
+    ok(len(single_observed)==1,"single-shot fired exactly once (first observation)",
+       {"observed":len(single_observed)})
+    # Observe across another tick: unexpected duplicates must fail.
+    time.sleep(65)
+    single_again=[x for x in search(once_id) if x.get("source")=="scheduler"]
+    ok(len(single_again)==1,"single-shot did not fire again on following scheduler tick",
+       {"observed":len(single_again)})
+    changed_once=call("/api/app/update_event/v1",{"id":once_id,"enabled":False})
+    ok(changed_once.get("event",{}).get("enabled") is False,"single-shot disabled and preserved")
+    (EV/"xyops-one-shot-id.txt").write_text(once_id+"\\n")
+    evidence={"phase":"before","event_id":event_id,"one_shot_id":once_id,"one_shot_due_utc":due,"checks":checks,
               "scheduled_count":len(scheduled), "scheduled_observed_after_s":observed_after_seconds,
               "manual_terminal":{k:rec.get(k) for k in ("state","complete","code","source")},
               "server_count":len(servers.get("servers",{}))}
@@ -152,7 +185,14 @@ def after():
     rows=search(event_id)
     ok(len(rows)>=2,"manual and scheduled run history survived container replacement",
        {"record_count":len(rows)})
-    return {"phase":"after","event_id":event_id,"checks":checks,
+    single_id=(EV/"xyops-one-shot-id.txt").read_text().strip()
+    persisted=call("/api/app/get_event/v1?id="+urllib.parse.quote(single_id)).get("event",{})
+    ok(persisted.get("id")==single_id and persisted.get("enabled") is False,
+       "single-shot schedule retained across restart")
+    single_history=[x for x in search(single_id) if x.get("source")=="scheduler"]
+    ok(len(single_history)==1,"single-shot history exactly once after restart",
+       {"records":len(single_history)})
+    return {"phase":"after","event_id":event_id,"one_shot_id":single_id,"checks":checks,
             "history_count":len(rows),"sources":sorted(set(str(x.get("source")) for x in rows))}
 
 if __name__=="__main__":
