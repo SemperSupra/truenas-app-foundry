@@ -100,9 +100,11 @@ func handle(raw []byte, trustedPolicy []byte) (Result, error) {
 
 func main() {
 	raw, err := io.ReadAll(io.LimitReader(os.Stdin, maxJobBytes+1))
-	if err == nil && os.Getenv("XYOPS_RDTE_POLICY") == "" { err = errors.New("no trusted fixture") }
+	// xySat intentionally does not inherit arbitrary conductor environment
+	// variables. The trusted, read-only fixture path is fixed for this CI.
+	// No path or secrets may be supplied through the untrusted job payload.
 	var trusted []byte
-	if err == nil { trusted, err = os.ReadFile(os.Getenv("XYOPS_RDTE_POLICY")) }
+	if err == nil { trusted, err = os.ReadFile("/opt/xyops-rdte/policy.json") }
 	if err == nil {
 		var result Result
 		result, err = handle(raw, trusted)
