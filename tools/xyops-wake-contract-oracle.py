@@ -44,7 +44,7 @@ def parse_timing(obj: dict) -> dict:
     if kind == "weekly":
         if set(obj) != {"kind", "weekday", "hour", "minute", "time_zone"}:
             raise ValueError("weekly requires explicit timezone and time")
-        if type(obj["weekday"]) is not int or not 0 <= obj["weekday"] <= 6:
+        if type(obj["weekday"]) is not int or not 1 <= obj["weekday"] <= 7:
             raise ValueError("weekday out of range")
         if type(obj["hour"]) is not int or not 0 <= obj["hour"] <= 23: raise ValueError("hour out of range")
         if type(obj["minute"]) is not int or not 0 <= obj["minute"] <= 59: raise ValueError("minute out of range")
@@ -249,7 +249,7 @@ class Contract(unittest.TestCase):
                 with self.assertRaises(ValueError):parse_timing(bad)
 
     def test_spring_gap_skip_and_fall_fold_once(self):
-        spring=wall_clock_occurrences(7,2,30,"Europe/Berlin",datetime(2027,3,26,tzinfo=UTC),9)
+        spring=wall_clock_occurrences(7,2,30,"Europe/Berlin",datetime(2027,3,26,tzinfo=UTC),11)
         self.assertEqual([x.isoformat() for x in spring],["2027-04-04T00:30:00+00:00"])
         autumn=wall_clock_occurrences(7,2,30,"Europe/Berlin",datetime(2027,10,29,tzinfo=UTC),9)
         self.assertEqual([x.isoformat() for x in autumn],
