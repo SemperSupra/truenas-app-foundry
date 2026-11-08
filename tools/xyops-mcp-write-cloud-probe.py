@@ -135,6 +135,6 @@ def run():
 if __name__=="__main__":
     try:result=run()
     except Exception as e:result={"status":"FAIL","checks":checks,"reason":str(e)[:600]}
-    (OUT/"xyops-mcp-write-result.json").write_text(json.dumps(result,indent=2)+"\\n")
+    (OUT/"xyops-mcp-write-result.json").write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps(result,indent=2))
     sys.exit(0 if result["status"]=="PASS" else 1)
