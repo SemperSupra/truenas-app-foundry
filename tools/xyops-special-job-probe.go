@@ -113,6 +113,6 @@ func main() {
 	}
 	// No input/policy strings are echoed: avoid leaking credential-like data.
 	_ = json.NewEncoder(os.Stdout).Encode(Result{XY:1,Complete:true,Code:1,
-		Description:"special-job rejected by synthetic policy"})
+		Description:"special-job synthetic reject: "+err.Error()})
 	os.Exit(1)
 }
