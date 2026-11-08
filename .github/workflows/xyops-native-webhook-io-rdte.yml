@@ -1,0 +1,76 @@
+name: xyOps synthetic inbound and outbound webhook qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-native-webhook-io-rdte.yml"
+      - "tools/xyops-native-webhook-io-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xyops-webhook-io-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webhook-io:
+    name: Native xyOps Magic Link inbound and HTTP action outbound
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Syntax check synthetic controller
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/xyops-native-webhook-io-probe.py
+          mkdir -p evidence
+      - name: Run disposable pinned xyOps conductor and local xySat
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          docker network create xyops-webhooks-net
+          docker volume create xyops-webhooks-data
+          docker run -d --init --name xyops-webhooks --hostname xyops-webhooks \
+            --network xyops-webhooks-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15524:5522 \
+            --volume xyops-webhooks-data:/opt/xyops/data \
+            -e XYOPS_masters=xyops-webhooks -e XYOPS_xysat_local=true -e TZ=UTC \
+            ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          for i in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:15524/api/app/ping >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Verify native inbound and outbound roundtrip and replay limitation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/xyops-native-webhook-io-probe.py
+      - name: Resource diagnostics (no credentials or tokens)
+        if: always()
+        shell: bash
+        run: |
+          docker ps --format '{{.Names}} {{.Status}}' > evidence/xyops-webhooks-containers.txt || true
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/xyops-webhooks-resources.txt || true
+      - name: Save sanitized proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-native-webhook-io-public-rdte
+          path: |
+            evidence/xyops-native-webhook-io.json
+            evidence/xyops-webhooks-containers.txt
+            evidence/xyops-webhooks-resources.txt
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Destroy disposable cloud environment
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f xyops-webhooks 2>/dev/null || true
+          docker volume rm xyops-webhooks-data 2>/dev/null || true
+          docker network rm xyops-webhooks-net 2>/dev/null || true
