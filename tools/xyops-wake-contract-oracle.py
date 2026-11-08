@@ -250,7 +250,7 @@ class Contract(unittest.TestCase):
 
     def test_spring_gap_skip_and_fall_fold_once(self):
         spring=wall_clock_occurrences(7,2,30,"Europe/Berlin",datetime(2027,3,26,tzinfo=UTC),9)
-        self.assertEqual([x.isoformat() for x in spring],["2027-04-03T00:30:00+00:00"])
+        self.assertEqual([x.isoformat() for x in spring],["2027-04-04T00:30:00+00:00"])
         autumn=wall_clock_occurrences(7,2,30,"Europe/Berlin",datetime(2027,10,29,tzinfo=UTC),9)
         self.assertEqual([x.isoformat() for x in autumn],
                          ["2027-10-31T00:30:00+00:00","2027-11-07T01:30:00+00:00"])
