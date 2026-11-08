@@ -53,5 +53,7 @@ jobs:
             evidence/release-digest.txt
             evidence/cli-candidates.txt
             evidence/photocraft-mcp-evidence.json
+            evidence/cloud-rdte.pcraft
+            evidence/cloud-rdte.png
           if-no-files-found: warn
           retention-days: 7
