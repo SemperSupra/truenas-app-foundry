@@ -67,14 +67,14 @@ def main() -> int:
             call(6, 'doc_save', {'path':'cloud-rdte.pcraft'})
             call(7, 'doc_export', {'path':'cloud-rdte.png'})
             proof = {}
-            for name, signature in [('cloud-rdte.pcraft',None), ('cloud-rdte.png',b'\\x89PNG\\r\\n\\x1a\\n')]:
+            for name, signature in [('cloud-rdte.pcraft',None), ('cloud-rdte.png',bytes.fromhex('89504e470d0a1a0a'))]:
                 artifact = out / name
                 if not artifact.is_file() or artifact.stat().st_size < 100:
                     raise RuntimeError(f'expected {name} is missing or empty')
+                shutil.copyfile(artifact, evidence_dir / name)
                 if signature and not artifact.read_bytes().startswith(signature):
                     raise RuntimeError(f'{name} has invalid file signature')
                 proof[name] = {'size_bytes':artifact.stat().st_size,'sha256':hashlib.sha256(artifact.read_bytes()).hexdigest()}
-                shutil.copyfile(artifact, evidence_dir / name)
             shutil.copyfile(out/'cloud-rdte.pcraft', inp/'cloud-rdte.pcraft')
             call(8, 'doc_open', {'path':'cloud-rdte.pcraft'})
             call(9, 'doc_inspect', {})
