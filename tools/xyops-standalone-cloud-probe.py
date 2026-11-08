@@ -20,6 +20,7 @@ ROOT = "http://127.0.0.1:15522"
 EV = Path("evidence")
 EV.mkdir(exist_ok=True)
 session_id = None
+csrf_token = None
 cookiejar = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookiejar))
 checks = []
@@ -31,6 +32,8 @@ def http(path, data=None, session=False):
         headers["Content-Type"] = "application/json"
     if session and session_id:
         headers["X-Session-ID"] = session_id
+    if session and data is not None and csrf_token:
+        headers["X-CSRF-Token"] = csrf_token
     req = urllib.request.Request(ROOT + path, headers=headers,
             data=json.dumps(data).encode() if data is not None else None)
     try:
@@ -58,10 +61,12 @@ def call(path, payload=None, login=True):
     return result
 
 def login():
-    global session_id
+    global session_id, csrf_token
     data = call("/api/user/login", {"username":"admin","password":"admin"}, login=False)
     session_id = data.get("session_id")
+    csrf_token = data.get("csrf_token")
     ok(session_id or any(True for _ in cookiejar), "local ephemeral admin session established")
+    ok(bool(csrf_token), "CSRF secret issued for authenticated POSTs")
 
 def search(event_id):
     return call("/api/app/search_jobs/v1?" + urllib.parse.urlencode({"query":"event:"+event_id,"limit":50})).get("rows", [])
