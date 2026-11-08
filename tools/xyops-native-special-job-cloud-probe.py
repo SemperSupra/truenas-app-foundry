@@ -144,7 +144,7 @@ def run():
     special_job=rows[0].get("id")
     check(bool(special_job),"special plugin job has independently inspectable identity")
     info=job_wait(special_job)
-    check(info.get("code")==0,"native special event completed",{"code":info.get("code")})
+    check(info.get("code")==0,"native special event completed",{"code":info.get("code"),"log_excerpt":job_output(special_job)[-400:]})
     api("/api/app/update_event/v1",{"id":sid,"enabled":False})
     check(marker_wait(special_job,"synthetic reference receipt only"),
           "special plugin synthetic receipt emitted without sidecar execution")
