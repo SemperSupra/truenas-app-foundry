@@ -1,0 +1,100 @@
+name: xyOps ordinary + special job REST/MCP parity cloud RDTE
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-native-mcp-parity-rdte.yml"
+      - "tools/xyops-mcp-native-parity-cloud-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-parity:
+    name: Native xyCLI agent and REST automation compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Build synthetic native plugin and pin candidate binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/xyops-rdte-runtime
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
+            -o evidence/xyops-rdte-runtime/xyops-special-job-probe \
+            tools/xyops-special-job-probe.go
+          chmod 755 evidence/xyops-rdte-runtime/xyops-special-job-probe
+          cat > evidence/xyops-rdte-runtime/policy.json <<'JSON'
+          {"allowed":[{"authority_ref":"https://github.com/example/synthetic-workset/issues/42","authority_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","delegation":"synthetic-observe"}]}
+          JSON
+          chmod 644 evidence/xyops-rdte-runtime/policy.json
+          sha256sum evidence/xyops-rdte-runtime/xyops-special-job-probe > evidence/xyops-mcp-plugin-hash.txt
+      - name: Start isolated pinned xyOps and official xyCLI MCP
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create xyops-parity-net
+          docker volume create xyops-parity-data
+          docker run -d --init --name xyops-parity --hostname xyops-parity \
+            --network xyops-parity-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15522:5522 \
+            --volume xyops-parity-data:/opt/xyops/data \
+            --mount type=bind,source="$PWD/evidence/xyops-rdte-runtime",target=/opt/xyops-rdte,readonly \
+            -e XYOPS_masters=xyops-parity -e XYOPS_xysat_local=true -e TZ=UTC \
+            ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          ready=0
+          for i in {1..75}; do
+            if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+          docker run -d --init --name xyops-parity-mcp --network xyops-parity-net \
+            --memory 512m --cpus 1 --publish 127.0.0.1:18080:8080 \
+            -e XYOPS_BASE_URL=http://xyops-parity:5522 \
+            -e 'XYOPS_MCP={"allowed_hosts":["localhost","127.0.0.1"],"read_only":false}' \
+            ghcr.io/pixlcore/xycli@sha256:4e8df48816480e5b3095b9b33d859f84eccbe698b3ea7d89898f6987ad998ddc \
+            mcp serve --host 0.0.0.0 --port 8080
+          ready=0
+          for i in {1..50}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/mcp || true)"
+            if test "$status" = 401; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+      - name: Test distinct ordinary and special job CRUD through MCP and REST
+        run: |
+          set -euo pipefail
+          python3 tools/xyops-mcp-native-parity-cloud-probe.py
+      - name: Capture login UI and sanitized resource evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/xyops-parity-resources.txt || true
+          if curl --silent --fail http://127.0.0.1:15522/ >/dev/null; then
+            google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
+              --no-first-run --window-size=390,844 --virtual-time-budget=2500 \
+              --screenshot=evidence/xyops-login-mobile.png \
+              http://127.0.0.1:15522/ >/dev/null 2>&1 || true
+          fi
+      - name: Upload evidence without credentials
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-mcp-native-event-parity
+          path: |
+            evidence/xyops-mcp-native-parity.json
+            evidence/xyops-mcp-plugin-hash.txt
+            evidence/xyops-parity-resources.txt
+            evidence/xyops-login-mobile.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Destroy disposable runtime
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f xyops-parity-mcp xyops-parity 2>/dev/null || true
+          docker volume rm xyops-parity-data 2>/dev/null || true
+          docker network rm xyops-parity-net 2>/dev/null || true
