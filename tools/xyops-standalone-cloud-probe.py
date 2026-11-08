@@ -192,7 +192,7 @@ def before():
        {"observed":len(single_again)})
     changed_once=call("/api/app/update_event/v1",{"id":once_id,"enabled":False})
     ok(changed_once.get("event",{}).get("enabled") is False,"single-shot disabled and preserved")
-    (EV/"xyops-one-shot-id.txt").write_text(once_id+"\\n")
+    (EV/"xyops-one-shot-id.txt").write_text(once_id+"\n")
     evidence={"phase":"before","event_id":event_id,"one_shot_id":once_id,"one_shot_due_utc":due,"checks":checks,
               "scheduled_count":len(scheduled), "scheduled_observed_after_s":observed_after_seconds,
               "manual_terminal":{k:rec.get(k) for k in ("state","complete","code","source")},
