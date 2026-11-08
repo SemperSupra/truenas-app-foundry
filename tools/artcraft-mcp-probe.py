@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Public-safe stdio MCP handshake for a released editor CLI, no credentials."""
 import json
+import hashlib
+import shutil
 import os
 import selectors
 import subprocess
@@ -48,11 +50,35 @@ def main() -> int:
             names = [t.get('name','') for t in tools.get('result',{}).get('tools',[])]
             evidence['mcp']['tool_names'] = names
             if not names: raise RuntimeError('MCP returned no tools')
-            if 'doc_inspect' in names:
-                send({'jsonrpc':'2.0','id':3,'method':'tools/call','params':{'name':'doc_inspect','arguments':{}}})
-                result = recv(3)
-                evidence['mcp']['doc_inspect'] = {'has_result':'result' in result,'error':result.get('error')}
-                if 'error' in result: raise RuntimeError('doc_inspect returned MCP protocol error')
+            def call(request_id, tool_name, args):
+                if tool_name not in names: raise RuntimeError(f'missing required tool: {tool_name}')
+                send({'jsonrpc':'2.0','id':request_id,'method':'tools/call','params':{'name':tool_name,'arguments':args}})
+                result = recv(request_id, timeout=50)
+                response = result.get('result')
+                error = result.get('error')
+                if error or not isinstance(response, dict) or response.get('isError'):
+                    details = json.dumps(error or response,ensure_ascii=True)[:700]
+                    raise RuntimeError(f'{tool_name} failed: {details}')
+                evidence['mcp'][tool_name] = 'PASS'
+                return response
+            call(3, 'doc_inspect', {})
+            call(4, 'doc_new', {'width':256, 'height':192, 'mode':'rgb','depth':8,'background':'white'})
+            call(5, 'command_run', {'id':'layer.new.layer','params':{'name':'Cloud RDTE layer'}})
+            call(6, 'doc_save', {'path':'cloud-rdte.pcraft'})
+            call(7, 'doc_export', {'path':'cloud-rdte.png'})
+            proof = {}
+            for name, signature in [('cloud-rdte.pcraft',None), ('cloud-rdte.png',b'\\x89PNG\\r\\n\\x1a\\n')]:
+                artifact = out / name
+                if not artifact.is_file() or artifact.stat().st_size < 100:
+                    raise RuntimeError(f'expected {name} is missing or empty')
+                if signature and not artifact.read_bytes().startswith(signature):
+                    raise RuntimeError(f'{name} has invalid file signature')
+                proof[name] = {'size_bytes':artifact.stat().st_size,'sha256':hashlib.sha256(artifact.read_bytes()).hexdigest()}
+                shutil.copyfile(artifact, evidence_dir / name)
+            shutil.copyfile(out/'cloud-rdte.pcraft', inp/'cloud-rdte.pcraft')
+            call(8, 'doc_open', {'path':'cloud-rdte.pcraft'})
+            call(9, 'doc_inspect', {})
+            evidence['artifacts'] = proof
             evidence['result']='PASS'
         except Exception as e:
             evidence['result']='FAIL'; evidence['reason']=str(e)[:600]
