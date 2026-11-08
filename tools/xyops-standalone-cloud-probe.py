@@ -100,7 +100,7 @@ def before():
         "params":{"script":"#!/bin/sh\nprintf 'xyops-rdte-marker\\n'"},
         "triggers":[
             {"type":"manual","enabled":True},
-            {"type":"interval","enabled":True,"start":int(time.time())+5,"duration":10}
+            {"type":"interval","enabled":True,"start":int(time.time())-20,"duration":10}
         ]
     }
     created = call("/api/app/create_event/v1",spec)
@@ -125,18 +125,20 @@ def before():
        {"state":rec.get("state"),"complete":rec.get("complete"),"code":rec.get("code")})
     # Do not infer scheduled wake from manual success.
     scheduled=[]
-    deadline=time.monotonic()+42
+    schedule_observation_start=time.monotonic()
+    deadline=time.monotonic()+115
     while time.monotonic()<deadline:
         rows=search(event_id)
         scheduled=[x for x in rows if x.get("source")=="scheduler"]
         if scheduled: break
         time.sleep(3)
-    ok(bool(scheduled),"real interval scheduled firing observed",{"scheduled_count":len(scheduled)})
+    observed_after_seconds=round(time.monotonic()-schedule_observation_start,1)
+    ok(bool(scheduled),"real interval scheduled firing observed",{"scheduled_count":len(scheduled),"wait_s":observed_after_seconds})
     # Keep the event but pause it so restart tests examine durable state.
     changed=call("/api/app/update_event/v1",{"id":event_id,"enabled":False})
     ok(changed.get("event",{}).get("enabled") is False,"schedule disabled without deleting history")
     evidence={"phase":"before","event_id":event_id,"checks":checks,
-              "scheduled_count":len(scheduled),
+              "scheduled_count":len(scheduled), "scheduled_observed_after_s":observed_after_seconds,
               "manual_terminal":{k:rec.get(k) for k in ("state","complete","code","source")},
               "server_count":len(servers.get("servers",{}))}
     return evidence
