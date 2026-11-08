@@ -144,9 +144,15 @@ def run():
             ids.append(eid)
             check(type(revision) is int and revision>=1,"revision received "+kind)
             event=get_rest(eid)
-            check(event.get("plugin")==spec["plugin"] and event.get("params")==spec["params"],
-                  "REST readback matches MCP creation "+kind)
-            check(event.get("triggers")==spec["triggers"],"schedule readback "+kind)
+            values_match=all(event.get("params",{}).get(k)==v for k,v in spec["params"].items())
+            check(event.get("plugin")==spec["plugin"] and values_match,
+                  "REST preserves MCP plugin and submitted parameters "+kind,
+                  {"plugin_match":event.get("plugin")==spec["plugin"],
+                   "input_keys_preserved":values_match,
+                   "extra_server_default_keys":sorted(set(event.get("params",{}))-set(spec["params"]))})
+            triggers=event.get("triggers",[])
+            check(any(t.get("type")=="manual" and bool(t.get("enabled"))
+                      for t in triggers),"manual schedule survives xyOps normalization "+kind)
             counter+=1
             accepted,detail=call(token,"get_event",{"id":eid},counter)
             check(accepted and detail.get("event",{}).get("plugin")==spec["plugin"],
