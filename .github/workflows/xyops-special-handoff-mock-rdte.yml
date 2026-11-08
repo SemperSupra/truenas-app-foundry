@@ -1,0 +1,39 @@
+name: xyOps special-job / WOW synthetic claim handoff RDTE
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-special-handoff-mock-rdte.yml"
+      - "tools/xyops-special-handoff-contract_test.go"
+      - "tools/xyops-special-job-probe.go"
+      - "tools/xyops-special-job-probe_test.go"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  handoff-mock:
+    name: Native xyOps special wake -> synthetic admitted receiver
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Contract-differential test against localhost mock receiver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          GOPROXY=off GOSUMDB=off GO111MODULE=off go test -count=1 -v \
+            tools/xyops-special-job-probe.go \
+            tools/xyops-special-job-probe_test.go \
+            tools/xyops-special-handoff-contract_test.go 2>&1 \
+            | tee evidence/xyops-special-handoff-verdict.txt
+      - name: Retain public-safe synthetic test result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-special-handoff-synthetic-contract
+          path: evidence/xyops-special-handoff-verdict.txt
+          if-no-files-found: warn
+          retention-days: 7
