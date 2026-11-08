@@ -1,0 +1,133 @@
+name: xyOps standalone scheduler + MCP cloud RDTE (no integration)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-standalone-cloud-rdte.yml"
+      - "tools/xyops-standalone-cloud-probe.py"
+      - "tools/xyops-mcp-cloud-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xyops-preintegration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone:
+    name: xyOps isolated free-cloud software qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Pull released containers and capture exact immutable digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          docker pull ghcr.io/pixlcore/xyops:v1.1.15
+          docker pull ghcr.io/pixlcore/xycli:latest
+          docker image inspect ghcr.io/pixlcore/xyops:v1.1.15 --format '{{json .RepoDigests}}' > evidence/xyops-image-digests.json
+          docker image inspect ghcr.io/pixlcore/xycli:latest --format '{{json .RepoDigests}}' > evidence/xycli-image-digests.json
+      - name: Start isolated conductor + satellite on runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create xyops-rdte-net
+          docker volume create xyops-rdte-data
+          docker run -d --init --name xyops-rdte --hostname xyops-rdte \
+            --network xyops-rdte-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15522:5522 \
+            --volume xyops-rdte-data:/opt/xyops/data \
+            -e XYOPS_masters=xyops-rdte \
+            -e XYOPS_xysat_local=true \
+            -e XYOPS_base_app_url=http://127.0.0.1:15522 \
+            -e TZ=UTC ghcr.io/pixlcore/xyops:v1.1.15
+          healthy=0
+          for i in {1..75}; do
+            if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then healthy=1; break; fi
+            sleep 2
+          done
+          test "$healthy" = 1
+          curl --silent --show-error --fail http://127.0.0.1:15522/ > evidence/webui-index.html
+          test -s evidence/webui-index.html
+      - name: Verify actual scheduler execution and create durable synthetic state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/xyops-standalone-cloud-probe.py --phase before
+      - name: Verify read-only MCP transport and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --init --name xyops-mcp-rdte --network xyops-rdte-net \
+            --memory 512m --cpus 1 \
+            --publish 127.0.0.1:18080:8080 \
+            -e XYOPS_BASE_URL=http://xyops-rdte:5522 \
+            -e 'XYOPS_MCP={"allowed_hosts":["localhost","127.0.0.1"],"read_only":true}' \
+            ghcr.io/pixlcore/xycli:latest mcp serve --host 0.0.0.0 --port 8080 --read-only
+          healthy=0
+          for i in {1..45}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/mcp || true)"
+            if test "$status" = 401; then healthy=1; break; fi
+            sleep 2
+          done
+          test "$healthy" = 1
+          python3 tools/xyops-mcp-cloud-probe.py
+      - name: Verify persistent scheduler after container replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f xyops-mcp-rdte xyops-rdte
+          docker run -d --init --name xyops-rdte --hostname xyops-rdte \
+            --network xyops-rdte-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15522:5522 \
+            --volume xyops-rdte-data:/opt/xyops/data \
+            -e XYOPS_masters=xyops-rdte \
+            -e XYOPS_xysat_local=true \
+            -e XYOPS_base_app_url=http://127.0.0.1:15522 \
+            -e TZ=UTC ghcr.io/pixlcore/xyops:v1.1.15
+          healthy=0
+          for i in {1..65}; do
+            if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then healthy=1; break; fi
+            sleep 2
+          done
+          test "$healthy" = 1
+          python3 tools/xyops-standalone-cloud-probe.py --phase after
+      - name: Capture public-safe resource and UI smoke evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          docker ps --format '{{.Names}} {{.Status}}' > evidence/containers.txt || true
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/resources.txt || true
+          if curl --silent --fail http://127.0.0.1:15522/ >/dev/null; then
+            google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
+              --no-first-run --window-size=1280,800 --virtual-time-budget=3500 \
+              --screenshot=evidence/xyops-login-webui.png http://127.0.0.1:15522/ >/dev/null 2>&1 || true
+          fi
+      - name: Publish sanitized RDTE evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-standalone-cloud-rdte
+          path: |
+            evidence/xyops-image-digests.json
+            evidence/xycli-image-digests.json
+            evidence/xyops-before-result.json
+            evidence/xyops-after-result.json
+            evidence/xyops-mcp-result.json
+            evidence/containers.txt
+            evidence/resources.txt
+            evidence/xyops-login-webui.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Destroy all disposable runtime resources
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f xyops-mcp-rdte xyops-rdte 2>/dev/null || true
+          docker volume rm xyops-rdte-data 2>/dev/null || true
+          docker network rm xyops-rdte-net 2>/dev/null || true
