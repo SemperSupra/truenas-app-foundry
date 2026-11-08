@@ -59,6 +59,8 @@ jobs:
           set -euo pipefail
           python3 tools/xyops-standalone-cloud-probe.py --phase before
       - name: Verify read-only MCP transport and permissions
+        id: mcp_probe
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -96,6 +98,24 @@ jobs:
           done
           test "$healthy" = 1
           python3 tools/xyops-standalone-cloud-probe.py --phase after
+      - name: Assert independent scheduler and MCP verdicts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdicts = {}
+          for name in ("xyops-before-result.json", "xyops-after-result.json", "xyops-mcp-result.json"):
+              p = Path("evidence") / name
+              if not p.is_file():
+                  verdicts[name] = "MISSING"
+              else:
+                  verdicts[name] = json.loads(p.read_text()).get("status", "UNKNOWN")
+          for name, status in verdicts.items():
+              print(name, status)
+          if any(status != "PASS" for status in verdicts.values()):
+              raise SystemExit(1)
+          PY
       - name: Capture public-safe resource and UI smoke evidence
         if: always()
         shell: bash
