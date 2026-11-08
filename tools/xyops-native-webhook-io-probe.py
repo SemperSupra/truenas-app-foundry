@@ -86,7 +86,7 @@ def run():
     receiver=api("/api/app/create_event/v1",{
       "title":"RDTE synthetic outbound receiver", "enabled":True,
       "category":"general", "targets":["main"],"algo":"random","plugin":"shellplug",
-      "params":{"script":"#!/bin/sh\\nprintf 'synthetic-receiver-ok\\n'"},
+      "params":{"script":"#!/bin/sh\nprintf 'synthetic-receiver-ok\n'"},
       "triggers":[{"type":"magic","enabled":True,"key":receiver_key}],
       "limits":[{"type":"file","enabled":True,"amount":0}]
     }).get("event",{})
@@ -106,7 +106,7 @@ def run():
     incoming=api("/api/app/create_event/v1",{
       "title":"RDTE synthetic inbound Magic Link", "enabled":True,
       "category":"general", "targets":["main"],"algo":"random","plugin":"shellplug",
-      "params":{"script":"#!/bin/sh\\nprintf 'synthetic-ingress-ok\\n'"},
+      "params":{"script":"#!/bin/sh\nprintf 'synthetic-ingress-ok\n'"},
       "triggers":[{"type":"magic","enabled":True,"key":incoming_key}],
       "actions":[{"enabled":True,"condition":"success","type":"web_hook","web_hook":"rdte_outbound_receipt"}],
       "limits":[{"type":"file","enabled":True,"amount":0}]
