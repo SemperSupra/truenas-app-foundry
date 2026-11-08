@@ -1,0 +1,87 @@
+name: xyOps native synthetic condition trigger RDTE
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-native-condition-trigger-rdte.yml"
+      - "tools/xyops-trigger-condition-probe.go"
+      - "tools/xyops-trigger-condition-probe_test.go"
+      - "tools/xyops-native-trigger-gate-cloud-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xyops-condition-trigger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-trigger-gate:
+    name: Real xyOps Trigger Plugin true/false/unknown synthetic trial
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Offline Go unit tests and native Trigger Plugin binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/xyops-trigger-rdte
+          GO111MODULE=off GOPROXY=off GOSUMDB=off go test -v tools/xyops-trigger-condition-probe.go tools/xyops-trigger-condition-probe_test.go 2>&1 | tee evidence/xyops-trigger-go-tests.txt
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o evidence/xyops-trigger-rdte/xyops-trigger-condition-probe tools/xyops-trigger-condition-probe.go
+          chmod 755 evidence/xyops-trigger-rdte/xyops-trigger-condition-probe
+          cat > evidence/xyops-trigger-rdte/condition-policy.json <<'JSON'
+          {"watches":[{"key":"watch-ready","condition":"TRUE","observed_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","accepted_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"key":"watch-false","condition":"FALSE","observed_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","accepted_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"key":"watch-unknown","condition":"UNKNOWN","observed_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","accepted_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"key":"watch-accepted","condition":"TRUE","observed_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","accepted_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}
+          JSON
+          sha256sum evidence/xyops-trigger-rdte/xyops-trigger-condition-probe > evidence/xyops-trigger-binary-sha256.txt
+      - name: Launch disposable pinned xyOps v1.1.15 conductor
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          docker network create xyops-trigger-net
+          docker volume create xyops-trigger-data
+          docker run -d --init --name xyops-trigger --hostname xyops-trigger \
+            --network xyops-trigger-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15523:5522 \
+            --volume xyops-trigger-data:/opt/xyops/data \
+            --mount type=bind,source="$PWD/evidence/xyops-trigger-rdte",target=/opt/xyops-rdte,readonly \
+            -e XYOPS_masters=xyops-trigger -e XYOPS_xysat_local=true -e TZ=UTC \
+            ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          for i in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:15523/api/app/ping >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Verify actual native Trigger Plugin decisions through xyOps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/xyops-native-trigger-gate-cloud-probe.py
+      - name: Preserve sanitized diagnostic evidence
+        if: always()
+        shell: bash
+        run: |
+          docker ps --format '{{.Names}} {{.Status}}' > evidence/xyops-trigger-containers.txt || true
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/xyops-trigger-resources.txt || true
+      - name: Publish sanitized qualification receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-native-trigger-gate-public-rdte
+          path: |
+            evidence/xyops-native-trigger-gate.json
+            evidence/xyops-trigger-go-tests.txt
+            evidence/xyops-trigger-binary-sha256.txt
+            evidence/xyops-trigger-containers.txt
+            evidence/xyops-trigger-resources.txt
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Destroy disposable environment
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f xyops-trigger 2>/dev/null || true
+          docker volume rm xyops-trigger-data 2>/dev/null || true
+          docker network rm xyops-trigger-net 2>/dev/null || true
