@@ -6,6 +6,7 @@ on:
       - ".github/workflows/xyops-standalone-cloud-rdte.yml"
       - "tools/xyops-standalone-cloud-probe.py"
       - "tools/xyops-mcp-cloud-probe.py"
+      - "tools/xyops-mcp-write-cloud-probe.py"
   workflow_dispatch:
 
 permissions:
@@ -78,6 +79,27 @@ jobs:
           done
           test "$healthy" = 1
           python3 tools/xyops-mcp-cloud-probe.py
+      - name: Verify isolated restricted MCP write and revision semantics
+        id: mcp_write
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f xyops-mcp-rdte
+          docker run -d --init --name xyops-mcp-rdte --network xyops-rdte-net \
+            --memory 512m --cpus 1 \
+            --publish 127.0.0.1:18080:8080 \
+            -e XYOPS_BASE_URL=http://xyops-rdte:5522 \
+            -e 'XYOPS_MCP={"allowed_hosts":["localhost","127.0.0.1"],"read_only":false}' \
+            ghcr.io/pixlcore/xycli:latest mcp serve --host 0.0.0.0 --port 8080
+          healthy=0
+          for i in {1..45}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/mcp || true)"
+            if test "$status" = 401; then healthy=1; break; fi
+            sleep 2
+          done
+          test "$healthy" = 1
+          python3 tools/xyops-mcp-write-cloud-probe.py
       - name: Verify persistent scheduler after container replacement
         shell: bash
         run: |
@@ -105,7 +127,7 @@ jobs:
           import json
           from pathlib import Path
           verdicts = {}
-          for name in ("xyops-before-result.json", "xyops-after-result.json", "xyops-mcp-result.json"):
+          for name in ("xyops-before-result.json", "xyops-after-result.json", "xyops-mcp-result.json", "xyops-mcp-write-result.json"):
               p = Path("evidence") / name
               if not p.is_file():
                   verdicts[name] = "MISSING"
@@ -139,6 +161,7 @@ jobs:
             evidence/xyops-before-result.json
             evidence/xyops-after-result.json
             evidence/xyops-mcp-result.json
+            evidence/xyops-mcp-write-result.json
             evidence/containers.txt
             evidence/resources.txt
             evidence/xyops-login-webui.png
