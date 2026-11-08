@@ -4,7 +4,7 @@
 No remote ChatGPT connection or integration. Disposable API key is generated inside
 the job, never written to artifacts or printed. MCP proxy is loopback-only.
 """
-import http.cookiejar, json, secrets, sys, urllib.error, urllib.request
+import http.cookiejar, json, sys, urllib.error, urllib.request
 from pathlib import Path
 EV=Path("evidence"); EV.mkdir(exist_ok=True)
 checks=[]
@@ -66,15 +66,15 @@ def run():
     csrf_token=auth.get("csrf_token")
     check(session_id or list(cookies),"ephemeral admin login for key creation")
     check(bool(csrf_token),"CSRF token issued for secure key management")
-    token=secrets.token_urlsafe(35)
     result=call("/api/app/create_api_key/v1",{
       "title":"RDTE ephemeral restricted client",
-      "key":token,"active":1,
+      "active":1,
       "privileges":{"admin":0,"run_jobs":0,"create_events":0,"edit_events":0,"delete_events":0},
       "roles":[]
     })
     key_id=result.get("api_key",{}).get("id")
-    check(bool(key_id),"ephemeral restricted API key provisioned (ID withheld)")
+    token=result.get("plain_key")
+    check(bool(key_id) and bool(token),"server-generated restricted API key provisioned (secret withheld)")
     status,data=rpc("initialize",{
        "protocolVersion":"2025-06-18",
        "capabilities":{},
