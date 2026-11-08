@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Public-safe, stdlib-only reference oracle for xyOps -> Agent Dispatch.
 
+ONLY the reserved agent_dispatch_wake job type is subject to this contract.
+Ordinary xyOps workflows/events retain ALL native xyOps features and native RBAC.
+
 This is NOT a production scheduler, HTTP service, sidecar adapter, credential
 manager, or admission grant.  It models only the unresolved authority seam.
 Canonical GitHub DLE state is represented by a deliberately simple in-memory
@@ -63,6 +66,23 @@ class Owner:
     revision: str
     admitted: bool
     state: str
+
+def route_event_class(event:dict, owners:dict, trusted_template:dict):
+    """Reference-only special-case routing, NOT a new xyOps global policy layer.
+
+    Ordinary events and workflows pass untouched: xyOps itself remains
+    responsible for its native RBAC, validation, scheduling and execution.
+    Agent Dispatch only recognizes the reserved special job contract.
+    """
+    if not isinstance(event,dict):
+        raise ValueError("event must be an object")
+    if event.get("plugin") != "agent_dispatch_wake":
+        return {"kind":"xyops-native","event":copy.deepcopy(event)}
+    if set(event) != {"plugin","special"}:
+        raise ValueError("special event must contain only reserved plugin and special payload")
+    projection, compiled = create(event["special"],owners,trusted_template)
+    return {"kind":"agent-dispatch-wake","projection":projection,"event":compiled}
+
 
 @dataclass
 class Projection:
@@ -179,6 +199,25 @@ class Contract(unittest.TestCase):
         self.req={"authority_ref":self.ref,"expected_revision":self.rev,
             "schedule_id":"owner-research", "timing":self.once}
         self.proj,self.event=create(self.req,self.owners,self.template)
+
+    def test_unrestricted_native_xyops_jobs_are_out_of_special_scope(self):
+        ordinary={"plugin":"shellplug","type":"event",
+                  "params":{"script":"#!/bin/sh\\nprintf 'native-ok\\n'"},
+                  "triggers":[{"type":"interval","start":123,"duration":10}]}
+        workflow={"type":"workflow","plugin":"_workflow",
+                  "workflow":{"nodes":[{"plugin":"shellplug","params":{"script":"echo xyops"}}]}}
+        for event in (ordinary, workflow):
+            selected=route_event_class(event,self.owners,self.template)
+            self.assertEqual(selected["kind"],"xyops-native")
+            self.assertEqual(selected["event"],event)
+            self.assertIsNot(selected["event"],event)
+        special=route_event_class({"plugin":"agent_dispatch_wake","special":self.req},
+                                    self.owners,self.template)
+        self.assertEqual(special["kind"],"agent-dispatch-wake")
+        self.assertEqual(special["event"]["plugin"],"approved-wake")
+        with self.assertRaises(ValueError):
+            route_event_class({"plugin":"agent_dispatch_wake","special":self.req,
+                               "params":{"script":"evil"}},self.owners,self.template)
 
     def test_creates_only_fixed_execution_profile(self):
         self.assertEqual(self.event["plugin"],"approved-wake")
