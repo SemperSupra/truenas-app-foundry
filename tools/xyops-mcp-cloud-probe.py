@@ -92,9 +92,10 @@ def run():
        "name":"list_events","arguments":{"limit":10}
     },id=3,bearer=token)
     result=(data or {}).get("result",{})
+    error_text=" ".join(str(x.get("text","")) for x in result.get("content",[]) if isinstance(x,dict)).replace(token,"<redacted>")[:300]
     check(status==200 and bool(result) and not result.get("isError"),
           "restricted client MCP list_events accepted",
-          {"http":status,"mcp_protocol_error":bool(data and data.get("error")),"tool_error":result.get("isError")})
+          {"http":status,"mcp_protocol_error":bool(data and data.get("error")),"tool_error":result.get("isError"),"error_excerpt":error_text if result.get("isError") else None})
     status,data=rpc("tools/call",{
        "name":"run_event","arguments":{"id":"nonexistent"}
     },id=4,bearer=token)
