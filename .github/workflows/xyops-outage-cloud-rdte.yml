@@ -1,0 +1,92 @@
+name: xyOps missed one-shot recovery cloud RDTE
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-outage-cloud-rdte.yml"
+      - "tools/xyops-outage-cloud-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  outage:
+    name: Real conductor outage vs catchup control
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Start disposable pinned xyOps with local worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          docker pull ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          docker network create xyops-outage-net
+          docker volume create xyops-outage-data
+          docker run -d --init --name xyops-outage --hostname xyops-outage \
+            --network xyops-outage-net --memory 2400m --cpus 2 \
+            --publish 127.0.0.1:15522:5522 \
+            --volume xyops-outage-data:/opt/xyops/data \
+            -e XYOPS_masters=xyops-outage \
+            -e XYOPS_xysat_local=true \
+            -e TZ=UTC \
+            ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:15522/api/app/ping >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "xyOps not ready"
+          exit 1
+      - name: Arm matched one-shot schedules and prove pre-due cursor tick
+        run: python3 tools/xyops-outage-cloud-probe.py arm
+      - name: Simulate process outage over both due minutes
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker stop -t 20 xyops-outage
+          python3 - <<'PY'
+          import json,time
+          from pathlib import Path
+          due=json.loads(Path('evidence/xyops-outage-spec.json').read_text())['due_utc']
+          sleep_until=due+12
+          seconds=max(0,sleep_until-time.time())
+          print('scheduled software-downtime seconds:',round(seconds,1))
+          if seconds:time.sleep(seconds)
+          PY
+          docker start xyops-outage
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:15522/api/app/ping >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "xyOps did not recover"
+          exit 1
+      - name: Assert catch-up semantic difference and real output
+        run: python3 tools/xyops-outage-cloud-probe.py verify
+      - name: Record sanitized diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/xyops-outage-resources.txt || true
+          docker ps --format '{{.Names}} {{.Status}}' > evidence/xyops-outage-containers.txt || true
+      - name: Retain public-safe evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-real-outage-catchup-cloud-rdte
+          path: |
+            evidence/xyops-outage-spec.json
+            evidence/xyops-outage-arm.json
+            evidence/xyops-outage-verify.json
+            evidence/xyops-outage-resources.txt
+            evidence/xyops-outage-containers.txt
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Destroy ephemeral workcell state
+        if: always()
+        run: |
+          docker rm -f xyops-outage 2>/dev/null || true
+          docker volume rm xyops-outage-data 2>/dev/null || true
+          docker network rm xyops-outage-net 2>/dev/null || true
