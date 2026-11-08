@@ -1,0 +1,80 @@
+name: xyOps REST-only clock ownership qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xyops-rest-clock-rdte.yml"
+      - "tools/xyops-rest-clock-cloud-probe.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xyops-rest-clock-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rest-clock:
+    name: Native REST clock register-reschedule-cancel / no extra MCP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Build inert native special plugin and trusted cloud fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/xyops-rdte-runtime
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
+            -o evidence/xyops-rdte-runtime/xyops-special-job-probe \
+            tools/xyops-special-job-probe.go
+          chmod 755 evidence/xyops-rdte-runtime/xyops-special-job-probe
+          printf '%s\n' '{"allowed":[]}' > evidence/xyops-rdte-runtime/policy.json
+      - name: Start exact pinned upstream xyOps (no xyCLI MCP process)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create xyops-rest-clock-net
+          docker volume create xyops-rest-clock-data
+          docker run -d --init --name xyops-rest-clock --hostname xyops-rest-clock \
+            --network xyops-rest-clock-net --memory 2500m --cpus 2 \
+            --publish 127.0.0.1:15522:5522 \
+            --volume xyops-rest-clock-data:/opt/xyops/data \
+            --mount type=bind,source="$PWD/evidence/xyops-rdte-runtime",target=/opt/xyops-rdte,readonly \
+            -e XYOPS_masters=xyops-rest-clock -e XYOPS_xysat_local=true -e TZ=UTC \
+            ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          ready=0
+          for i in {1..70}; do
+            if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+          test "$(docker ps --format '{{.Names}}' | grep -c '^xyops-rest-clock$')" -eq 1
+      - name: Execute non-activating native REST clock experiment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/xyops-rest-clock-cloud-probe.py
+      - name: Capture sanitized resource evidence
+        if: always()
+        shell: bash
+        run: |
+          docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' > evidence/xyops-rest-clock-resources.txt || true
+      - name: Upload public-safe readback
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xyops-rest-clock-cloud
+          path: |
+            evidence/xyops-rest-clock-result.json
+            evidence/xyops-rest-clock-resources.txt
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Destroy disposable runtime
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f xyops-rest-clock 2>/dev/null || true
+          docker volume rm xyops-rest-clock-data 2>/dev/null || true
+          docker network rm xyops-rest-clock-net 2>/dev/null || true
