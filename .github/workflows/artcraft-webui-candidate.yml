@@ -37,8 +37,7 @@ jobs:
       - name: Inspect Web UI using Chrome on desktop and mobile viewports
         run: |
           set -euo pipefail
-          npm install --no-save --prefix /tmp/craft-playwright playwright@1.56.1
-          PLAYWRIGHT_PACKAGE=/tmp/craft-playwright/node_modules/playwright ARTCRAFT_PROBE_URL=http://127.0.0.1:18080/photocraft/ ARTCRAFT_PROBE_NAME=wasm-photocraft ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
+          ARTCRAFT_PROBE_URL=http://127.0.0.1:18080/photocraft/ ARTCRAFT_PROBE_NAME=wasm-photocraft ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
       - name: Publish public-safe CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -70,8 +69,7 @@ jobs:
       - name: Inspect desktop using Chrome on desktop and mobile viewports
         run: |
           set -euo pipefail
-          npm install --no-save --prefix /tmp/craft-playwright playwright@1.56.1
-          PLAYWRIGHT_PACKAGE=/tmp/craft-playwright/node_modules/playwright ARTCRAFT_PROBE_URL=https://127.0.0.1:13001/ ARTCRAFT_PROBE_NAME=streamed-desktop ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
+          ARTCRAFT_PROBE_URL=https://127.0.0.1:13001/ ARTCRAFT_PROBE_NAME=streamed-desktop ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
       - name: Publish public-safe CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
