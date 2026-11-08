@@ -53,6 +53,7 @@ func evaluate(inputRaw, policyRaw []byte) (Output,error) {
  var p Policy
  if len(policyRaw)==0||len(policyRaw)>65536 {return Output{},errors.New("policy absent or oversized")}
  if err:=decodeOne(policyRaw,&p,true);err!=nil{return Output{},errors.New("invalid trusted policy")}
+ if len(p.Watches)==0 {return Output{},errors.New("empty trusted policy")}
  valid:=map[string]Watch{}
  for _,w:=range p.Watches{
   if !watchKey.MatchString(w.Key)||!revision.MatchString(w.ObservedRevision)||
