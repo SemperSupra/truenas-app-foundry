@@ -1,60 +1,35 @@
 'use strict';
-// Public-safe browser smoke test: no accounts, privileged tokens, or user artifacts.
+// Public-safe, dependency-free Chromium screenshot/DOM smoke. NOT a usability acceptance test.
 const fs = require('node:fs');
 const path = require('node:path');
+const {execFileSync} = require('node:child_process');
 const assert = require('node:assert/strict');
-const { chromium } = require(process.env.PLAYWRIGHT_PACKAGE || 'playwright');
-
-(async () => {
-  const url = process.env.ARTCRAFT_PROBE_URL;
-  const name = process.env.ARTCRAFT_PROBE_NAME || 'artcraft';
-  const dir = process.env.ARTCRAFT_EVIDENCE_DIR || 'evidence';
-  assert(url && /^https?:\/\//.test(url), 'ARTCRAFT_PROBE_URL required');
-  fs.mkdirSync(dir, { recursive: true });
-  const browser = await chromium.launch({
-    channel: 'chrome',
-    headless: true,
-    args: ['--disable-dev-shm-usage', '--no-sandbox']
-  });
-  const evidence = {
-    target: name, url, utc: new Date().toISOString(),
-    playwright: require(path.join(path.dirname(require.resolve(process.env.PLAYWRIGHT_PACKAGE || 'playwright')), 'package.json')).version,
-    probes: []
-  };
+const url = process.env.ARTCRAFT_PROBE_URL;
+const name = process.env.ARTCRAFT_PROBE_NAME || 'artcraft';
+const dir = path.resolve(process.env.ARTCRAFT_EVIDENCE_DIR || 'evidence');
+assert(url && /^https?:\/\//.test(url), 'ARTCRAFT_PROBE_URL required');
+fs.mkdirSync(dir, {recursive:true});
+const evidence = {target:name, url, utc:new Date().toISOString(), probes:[]};
+let failures = [];
+for (const v of [{width:1280,height:800,label:'desktop'},{width:390,height:844,label:'narrow-viewport'}]) {
+  const screenshot = path.join(dir,`${name}-${v.label}.png`);
+  const profile = path.join('/tmp',`craft-chrome-${process.pid}-${v.label}`);
   try {
-    for (const viewport of [
-      {width:1280, height:800, label:'desktop'},
-      {width:390, height:844, label:'mobile'}
-    ]) {
-      const context = await browser.newContext({
-        viewport, ignoreHTTPSErrors:true, acceptDownloads:true
-      });
-      const page = await context.newPage();
-      const errors = [];
-      page.on('pageerror', e => errors.push({type:'pageerror',message:String(e.message).slice(0,500)}));
-      page.on('console', m => {
-        if (m.type() === 'error') errors.push({type:'console',message:m.text().slice(0,500)});
-      });
-      const response = await page.goto(url, {waitUntil:'domcontentloaded',timeout:60000});
-      await page.waitForTimeout(8000);
-      const title = await page.title();
-      const snapshot = await page.evaluate(() => ({
-        htmlLength:document.documentElement.outerHTML.length,
-        canvasCount:document.querySelectorAll('canvas').length,
-        buttonCount:document.querySelectorAll('button').length,
-        viewportWidth:document.documentElement.clientWidth,
-        scrollWidth:document.documentElement.scrollWidth
-      }));
-      const screenshot = path.join(dir, `${name}-${viewport.label}.png`);
-      await page.screenshot({path:screenshot,fullPage:false,timeout:15000});
-      const pass = response && response.status() < 400 && snapshot.htmlLength > 100;
-      evidence.probes.push({viewport,status:response?.status()??null,title,snapshot,errors,screenshot,pass});
-      await context.close();
-      assert(pass, `HTTP/DOM smoke failed for ${name}/${viewport.label}`);
-    }
-  } finally {
-    await browser.close();
-    fs.writeFileSync(path.join(dir,`${name}-browser-evidence.json`),JSON.stringify(evidence,null,2)+'\n');
-    process.stdout.write(JSON.stringify(evidence,null,2)+'\n');
-  }
-})().catch(e => { console.error(e.stack || String(e)); process.exitCode = 1; });
+    const dom = execFileSync(process.env.CHROME_BIN || 'google-chrome', [
+      '--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',
+      '--ignore-certificate-errors','--no-first-run',`--user-data-dir=${profile}`,
+      '--virtual-time-budget=12000',`--window-size=${v.width},${v.height}`,
+      `--screenshot=${screenshot}`,'--dump-dom',url
+    ], {timeout:80000,maxBuffer:20*1024*1024,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+    const pngBytes=fs.statSync(screenshot).size;
+    const ok=dom.includes('<html') && dom.length>200 && pngBytes>1000;
+    evidence.probes.push({viewport:v,htmlLength:dom.length,screenshot:path.basename(screenshot),pngBytes,pass:ok});
+    if(!ok) failures.push(v.label);
+  } catch(err) {
+    evidence.probes.push({viewport:v,pass:false,error:String(err.message).slice(0,900)});
+    failures.push(v.label);
+  } finally { fs.rmSync(profile,{recursive:true,force:true}); }
+}
+fs.writeFileSync(path.join(dir,`${name}-browser-evidence.json`),JSON.stringify(evidence,null,2)+'\n');
+process.stdout.write(JSON.stringify(evidence,null,2)+'\n');
+if(failures.length) process.exitCode=1;
