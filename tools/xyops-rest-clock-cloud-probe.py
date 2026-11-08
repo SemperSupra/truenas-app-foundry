@@ -37,7 +37,7 @@ def raw(path, data=None, use_key=False):
              data=json.dumps(data).encode() if data is not None else None,
              method="POST" if data is not None else "GET")
     try:
-        with opener.open(req, timeout=18) as response:
+        with (urllib.request.urlopen(req, timeout=18) if use_key else opener.open(req, timeout=18)) as response:
             return response.status, json.loads(response.read(1000000))
     except urllib.error.HTTPError as exc:
         try:return exc.code,json.loads(exc.read(1000000))
