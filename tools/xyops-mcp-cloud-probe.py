@@ -13,6 +13,7 @@ http=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
 ROOT="http://127.0.0.1:15522"
 MCP="http://127.0.0.1:18080/mcp"
 session_id=None
+csrf_token=None
 
 def request(url,payload=None,headers=None):
     req=urllib.request.Request(url,headers=headers or {},
@@ -30,6 +31,7 @@ def check(cond,name,details=None):
 def call(path,payload=None):
     headers={"Content-Type":"application/json"}
     if session_id: headers["X-Session-ID"]=session_id
+    if session_id and payload is not None and csrf_token: headers["X-CSRF-Token"]=csrf_token
     status,ct,raw=request(ROOT+path,payload,headers)
     try: obj=json.loads(raw)
     except Exception: raise RuntimeError(f"API {path} HTTP={status} non-JSON response")
@@ -56,12 +58,14 @@ def rpc(method,params,id=1,bearer=None):
     return status,obj
 
 def run():
-    global session_id
+    global session_id,csrf_token
     status,_,_=request(MCP,{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}},{"Accept":"application/json,text/event-stream","Content-Type":"application/json"})
     check(status==401,"no-token MCP HTTP denied",{"status":status})
     auth=call("/api/user/login",{"username":"admin","password":"admin"})
     session_id=auth.get("session_id")
+    csrf_token=auth.get("csrf_token")
     check(session_id or list(cookies),"ephemeral admin login for key creation")
+    check(bool(csrf_token),"CSRF token issued for secure key management")
     token=secrets.token_urlsafe(35)
     result=call("/api/app/create_api_key/v1",{
       "title":"RDTE ephemeral restricted client",
