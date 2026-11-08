@@ -28,10 +28,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          docker pull ghcr.io/pixlcore/xyops:v1.1.15
-          docker pull ghcr.io/pixlcore/xycli:latest
-          docker image inspect ghcr.io/pixlcore/xyops:v1.1.15 --format '{{json .RepoDigests}}' > evidence/xyops-image-digests.json
-          docker image inspect ghcr.io/pixlcore/xycli:latest --format '{{json .RepoDigests}}' > evidence/xycli-image-digests.json
+          docker pull ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
+          docker pull ghcr.io/pixlcore/xycli@sha256:4e8df48816480e5b3095b9b33d859f84eccbe698b3ea7d89898f6987ad998ddc
+          docker image inspect ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1 --format '{{json .RepoDigests}}' > evidence/xyops-image-digests.json
+          docker image inspect ghcr.io/pixlcore/xycli@sha256:4e8df48816480e5b3095b9b33d859f84eccbe698b3ea7d89898f6987ad998ddc --format '{{json .RepoDigests}}' > evidence/xycli-image-digests.json
       - name: Start isolated conductor + satellite on runner only
         shell: bash
         run: |
@@ -45,7 +45,7 @@ jobs:
             -e XYOPS_masters=xyops-rdte \
             -e XYOPS_xysat_local=true \
             -e XYOPS_base_app_url=http://127.0.0.1:15522 \
-            -e TZ=UTC ghcr.io/pixlcore/xyops:v1.1.15
+            -e TZ=UTC ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
           healthy=0
           for i in {1..75}; do
             if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then healthy=1; break; fi
@@ -70,7 +70,7 @@ jobs:
             --publish 127.0.0.1:18080:8080 \
             -e XYOPS_BASE_URL=http://xyops-rdte:5522 \
             -e 'XYOPS_MCP={"allowed_hosts":["localhost","127.0.0.1"],"read_only":true}' \
-            ghcr.io/pixlcore/xycli:latest mcp serve --host 0.0.0.0 --port 8080 --read-only
+            ghcr.io/pixlcore/xycli@sha256:4e8df48816480e5b3095b9b33d859f84eccbe698b3ea7d89898f6987ad998ddc mcp serve --host 0.0.0.0 --port 8080 --read-only
           healthy=0
           for i in {1..45}; do
             status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/mcp || true)"
@@ -91,7 +91,7 @@ jobs:
             --publish 127.0.0.1:18080:8080 \
             -e XYOPS_BASE_URL=http://xyops-rdte:5522 \
             -e 'XYOPS_MCP={"allowed_hosts":["localhost","127.0.0.1"],"read_only":false}' \
-            ghcr.io/pixlcore/xycli:latest mcp serve --host 0.0.0.0 --port 8080
+            ghcr.io/pixlcore/xycli@sha256:4e8df48816480e5b3095b9b33d859f84eccbe698b3ea7d89898f6987ad998ddc mcp serve --host 0.0.0.0 --port 8080
           healthy=0
           for i in {1..45}; do
             status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/mcp || true)"
@@ -112,7 +112,7 @@ jobs:
             -e XYOPS_masters=xyops-rdte \
             -e XYOPS_xysat_local=true \
             -e XYOPS_base_app_url=http://127.0.0.1:15522 \
-            -e TZ=UTC ghcr.io/pixlcore/xyops:v1.1.15
+            -e TZ=UTC ghcr.io/pixlcore/xyops@sha256:43661e5257b26cd0cc680c3588ff8432d9e5e92dc3cd50a345529d3f260721e1
           healthy=0
           for i in {1..65}; do
             if curl --silent --fail http://127.0.0.1:15522/api/app/ping >/dev/null; then healthy=1; break; fi
