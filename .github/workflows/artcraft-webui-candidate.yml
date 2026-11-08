@@ -28,7 +28,7 @@ jobs:
           docker pull ghcr.io/sbuchweitz/artcraft-in-a-box:latest
           mkdir -p evidence
           docker image inspect ghcr.io/sbuchweitz/artcraft-in-a-box:latest --format '{{json .RepoDigests}}' > evidence/wasm-image-digests.json
-          docker run -d --name craft-wasm-rdte --read-only --cap-drop ALL --security-opt no-new-privileges --publish 127.0.0.1:18080:8080 ghcr.io/sbuchweitz/artcraft-in-a-box:latest
+          docker run -d --name craft-wasm-rdte --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges --publish 127.0.0.1:18080:8080 ghcr.io/sbuchweitz/artcraft-in-a-box:latest
           for i in {1..60}; do if curl --fail --silent http://127.0.0.1:18080/healthz >/dev/null; then break; fi; sleep 2; done
           curl --fail --show-error --silent http://127.0.0.1:18080/healthz
           curl --fail --show-error --silent http://127.0.0.1:18080/versions.json > evidence/wasm-versions.json
@@ -38,6 +38,9 @@ jobs:
         run: |
           set -euo pipefail
           ARTCRAFT_PROBE_URL=http://127.0.0.1:18080/photocraft/ ARTCRAFT_PROBE_NAME=wasm-photocraft ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
+      - name: Capture container diagnostics
+        if: always()
+        run: docker logs craft-wasm-rdte > evidence/wasm-container.log 2>&1 || true
       - name: Publish public-safe CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -69,7 +72,7 @@ jobs:
       - name: Inspect desktop using Chrome on desktop and mobile viewports
         run: |
           set -euo pipefail
-          ARTCRAFT_PROBE_URL=https://127.0.0.1:13001/ ARTCRAFT_PROBE_NAME=streamed-desktop ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
+          ARTCRAFT_MIN_SCREENSHOT_BYTES=20000 ARTCRAFT_PROBE_URL=https://127.0.0.1:13001/ ARTCRAFT_PROBE_NAME=streamed-desktop ARTCRAFT_EVIDENCE_DIR=evidence node tools/artcraft-browser-probe.cjs
       - name: Publish public-safe CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
