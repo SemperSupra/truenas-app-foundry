@@ -28,10 +28,10 @@ jobs:
           mkdir -p evidence /tmp/artcraft-bin
           version=0.21.0
           file="photocraft-${version}-linux-x86_64.tar.gz"
-          curl -fsSL --retry 3 -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/storytold/photocraft/releases/tags/v${version}" > evidence/upstream-release.json
-          digest="$(jq -r --arg n "$file" '.assets[] | select(.name == $n) | .digest' evidence/upstream-release.json)"
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then echo "missing explicit upstream digest for $file"; exit 1; fi
-          curl -fsSL --retry 3 -o /tmp/artcraft-bin/photocraft.tar.gz "https://github.com/storytold/photocraft/releases/download/v${version}/$file"
+          # Exact SHA-256 sourced from upstream GitHub release metadata and verified by prior PASS run 42492773892.
+          # Do not call the unauthenticated GitHub API for every CI retry (hit 403 rate limit).
+          digest="sha256:3115e56cc646dbad3541e39b6323b8a24318fee6194d784ddf6d065f7b5d2d37"
+          curl -fsSL --retry 3 --retry-all-errors --retry-delay 3 -o /tmp/artcraft-bin/photocraft.tar.gz "https://github.com/storytold/photocraft/releases/download/v${version}/$file"
           printf '%s  %s\n' "${digest#sha256:}" /tmp/artcraft-bin/photocraft.tar.gz | sha256sum -c -
           echo "$digest" > evidence/release-digest.txt
           tar -xzf /tmp/artcraft-bin/photocraft.tar.gz -C /tmp/artcraft-bin
