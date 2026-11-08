@@ -22,8 +22,9 @@ for (const v of [{width:1280,height:800,label:'desktop'},{width:390,height:844,l
       `--screenshot=${screenshot}`,'--dump-dom',url
     ], {timeout:80000,maxBuffer:20*1024*1024,encoding:'utf8',stdio:['ignore','pipe','pipe']});
     const pngBytes=fs.statSync(screenshot).size;
-    const ok=dom.includes('<html') && dom.length>200 && pngBytes>1000;
-    evidence.probes.push({viewport:v,htmlLength:dom.length,screenshot:path.basename(screenshot),pngBytes,pass:ok});
+    const minScreenshotBytes=Number(process.env.ARTCRAFT_MIN_SCREENSHOT_BYTES || 1000);
+    const ok=dom.includes('<html') && dom.length>200 && pngBytes>minScreenshotBytes;
+    evidence.probes.push({viewport:v,htmlLength:dom.length,screenshot:path.basename(screenshot),pngBytes,minScreenshotBytes,pass:ok});
     if(!ok) failures.push(v.label);
   } catch(err) {
     evidence.probes.push({viewport:v,pass:false,error:String(err.message).slice(0,900)});
