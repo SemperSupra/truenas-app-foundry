@@ -144,12 +144,30 @@ def run():
             ids.append(eid)
             check(type(revision) is int and revision>=1,"revision received "+kind)
             event=get_rest(eid)
-            values_match=all(event.get("params",{}).get(k)==v for k,v in spec["params"].items())
+            plugin_definition=next((x for x in existing if x.get("id")==spec["plugin"]),None)
+            if kind=="special":
+                plugin_definition=p
+            param_defs={x["id"]:x for x in plugin_definition.get("params",[])
+                        if isinstance(x,dict) and x.get("id")}
+            stored=event.get("params",{})
+            expected={}
+            locked=[]
+            for k,v in spec["params"].items():
+                definition=param_defs.get(k,{})
+                if definition.get("locked"):
+                    expected[k]=definition.get("value")
+                    locked.append(k)
+                else:
+                    expected[k]=v
+            values_match=all(stored.get(k)==v for k,v in expected.items())
             check(event.get("plugin")==spec["plugin"] and values_match,
-                  "REST preserves MCP plugin and submitted parameters "+kind,
+                  "REST preserves MCP plugin and server-enforced parameter policy "+kind,
                   {"plugin_match":event.get("plugin")==spec["plugin"],
-                   "input_keys_preserved":values_match,
-                   "extra_server_default_keys":sorted(set(event.get("params",{}))-set(spec["params"]))})
+                   "submitted_keys":sorted(spec["params"]),
+                   "stored_keys":sorted(stored),
+                   "locked_fields":locked,
+                   "input_effective_match":values_match,
+                   "actual_excerpt":{k:str(stored.get(k))[:90] for k in spec["params"]}})
             triggers=event.get("triggers",[])
             check(any(t.get("type")=="manual" and bool(t.get("enabled"))
                       for t in triggers),"manual schedule survives xyOps normalization "+kind)
