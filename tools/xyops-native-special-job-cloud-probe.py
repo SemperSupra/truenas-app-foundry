@@ -146,8 +146,13 @@ def run():
     info=job_wait(special_job)
     check(info.get("code")==0,"native special event completed",{"code":info.get("code"),"log_excerpt":job_output(special_job)[-400:]})
     api("/api/app/update_event/v1",{"id":sid,"enabled":False})
-    check(marker_wait(special_job,"synthetic reference receipt only"),
-          "special plugin synthetic receipt emitted without sidecar execution")
+    # Native xyOps consumes the {xy:1,complete:true,code:0,description}
+    # protocol line and does NOT append it to the raw stdout log.
+    # Its job record is the authoritative place for structured completion.
+    check("synthetic reference receipt only" in str(info.get("description","")) or
+          marker_wait(special_job,"synthetic reference receipt only",timeout=3),
+          "native job retains structured synthetic completion description",
+          {"stored_description":str(info.get("description",""))[:180]})
 
     # Negative: a user may author the event in xyOps, but plugin must still
     # refuse to turn unapproved parameters into Agent Dispatch work.
