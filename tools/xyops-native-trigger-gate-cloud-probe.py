@@ -106,9 +106,9 @@ def run():
           "targets": ["main"], "algo": "random", "plugin": "shellplug",
           "params": {"script": "#!/bin/sh\nprintf 'synthetic-trigger-marker\\n'"},
           "triggers": [
-            {"type": "schedule", "enabled": True, "timezone": "UTC"},
+            {"type": "schedule", "enabled": True, "timezone": "America/New_York"},
             {"type": "plugin", "enabled": True, "plugin_id": "synthetic_condition_gate",
-             "params": {"watch_key": key}, "timezone": "UTC"},
+             "params": {"watch_key": key}, "timezone": "America/New_York"},
           ],
         }).get("event", {})
         check(bool(event.get("id")), "created native synthetic event for "+key)
