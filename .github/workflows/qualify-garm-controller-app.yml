@@ -107,6 +107,36 @@ jobs:
           ' "$out" >/dev/null
           rm -f "$out"
 
+      - name: Verify private Compose atomic-write and symlink safety
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import stat
+          import tempfile
+          from pathlib import Path
+
+          from tools.render_truenas_candidate import write_private_output
+
+          payload = {"services": {"fixture": {"image": "synthetic-only"}}}
+          with tempfile.TemporaryDirectory() as directory:
+              root = Path(directory)
+              victim = root / "untouched.txt"
+              victim.write_text("UNCHANGED", encoding="utf-8")
+              target = root / "private-compose.json"
+              target.symlink_to(victim)
+              write_private_output(target, payload)
+              assert not target.is_symlink(), "destination symlink was followed"
+              assert victim.read_text(encoding="utf-8") == "UNCHANGED"
+              assert stat.S_IMODE(target.stat().st_mode) == 0o600
+              assert json.loads(target.read_text(encoding="utf-8")) == payload
+              assert not list(root.glob(".private-compose.json.*")), "temp file leaked"
+              target.chmod(0o644)
+              write_private_output(target, payload)
+              assert stat.S_IMODE(target.stat().st_mode) == 0o600
+          print("Atomic private Compose output and symlink negatives PASS")
+          PY
+
       - name: Resolve exact appliance identity
         id: appliance
         shell: bash
