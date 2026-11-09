@@ -174,7 +174,7 @@ def run():
         outcomes=list(pool.map(duplicate_delivery,range(4)))
     accepted=[o["job"] for o in outcomes if o["http"]==200 and o["code"]==0 and o["job"]]
     post_jobs=wait_count(inc_id,2+len(accepted),timeout=30)
-    concurrent={
+    concurrency_observation={
         "delivery_count":4,"native_accepted":len(accepted),
         "native_distinct_job_ids":len(set(accepted)),
         "total_inbound_jobs_observed":len(post_jobs),
@@ -191,7 +191,7 @@ def run():
             "inbound":"TOKENIZED_MAGIC_LINK_DEMONSTRATED",
             "outbound":"LOCAL_HTTP_WEBHOOK_DEMONSTRATED",
             "replay":"REQUIRES_SIDECAR_OWNER_IDEMPOTENCY",
-            "concurrent_duplicate_delivery":concurrent,
+            "concurrent_duplicate_delivery":concurrency_observation,
             "auth":"BEARER_URL_ONLY_NOT_GITHUB_SIGNATURE",
             "external_network_touched":False,
             "pandora_touched":False,"suprachat_touched":False}
