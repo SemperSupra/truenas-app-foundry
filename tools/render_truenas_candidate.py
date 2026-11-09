@@ -184,6 +184,27 @@ def render(manifest_path: Path, values_path: Path) -> dict[str, Any]:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def write_private_output(path: Path, compose: dict[str, Any]) -> None:
+    """Publish secret-bearing Compose atomically, with 0600 from creation.
+
+    A write-then-chmod sequence exposes bytes briefly when the parent is
+    readable by others. Replacing the directory entry also avoids following
+    a pre-existing output symlink to another file.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as destination:
+            os.fchmod(destination.fileno(), 0o600)
+            destination.write(json.dumps(compose, sort_keys=True, indent=2) + "\n")
+            destination.flush()
+            os.fsync(destination.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", type=Path, required=True)
@@ -198,12 +219,7 @@ def main() -> int:
 
     try:
         compose = render(args.candidate, args.values)
-        args.output_compose.parent.mkdir(parents=True, exist_ok=True)
-        args.output_compose.write_text(
-            json.dumps(compose, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.chmod(args.output_compose, 0o600)
+        write_private_output(args.output_compose, compose)
         print(json.dumps({
             "status": "PASS",
             "output_mode": "0600",
