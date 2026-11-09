@@ -216,6 +216,16 @@ def run():
     check(bool(CSRF and (SESSION or list(JAR))),"new native session")
     retained=len(event_jobs(inc_id))
     check(retained>=prior_count,"prior native history survived restart")
+    worker_online=False
+    for _ in range(150):
+        native=api("/api/app/get_active_servers/v1")
+        active=native.get("servers") or native.get("rows") or []
+        if len(active)>0:
+            worker_online=True
+            break
+        time.sleep(.2)
+    worker_ready_ms=round((time.monotonic()-start)*1000,3)
+    check(worker_online,"native execution worker recovered after restart")
     code,new_job=request("/api/app/magic/v1/"+incoming_key,
         {"synthetic":"event","serial":"one"},
         {"X-GitHub-Delivery":delivery_id})
@@ -230,6 +240,7 @@ def run():
     restart_receipt={
        "same_volume":True,"prior_jobs":prior_count,"restored_jobs":retained,
        "ready_and_replay_ms":round((time.monotonic()-start)*1000,3),
+       "worker_ready_ms":worker_ready_ms,
        "duplicate_delivery_new_job":True,
        "complete_before_restart":concurrent_observed,
        "owner_effect_qualified":False,"host_reboot_tested":False}
