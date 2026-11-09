@@ -223,7 +223,10 @@ def run():
           [jid,launched2.get("id")]+accepted,"replayed delivery still creates new native job")
     last=wait_job(new_job["id"])
     check(last.get("complete") and last.get("code")==0,
-          "post-restart native job completed")
+          "post-restart native job completed",
+          {"code":last.get("code"),"complete":last.get("complete"),
+           "state":last.get("state"),
+           "description":str(last.get("description") or "")[:250]})
     restart_receipt={
        "same_volume":True,"prior_jobs":prior_count,"restored_jobs":retained,
        "ready_and_replay_ms":round((time.monotonic()-start)*1000,3),
