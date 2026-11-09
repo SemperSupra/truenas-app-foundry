@@ -7,6 +7,7 @@ import concurrent.futures
 import http.cookiejar
 import json
 import secrets
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -185,6 +186,50 @@ def run():
     }
     check(len(post_jobs)>=2,"concurrent ingress did not erase prior native history",
           {"count":len(post_jobs)})
+    # R7: process restart on the isolated public CI container using the
+    # unchanged native state volume. Prove history persisted, then attempt
+    # identical external delivery again (must not infer owner exactly-once).
+    prior_count=len(post_jobs)
+    finished=[wait_job(j) for j in accepted]
+    concurrent_observed=sum(int(j.get("complete") and j.get("code")==0) for j in finished)
+    check(concurrent_observed==len(accepted),"all R6 inbound jobs completed")
+    r=subprocess.run(["docker","restart","xyops-webhooks"],
+                     capture_output=True,text=True,timeout=30)
+    check(r.returncode==0,"isolated native container restart")
+    ready=False
+    start=time.monotonic()
+    for _ in range(100):
+        try:
+            code,_=request("/api/app/ping")
+            if code==200:
+                ready=True
+                break
+        except OSError:
+            pass
+        time.sleep(.2)
+    check(ready,"native endpoint recovered after restart")
+    SESSION=None
+    CSRF=None
+    again=api("/api/user/login",{"username":"admin","password":"admin"})
+    SESSION=again.get("session_id")
+    CSRF=again.get("csrf_token")
+    check(bool(CSRF and (SESSION or list(JAR))),"new native session")
+    retained=len(event_jobs(inc_id))
+    check(retained>=prior_count,"prior native history survived restart")
+    code,new_job=request("/api/app/magic/v1/"+incoming_key,
+        {"synthetic":"event","serial":"one"},
+        {"X-GitHub-Delivery":delivery_id})
+    check(code==200 and new_job.get("code")==0 and new_job.get("id") not in
+          [jid,launched2.get("id")]+accepted,"replayed delivery still creates new native job")
+    last=wait_job(new_job["id"])
+    check(last.get("complete") and last.get("code")==0,
+          "post-restart native job completed")
+    restart_receipt={
+       "same_volume":True,"prior_jobs":prior_count,"restored_jobs":retained,
+       "ready_and_replay_ms":round((time.monotonic()-start)*1000,3),
+       "duplicate_delivery_new_job":True,
+       "complete_before_restart":concurrent_observed,
+       "owner_effect_qualified":False,"host_reboot_tested":False}
     api("/api/app/update_event/v1",{"id":inc_id,"enabled":False})
     api("/api/app/update_event/v1",{"id":recv_id,"enabled":False})
     return {"status":"PASS","checks":CHECKS,
@@ -192,6 +237,7 @@ def run():
             "outbound":"LOCAL_HTTP_WEBHOOK_DEMONSTRATED",
             "replay":"REQUIRES_SIDECAR_OWNER_IDEMPOTENCY",
             "concurrent_duplicate_delivery":concurrency_observation,
+            "native_restart_recovery":restart_receipt,
             "auth":"BEARER_URL_ONLY_NOT_GITHUB_SIGNATURE",
             "external_network_touched":False,
             "pandora_touched":False,"suprachat_touched":False}
