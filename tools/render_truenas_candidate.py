@@ -72,8 +72,13 @@ def checkout_upstream(root: Path, manifest: dict[str, Any]) -> Path:
     require(isinstance(materializer, dict), "candidate source_materializer is required")
     repository = materializer.get("repository")
     commit = materializer.get("commit")
-    require(isinstance(repository, str) and repository.startswith("https://"), "materializer repository must be HTTPS")
-    require(isinstance(commit, str) and len(commit) == 40, "materializer commit must be a full SHA")
+    # This program executes the pinned upstream CI renderer, so accepting any
+    # HTTPS repository would turn a candidate manifest into arbitrary code.
+    require(repository == "https://github.com/truenas/apps.git",
+            "materializer must be the official TrueNAS apps source")
+    require(isinstance(commit, str) and len(commit) == 40 and
+            all(ch in "0123456789abcdef" for ch in commit),
+            "materializer commit must be a lowercase full SHA")
 
     checkout = root / "truenas-apps"
     run_private(["git", "init", "--quiet", str(checkout)], cwd=root)
