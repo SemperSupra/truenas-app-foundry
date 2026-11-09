@@ -19,6 +19,10 @@ SPEC.loader.exec_module(MOD)
 QUESTIONS = {
     "questions": [
         {
+            "variable": "TZ",
+            "schema": {"type": "string", "$ref": ["definitions/timezone"]},
+        },
+        {
             "variable": "network",
             "schema": {
                 "type": "dict",
@@ -78,6 +82,7 @@ QUESTIONS = {
 class PlatformValuesTests(unittest.TestCase):
     def base_values(self):
         return {
+            "TZ": "Etc/UTC",
             "network": {"certificate_id": 7, "host_ips": []},
             "storage": {
                 "config": {
@@ -91,6 +96,7 @@ class PlatformValuesTests(unittest.TestCase):
 
     def resolved(self, certificate="CERTIFICATE-A"):
         return {
+            "timezones": {"Etc/UTC": "Etc/UTC", "Europe/Berlin": "Europe/Berlin"},
             "certificates": {
                 "7": {
                     "id": 7,
@@ -106,6 +112,20 @@ class PlatformValuesTests(unittest.TestCase):
                 }
             },
         }
+
+    def test_timezone_is_validated_and_preserved(self):
+        normalized, plan = MOD.prepare_values(QUESTIONS, self.base_values(), self.resolved())
+        self.assertEqual(normalized["TZ"], "Etc/UTC")
+        self.assertIn(
+            {"feature": "definitions/timezone", "id": "Etc/UTC"},
+            plan["dependencies"],
+        )
+
+    def test_unknown_timezone_fails_closed(self):
+        values = self.base_values()
+        values["TZ"] = "Mars/Olympus"
+        with self.assertRaises(MOD.MaterializationError):
+            MOD.prepare_values(QUESTIONS, values, self.resolved())
 
     def test_certificate_and_volume_are_injected(self):
         normalized, plan = MOD.prepare_values(QUESTIONS, self.base_values(), self.resolved())

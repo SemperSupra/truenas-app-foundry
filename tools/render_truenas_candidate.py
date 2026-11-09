@@ -72,8 +72,13 @@ def checkout_upstream(root: Path, manifest: dict[str, Any]) -> Path:
     require(isinstance(materializer, dict), "candidate source_materializer is required")
     repository = materializer.get("repository")
     commit = materializer.get("commit")
-    require(isinstance(repository, str) and repository.startswith("https://"), "materializer repository must be HTTPS")
-    require(isinstance(commit, str) and len(commit) == 40, "materializer commit must be a full SHA")
+    # This program executes the pinned upstream CI renderer, so accepting any
+    # HTTPS repository would turn a candidate manifest into arbitrary code.
+    require(repository == "https://github.com/truenas/apps.git",
+            "materializer must be the official TrueNAS apps source")
+    require(isinstance(commit, str) and len(commit) == 40 and
+            all(ch in "0123456789abcdef" for ch in commit),
+            "materializer commit must be a lowercase full SHA")
 
     checkout = root / "truenas-apps"
     run_private(["git", "init", "--quiet", str(checkout)], cwd=root)
@@ -184,6 +189,27 @@ def render(manifest_path: Path, values_path: Path) -> dict[str, Any]:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def write_private_output(path: Path, compose: dict[str, Any]) -> None:
+    """Publish secret-bearing Compose atomically, with 0600 from creation.
+
+    A write-then-chmod sequence exposes bytes briefly when the parent is
+    readable by others. Replacing the directory entry also avoids following
+    a pre-existing output symlink to another file.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as destination:
+            os.fchmod(destination.fileno(), 0o600)
+            destination.write(json.dumps(compose, sort_keys=True, indent=2) + "\n")
+            destination.flush()
+            os.fsync(destination.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", type=Path, required=True)
@@ -198,12 +224,7 @@ def main() -> int:
 
     try:
         compose = render(args.candidate, args.values)
-        args.output_compose.parent.mkdir(parents=True, exist_ok=True)
-        args.output_compose.write_text(
-            json.dumps(compose, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.chmod(args.output_compose, 0o600)
+        write_private_output(args.output_compose, compose)
         print(json.dumps({
             "status": "PASS",
             "output_mode": "0600",

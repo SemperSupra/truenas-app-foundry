@@ -1,0 +1,98 @@
+name: FolioRelay T6 Candidate Contract
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/version-aware-truenas-target-reconcile
+    paths:
+      - ".foundry/foliorelay/**"
+      - ".foundry/truenas-compatibility/**"
+      - "tools/build_foliorelay_t6_control.py"
+      - "tools/test_build_foliorelay_t6_control.py"
+      - ".github/workflows/validate-foliorelay-t6-candidate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  target-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["25.04.1", "25.04.2.6", "25.10.7", "26.0.0-BETA.3"]
+    steps:
+      - name: Checkout exact Foundry source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Unit test FolioRelay exporter
+        run: python3 -m unittest tools/test_build_foliorelay_t6_control.py
+
+      - name: Build exact target control bundle
+        env:
+          TARGET_VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          out="/tmp/foliorelay-t6-${TARGET_VERSION}"
+          rm -rf "$out"
+          python3 tools/build_foliorelay_t6_control.py \
+            --publication-receipt .foundry/foliorelay/t6/beta3/publication-receipt.json \
+            --compose .foundry/foliorelay/t6/beta3/compose.json \
+            --values .foundry/foliorelay/t6/beta3/values.yaml \
+            --target-profile ".foundry/truenas-compatibility/${TARGET_VERSION}-materialization.json" \
+            --output "$out" \
+            --foundry-ref "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify control receipt binds exact candidate
+        env:
+          TARGET_VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import os
+          version = os.environ["TARGET_VERSION"]
+          root = Path(f"/tmp/foliorelay-t6-{version}")
+          control = json.loads((root / "control.json").read_text())
+          publication = json.loads(Path(".foundry/foliorelay/t6/beta3/publication-receipt.json").read_text())
+          expected_control = publication["control"]["image"] + "@" + publication["control"]["digest"]
+          expected_cups = publication["cups"]["image"] + "@" + publication["cups"]["digest"]
+          assert publication["schema"] == "semper-supra.foliorelay-rdte-publication/1"
+          assert publication["status"] == "PASS"
+          assert publication["control"]["anonymous_pull"] is True
+          assert publication["cups"]["anonymous_pull"] is True
+          assert publication["control"]["signed_keyless"] is True
+          assert publication["cups"]["signed_keyless"] is True
+          assert control["schema"] == "semper-supra.foliorelay-truenas-t6-control/1"
+          assert control["candidate"]["truenas_version"] == version
+          assert control["candidate"]["control_image"] == expected_control
+          assert control["candidate"]["cups_image"] == expected_cups
+          required = set(control["required_oracles"])
+          assert "control-cups-dnssd-uuid-coherence" in required
+          assert "dnssd-universal-visible" in required
+          assert "pdf-exact-source-inbox" in required
+          assert "urf-exact-source-inbox" in required
+          assert "delete-zero-residue" in required
+          print(json.dumps({
+              "status": "PASS",
+              "schema": control["schema"],
+              "foundry_ref": control["foundry_ref"],
+              "truenas_version": control["candidate"]["truenas_version"],
+              "control_image": control["candidate"]["control_image"],
+              "cups_image": control["candidate"]["cups_image"],
+              "compose_sha256": control["artifacts"]["compose_canonical_sha256"],
+              "secrets_captured": control["secrets_captured"],
+          }, sort_keys=True))
+          PY
+
+      - name: Upload exact target control bundle
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: foliorelay-t6-${{ matrix.version }}-control
+          path: /tmp/foliorelay-t6-${{ matrix.version }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

@@ -165,6 +165,26 @@ def apply_ref(
     if ref == "definitions/certificate":
         normalize_certificate(value, normalized, resolved, plan, path)
         return
+    if ref == "definitions/timezone":
+        if not value_is_active(value):
+            return
+        timezones = resolved.get("timezones")
+        if isinstance(timezones, dict):
+            allowed = set(str(item) for item in timezones)
+        elif isinstance(timezones, list):
+            allowed = set(str(item) for item in timezones)
+        else:
+            raise MaterializationError(f"{path}: resolved.timezones must be an object or list")
+        timezone = str(value)
+        if timezone not in allowed:
+            raise MaterializationError(f"{path}: timezone {timezone!r} is not in resolved choices")
+        plan["dependencies"].append(
+            {
+                "feature": "definitions/timezone",
+                "id": timezone,
+            }
+        )
+        return
     if ref == "normalize/ix_volume":
         normalize_ix_volume(value, normalized, resolved, plan, path)
         return

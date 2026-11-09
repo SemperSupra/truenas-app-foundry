@@ -5,7 +5,6 @@ This intentionally does not emulate TrueNAS. It verifies that an exact upstream
 checkout still contains the source identities and semantics recorded by a
 Foundry compatibility profile. Live appliance behavior remains a HIL concern.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -135,9 +134,15 @@ def main() -> int:
         )
 
     assumptions = profile.get("provider_assumptions", {})
+    app_states = assumptions.get("app_states", [])
+    if not isinstance(app_states, list) or not all(isinstance(x, str) for x in app_states):
+        fail("provider_assumptions.app_states must be an array of strings")
+    if len(app_states) != len(set(app_states)):
+        fail("provider_assumptions.app_states must not contain duplicates")
     required_states = {"CRASHED", "DEPLOYING", "RUNNING", "STOPPED"}
-    if set(assumptions.get("app_states", [])) != required_states:
-        fail("Apps state contract must explicitly enumerate CRASHED/DEPLOYING/RUNNING/STOPPED")
+    missing_states = required_states - set(app_states)
+    if missing_states:
+        fail(f"Apps state contract is missing required core states: {sorted(missing_states)!r}")
 
     required_workload_fields = {
         "containers",
@@ -159,6 +164,40 @@ def main() -> int:
     if delete_semantics.get("ix_volumes_removed_only_when_requested") is not True:
         fail("profile must record conditional ixVolume dataset deletion")
 
+    runtime_api = profile.get("runtime_api")
+    if not isinstance(runtime_api, dict):
+        fail("materialization profile must define runtime_api")
+    if runtime_api.get("transport") != "middleware-json-rpc":
+        fail("runtime_api.transport must be middleware-json-rpc")
+    if runtime_api.get("version_probe") != "system.version":
+        fail("runtime_api.version_probe must be system.version")
+    if runtime_api.get("capability_probe") != "core.get_methods":
+        fail("runtime_api.capability_probe must be core.get_methods")
+    for key, method, job_backed in (
+        ("app_query", "app.query", None),
+        ("app_config", "app.config", None),
+        ("app_create", "app.create", True),
+        ("app_update", "app.update", True),
+        ("app_stop", "app.stop", True),
+        ("app_start", "app.start", True),
+        ("app_redeploy", "app.redeploy", True),
+        ("app_delete", "app.delete", True),
+    ):
+        contract = runtime_api.get(key)
+        if not isinstance(contract, dict) or contract.get("method") != method:
+            fail(f"runtime_api.{key} must bind {method}")
+        if job_backed is not None and contract.get("job_backed") is not job_backed:
+            fail(f"runtime_api.{key}.job_backed must be {job_backed}")
+    if runtime_api["app_create"].get("arguments") != "single-dictionary":
+        fail("current qualified releases require app.create single-dictionary payload")
+    if runtime_api["app_update"].get("arguments") != "app_name-plus-update-dictionary":
+        fail("current qualified releases require app.update app_name + update dictionary")
+    for key in ("app_stop", "app_start", "app_redeploy"):
+        if runtime_api[key].get("arguments") != "app_name":
+            fail(f"current qualified releases require runtime_api.{key} app_name argument")
+    if runtime_api["app_delete"].get("arguments") != "app_name-plus-options":
+        fail("current qualified releases require app.delete app_name + options")
+
     feature_summary = validate_materialization_profile(profile) if schema_version >= 2 else None
 
     evidence = {
@@ -171,6 +210,7 @@ def main() -> int:
         "middleware_commit": actual_commit,
         "checked_files": checked_files,
         "provider_assumptions": assumptions,
+        "runtime_api": runtime_api,
         "platform_features": feature_summary,
         "scope": profile.get("scope", {}),
     }

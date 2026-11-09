@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "reconnaissance-only",
+  "observed_upstream": {
+    "repository": "https://github.com/truenas/middleware.git",
+    "commit": "33cb50f9455a1f9fa5f657e096a26fa78df1d555",
+    "api_family": "v27_0_0",
+    "app_api_path": "src/middlewared/middlewared/api/v27_0_0/app.py",
+    "app_api_blob_sha": "840d468009ad2a8069cf81cd3bbb5f76567d9941"
+  },
+  "observations": [
+    {
+      "finding": "AppEntry state model adds ERROR",
+      "implication": "verification must recognize ERROR as a distinct failure/read-only-delete state rather than an unknown string"
+    },
+    {
+      "finding": "AppCreateArgs is an explicit app_create wrapper model instead of using @single_argument_args('app_create')",
+      "implication": "future apply adapters must bind invocation shape from the exact profile and must not inherit the 25/26 create-call contract"
+    },
+    {
+      "finding": "custom_compose_config and custom_compose_config_string are FullAdmin fields",
+      "implication": "future observer/planner must preserve privilege requirements and never infer callability from method name alone"
+    }
+  ],
+  "qualification_policy": {
+    "support_claim": false,
+    "mutation_allowed": false,
+    "exact_release_required": true,
+    "source_profile_required": true,
+    "real_system_runtime_evidence_required": true
+  }
+}
