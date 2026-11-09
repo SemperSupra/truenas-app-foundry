@@ -116,7 +116,9 @@ jobs:
           import tempfile
           from pathlib import Path
 
-          from tools.render_truenas_candidate import write_private_output
+          from tools.render_truenas_candidate import (
+              RenderError, checkout_upstream, write_private_output,
+          )
 
           payload = {"services": {"fixture": {"image": "synthetic-only"}}}
           with tempfile.TemporaryDirectory() as directory:
@@ -134,7 +136,21 @@ jobs:
               target.chmod(0o644)
               write_private_output(target, payload)
               assert stat.S_IMODE(target.stat().st_mode) == 0o600
-          print("Atomic private Compose output and symlink negatives PASS")
+              for url, revision in [
+                  ("https://untrusted.invalid/apps.git", "a" * 40),
+                  ("file:///tmp/apps.git", "a" * 40),
+                  ("https://github.com/truenas/apps.git", "X" * 40),
+              ]:
+                  try:
+                      checkout_upstream(root, {
+                          "source_materializer": {
+                              "repository": url, "commit": revision,
+                          },
+                      })
+                  except RenderError:
+                      continue
+                  raise AssertionError("Untrusted renderer origin accepted")
+          print("Atomic output, symlink and untrusted-origin negatives PASS")
           PY
 
       - name: Resolve exact appliance identity
