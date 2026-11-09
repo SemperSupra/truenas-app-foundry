@@ -3,6 +3,7 @@
 No private data, no external callback, no production authentication, no
 Agent Dispatch/WOW or SupraChat session; disposable public cloud runner only.
 """
+import concurrent.futures
 import http.cookiejar
 import json
 import secrets
@@ -100,7 +101,7 @@ def run():
       "headers":[{"name":"Content-Type","value":"application/json"}],
       "body":json.dumps({"type":marker,"source":"xyops-rdte"}),
       "retries":0,"timeout":10,"follow":False,"ssl_cert_bypass":False,
-      "max_per_day":5
+      "max_per_day":20
     }).get("web_hook",{})
     check(hook.get("id")=="rdte_outbound_receipt","native outbound HTTP webhook created")
     incoming=api("/api/app/create_event/v1",{
@@ -149,12 +150,48 @@ def run():
     wait_job(launched2["id"])
     check(len(wait_count(inc_id,2,timeout=15))>=2,
           "duplicate ingress observed, NOT an idempotency PASS")
+    # Distinct concurrent R6 lane: FOUR identical external delivery IDs,
+    # submitted through independent unauthenticated-by-session Magic requests.
+    # No private webhook, no GitHub signature or owner-effect simulation.
+    def duplicate_delivery(_):
+        payload=json.dumps({"synthetic":"event","serial":"one"}).encode("utf-8")
+        q=urllib.request.Request(
+            ROOT+"/api/app/magic/v1/"+incoming_key,data=payload,
+            headers={"Content-Type":"application/json",
+                     "X-GitHub-Delivery":delivery_id,
+                     "X-Research-Synthetic":"concurrent-r6"},method="POST")
+        try:
+            with urllib.request.urlopen(q,timeout=30) as res:
+                ans=json.loads(res.read(1000000))
+                return {"http":res.status,"code":ans.get("code"),
+                        "job":ans.get("id")}
+        except urllib.error.HTTPError as e:
+            return {"http":e.code,"code":"native-http-error","job":None}
+        except Exception as e:
+            return {"http":None,"code":type(e).__name__,"job":None}
+    t0=time.monotonic()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        outcomes=list(pool.map(duplicate_delivery,range(4)))
+    accepted=[o["job"] for o in outcomes if o["http"]==200 and o["code"]==0 and o["job"]]
+    post_jobs=wait_count(inc_id,2+len(accepted),timeout=30)
+    concurrent={
+        "delivery_count":4,"native_accepted":len(accepted),
+        "native_distinct_job_ids":len(set(accepted)),
+        "total_inbound_jobs_observed":len(post_jobs),
+        "wall_ms":round((time.monotonic()-t0)*1000,3),
+        "statuses":[{"http":o["http"],"code":o["code"]} for o in outcomes],
+        "external_delivery_id_dedup_qualified":False,
+        "actual_owner_effect_qualified":False,
+    }
+    check(len(post_jobs)>=2,"concurrent ingress did not erase prior native history",
+          {"count":len(post_jobs)})
     api("/api/app/update_event/v1",{"id":inc_id,"enabled":False})
     api("/api/app/update_event/v1",{"id":recv_id,"enabled":False})
     return {"status":"PASS","checks":CHECKS,
             "inbound":"TOKENIZED_MAGIC_LINK_DEMONSTRATED",
             "outbound":"LOCAL_HTTP_WEBHOOK_DEMONSTRATED",
             "replay":"REQUIRES_SIDECAR_OWNER_IDEMPOTENCY",
+            "concurrent_duplicate_delivery":concurrent,
             "auth":"BEARER_URL_ONLY_NOT_GITHUB_SIGNATURE",
             "external_network_touched":False,
             "pandora_touched":False,"suprachat_touched":False}
