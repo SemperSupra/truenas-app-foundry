@@ -123,9 +123,28 @@ def install_candidate(checkout: Path, manifest: dict[str, Any]) -> tuple[Path, s
     return app_dir, train, app
 
 
+def _write_private_text(path: Path, content: str) -> None:
+    """Atomically replace a private artifact, with 0600 before any bytes.
+
+    Shared by input fixture YAML and normalized Compose JSON. Do not follow a
+    pre-existing destination symlink or leave secret-bearing temporary files.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as destination:
+            os.fchmod(destination.fileno(), 0o600)
+            destination.write(content)
+            destination.flush()
+            os.fsync(destination.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
 def write_private_yaml(path: Path, value: dict[str, Any]) -> None:
-    path.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
-    os.chmod(path, 0o600)
+    _write_private_text(path, yaml.safe_dump(value, sort_keys=False))
 
 
 def normalize_compose(rendered: Path, checkout: Path) -> dict[str, Any]:
@@ -190,24 +209,8 @@ def render(manifest_path: Path, values_path: Path) -> dict[str, Any]:
 
 
 def write_private_output(path: Path, compose: dict[str, Any]) -> None:
-    """Publish secret-bearing Compose atomically, with 0600 from creation.
-
-    A write-then-chmod sequence exposes bytes briefly when the parent is
-    readable by others. Replacing the directory entry also avoids following
-    a pre-existing output symlink to another file.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as destination:
-            os.fchmod(destination.fileno(), 0o600)
-            destination.write(json.dumps(compose, sort_keys=True, indent=2) + "\n")
-            destination.flush()
-            os.fsync(destination.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    """Publish secret-bearing normalized Compose atomically and mode 0600."""
+    _write_private_text(path, json.dumps(compose, sort_keys=True, indent=2) + "\n")
 
 
 def main() -> int:
