@@ -1,0 +1,155 @@
+name: Book2EPUB pre-catalog iX source-render qualification
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/book2epub-app/**'
+      - '.github/workflows/qualify-book2epub-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precat-book2epub-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  official-source-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install bounded pinned validator dependency
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+      - name: Verify renderer + exact pinned 25.04.2.6 profile exist
+        run: |
+          set -euo pipefail
+          test -f tools/render_truenas_candidate.py
+          test -f .foundry/truenas-compatibility/25.04.2.6-materialization.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("candidates/book2epub-app/candidate.json").read_text())
+          profile = json.loads(Path(".foundry/truenas-compatibility/25.04.2.6-materialization.json").read_text())
+          assert manifest["source_only"] and manifest["product_image"] == "UNPUBLISHED"
+          assert profile["middleware"]["commit"] == "244b717370fe35fb9eefc3096acfbc25f12b57b6"
+          assert manifest["source_materializer"]["commit"] == "532236882212e8c5e51d5b49cfe2c6ce3dd5675e"
+          print("PINNED_SOURCE_AND_MIDDLEWARE_IDENTITY_PASS")
+          PY
+      - name: Prepare public-safe loopback fixture without modifying candidate source
+        run: |
+          python3 - <<'PY'
+          import yaml
+          from pathlib import Path
+          src = Path("candidates/book2epub-app/ix-dev/community/book2epub/templates/test_values/basic-values.yaml")
+          values = yaml.safe_load(src.read_text())
+          # TrueNAS ix-lib Ports expects host_ips as list[str], not list[dict].
+          # Wrong-shaped values silently fall back to unrestricted host publishing.
+          values["network"]["web_port"]["host_ips"] = ["127.0.0.1"]
+          assert values["network"]["web_port"]["host_ips"] == ["127.0.0.1"]
+          values["ix_volumes"] = {"book2epub-state": "/opt/tests/mnt/book2epub/state"}
+          Path("/tmp/book2epub-test-values.yaml").write_text(yaml.safe_dump(values))
+          PY
+      - name: Exact pinned official TrueNAS source render using existing Foundry renderer
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/book2epub-app/candidate.json \
+            --values /tmp/book2epub-test-values.yaml \
+            --output-compose /tmp/book2epub-rendered-private.json
+      - name: Prove normalized Compose is safe and record public-safe digest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          p = Path("/tmp/book2epub-rendered-private.json")
+          rendered = json.loads(p.read_text())
+          services = rendered.get("services") or {}
+          assert services and "book2epub" in services, sorted(services)
+          worker = services["book2epub"]
+          assert worker.get("read_only") is True, worker
+          assert not worker.get("privileged") and worker.get("network_mode") != "host"
+          assert not any("docker.sock" in str(v) for v in worker.get("volumes", []))
+          assert str(worker.get("user")) in {"568:568", "568"}
+          ports = worker.get("ports") or []
+          assert ports, "No published browser port"
+          # Compose normalization must actually preserve loopback, not just render a valid port.
+          assert len(ports) == 1 and ports[0].get("host_ip") == "127.0.0.1", ports
+          assert int(ports[0]["target"]) == 8080, ports
+          assert int(ports[0]["published"]) == 18787, ports
+          assert not any("UNPUBLISHED" not in str(v.get("image", "")) for k,v in services.items() if k == "book2epub")
+          out = {
+              "claim": "official-pinned-iX-source-render-and-normalized-compose-only",
+              "truenas_profile": "25.04.2.6",
+              "qualified_source": "exact PR HEAD; not source promotion",
+              "compose_sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+              "services": sorted(services),
+              "runtime_realization": "NOT_RUN",
+              "registry_image": "UNPUBLISHED",
+              "physical_apply": "HOLD"
+          }
+          print(json.dumps(out, sort_keys=True))
+          PY
+
+      - name: Verify persisted research and production source-mode rendering (no runtime)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import yaml
+          p=Path("/tmp/book2epub-test-values.yaml")
+          values=yaml.safe_load(p.read_text())
+          assert values["mode"]["operating_mode"]=="research"
+          source=json.loads(Path("/tmp/book2epub-rendered-private.json").read_text())
+          env=source["services"]["book2epub"]["environment"]
+          assert env["BOOK2EPUB_OPERATION_MODE"]=="research",env
+          assert env["BOOK2EPUB_MODEL_ADMISSION_POLICY"]=="preverified"
+          assert env["BOOK2EPUB_RESEARCH_ONLY"]=="1"
+          assert env.get("BOOK2EPUB_PRODUCTION_ADMISSION_SHA256","")==""
+          assert all(env[name]=="1" for name in (
+              "HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE","HF_DATASETS_OFFLINE"))
+          values["mode"]["operating_mode"]="production"
+          # Synthetic placeholder only: never a real rights/release acceptance.
+          values["mode"]["production_admission_digest"]="sha256:"+"a"*64
+          Path("/tmp/book2epub-production-values.yaml").write_text(yaml.safe_dump(values))
+          print("RESEARCH_SOURCE_MODE_PASS")
+          PY
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/book2epub-app/candidate.json \
+            --values /tmp/book2epub-production-values.yaml \
+            --output-compose /tmp/book2epub-production-render.json
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path("/tmp/book2epub-production-render.json")
+          prod=json.loads(p.read_text())["services"]["book2epub"]
+          env=prod["environment"]
+          assert env["BOOK2EPUB_OPERATION_MODE"]=="production",env
+          assert env["BOOK2EPUB_RESEARCH_ONLY"]=="0"
+          assert env["BOOK2EPUB_MODEL_ADMISSION_POLICY"]=="preverified"
+          assert env["BOOK2EPUB_PRODUCTION_ADMISSION_SHA256"]=="sha256:"+"a"*64
+          assert all(env[name]=="1" for name in (
+              "HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE","HF_DATASETS_OFFLINE"))
+          assert "BOOK2EPUB_ALLOW_MODEL_BOOTSTRAP" not in env
+          assert prod.get("read_only") is True
+          assert str(prod.get("user")) in {"568:568","568"}
+          ports=prod["ports"]
+          assert len(ports)==1 and ports[0]["host_ip"]=="127.0.0.1"
+          print(json.dumps({
+            "claim":"official-catalog-source-mode-toggle-only",
+            "production_persistent_selection":"PASS",
+            "release_rights_claim":"NOT_PROVEN_BY_SYNTHETIC_SHA",
+            "production_compose_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),
+            "registry_pull":"NOT_RUN",
+            "guest_apply":"NOT_RUN",
+            "physical_apply":"HOLD",
+          },sort_keys=True))
+          PY
