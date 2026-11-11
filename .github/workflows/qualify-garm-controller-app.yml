@@ -118,7 +118,9 @@ jobs:
 
           from tools.render_truenas_candidate import (
               RenderError, checkout_upstream, write_private_output,
+              write_private_yaml,
           )
+          import yaml
 
           payload = {"services": {"fixture": {"image": "synthetic-only"}}}
           with tempfile.TemporaryDirectory() as directory:
@@ -133,6 +135,24 @@ jobs:
               assert stat.S_IMODE(target.stat().st_mode) == 0o600
               assert json.loads(target.read_text(encoding="utf-8")) == payload
               assert not list(root.glob(".private-compose.json.*")), "temp file leaked"
+
+              # Private site input YAML is also secret-bearing: detect transient
+              # world-readable creation and destination-symlink overwrite bugs.
+              yaml_victim = root / "yaml-victim.txt"
+              yaml_victim.write_text("UNCHANGED", encoding="utf-8")
+              yaml_target = root / "private-values.yaml"
+              yaml_target.symlink_to(yaml_victim)
+              payload_values = {"tls": {"test_only": "synthetic"}}
+              write_private_yaml(yaml_target, payload_values)
+              assert not yaml_target.is_symlink(), "private YAML symlink was followed"
+              assert yaml_victim.read_text(encoding="utf-8") == "UNCHANGED"
+              assert stat.S_IMODE(yaml_target.stat().st_mode) == 0o600
+              assert yaml.safe_load(yaml_target.read_text(encoding="utf-8")) == payload_values
+              assert not list(root.glob(".private-values.yaml.*")), "private YAML temp leaked"
+              yaml_target.chmod(0o644)
+              write_private_yaml(yaml_target, payload_values)
+              assert stat.S_IMODE(yaml_target.stat().st_mode) == 0o600
+
               target.chmod(0o644)
               write_private_output(target, payload)
               assert stat.S_IMODE(target.stat().st_mode) == 0o600
