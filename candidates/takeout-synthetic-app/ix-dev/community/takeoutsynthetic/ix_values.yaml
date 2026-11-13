@@ -1,0 +1,27 @@
+images:
+  image:
+    repository: ghcr.io/sempersupra/takeout-synthetic
+    tag: 0.0.0-UNPUBLISHED
+  container_utils_image:
+    repository: ixsystems/container-utils@sha256
+    tag: 46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992
+consts:
+  worker_container_name: takeoutsynthetic
+  perms_container_name: permissions
+  runtime_uid: 10001
+  runtime_gid: 10001
+storage:
+  archives:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: takeout-synthetic-archive
+      acl_enable: false
+  state:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: takeout-synthetic-state
+      acl_enable: false
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024

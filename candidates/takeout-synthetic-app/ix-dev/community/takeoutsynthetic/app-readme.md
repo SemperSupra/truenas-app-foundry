@@ -1,0 +1,1 @@
+Disposable TrueNAS synthetic Takeout lifecycle test, source-only and image UNPUBLISHED. Not for Google credentials, personal exports, or production installation.

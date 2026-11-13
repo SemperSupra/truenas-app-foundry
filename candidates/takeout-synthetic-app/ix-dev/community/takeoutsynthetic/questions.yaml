@@ -1,0 +1,106 @@
+groups:
+  - name: Storage
+    description: Disposable fixture datasets, not real backup archives
+  - name: Resources
+    description: Bounded synthetic fixture limits
+questions:
+  - variable: storage
+    label: Storage
+    group: Storage
+    schema:
+      type: dict
+      attrs:
+        - variable: archives
+          label: Synthetic Archive Dataset
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Storage Type
+                schema:
+                  type: string
+                  default: ix_volume
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: ix_volume
+                      description: Disposable synthetic ixVolume
+              - variable: ix_volume_config
+                label: Archive Dataset
+                schema:
+                  type: dict
+                  $ref:
+                    - normalize/ix_volume
+                  attrs:
+                    - variable: dataset_name
+                      label: Dataset Name
+                      schema:
+                        type: string
+                        default: takeout-synthetic-archive
+                        hidden: true
+                        required: true
+                    - variable: acl_enable
+                      label: Enable ACL
+                      schema:
+                        type: boolean
+                        default: false
+        - variable: state
+          label: Temporary State Dataset
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Storage Type
+                schema:
+                  type: string
+                  default: ix_volume
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: ix_volume
+                      description: Disposable state ixVolume
+              - variable: ix_volume_config
+                label: State Dataset
+                schema:
+                  type: dict
+                  $ref:
+                    - normalize/ix_volume
+                  attrs:
+                    - variable: dataset_name
+                      label: Dataset Name
+                      schema:
+                        type: string
+                        default: takeout-synthetic-state
+                        hidden: true
+                        required: true
+                    - variable: acl_enable
+                      label: Enable ACL
+                      schema:
+                        type: boolean
+                        default: false
+  - variable: resources
+    label: Resources
+    group: Resources
+    schema:
+      type: dict
+      attrs:
+        - variable: limits
+          label: Limits
+          schema:
+            type: dict
+            attrs:
+              - variable: cpus
+                label: CPU limit
+                schema:
+                  type: float
+                  default: 1
+                  min: 1
+                  required: true
+              - variable: memory
+                label: Memory limit (MiB)
+                schema:
+                  type: int
+                  default: 1024
+                  min: 512
+                  unit: MiB
+                  required: true

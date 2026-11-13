@@ -1,0 +1,252 @@
+name: Takeout synthetic pre-catalog iX source-render qualification
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/takeout-synthetic-app/**'
+      - '.github/workflows/qualify-takeout-synthetic-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precat-takeout-synthetic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  official-source-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact public synthetic source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Pin native YAML parser for renderer
+        run: python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+      - name: Prove no unpublished artifact is treated as deployment authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          profile=json.loads(Path('.foundry/truenas-compatibility/25.04.2.6-materialization.json').read_text())
+          assert candidate['source_only'] is True and candidate['public_safe'] is True
+          assert candidate['product_image'] == 'UNPUBLISHED'
+          transport=candidate['synthetic_transport_evidence']
+          assert transport['source_commit'] == '144aa93eb93fe1fab4a08f780506a1d77f0d5d09'
+          assert transport['artifact_id'] == 11912326284
+          assert transport['artifact_zip_sha256'] == 'sha256:eb485e980c480649c3de88708df165094d77df47211002eaceea5aed79022306'
+          assert transport['oci_manifest_sha256'] == 'sha256:40a3b5b98939a2ae7d37099b1996a91e92a0877db1a1d91d09f403f88bd97fb5'
+          assert transport['loaded_image_config_sha256'] == 'sha256:86de81f4401811f145c0569a210482a559746aa337f28554bb751ece08f77b7c'
+          assert transport['docker_transport_sha256'] == 'sha256:d42d5341ad329a739bfa6488a6455298ebca58cf395b5f3d2494aed88042db10'
+          assert transport['independent_latest_zip_blob_audit'] == 'PASS'
+          assert transport['docker_config_identity_matches_oci'] == 'PASS'
+          assert transport['oci_manifest_sha256'] != transport['loaded_image_config_sha256']
+          assert transport['public_runner_offline_import'] == 'PASS'
+          assert transport['qualification'] == 'TRANSFER_ONLY'
+          assert transport['disposable_guest_import'] == 'NOT_RUN'
+          assert transport['registry_image'] == 'UNPUBLISHED'
+          assert candidate['claims']['native_terminal_observer'] == 'BLOCKED'
+          assert candidate['claims']['physical_apply'] == 'HOLD'
+          assert candidate['claims']['disposable_truenas'] == 'NOT_RUN'
+          assert candidate['source_materializer']['commit'] == '532236882212e8c5e51d5b49cfe2c6ce3dd5675e'
+          assert profile['middleware']['commit'] == '244b717370fe35fb9eefc3096acfbc25f12b57b6'
+          print('PINNED_SOURCE_HOLD_PASS')
+          PY
+      - name: Render using already qualified generic Foundry source renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/takeout-synthetic-app/candidate.json \
+            --values candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic/templates/test_values/basic-values.yaml \
+            --output-compose "$RUNNER_TEMP/takeout-rendered-private.json"
+      - name: Independently inspect normalized Compose for zero ingress and rootless one-shot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          # pull_request GITHUB_SHA is the merge ref, not necessarily the
+          # checked-out PR head. Never mislabel evidence as the exact head.
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          expected=(event.get('pull_request') or {}).get('head',{}).get('sha') or os.environ['GITHUB_SHA']
+          checked_out=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert checked_out == expected, 'source checkout differs from event head'
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-rendered-private.json'
+          d=json.loads(p.read_text())
+          services=d.get('services') or {}
+          worker=services['takeoutsynthetic']
+          assert worker.get('read_only') is True
+          assert worker.get('restart') == 'no', 'one-shot restart policy must disable auto restart'
+          assert str(worker.get('user')) in ('10001:10001','10001')
+          assert worker.get('ports') in (None, [], {})
+          assert not worker.get('privileged')
+          assert worker.get('network_mode') == 'none'
+          assert not any('docker.sock' in str(v) for v in worker.get('volumes', []))
+          assert 'UNPUBLISHED' in worker.get('image','')
+          assert any('/archive' in str(v) for v in worker.get('volumes', []))
+          assert any('/state' in str(v) for v in worker.get('volumes', []))
+          assert worker.get('healthcheck',{}).get('disable') is True
+          for service in services.values():
+              assert service.get('ports') in (None, [], {})
+              assert not service.get('privileged')
+          out={'classification':'SOURCE_RENDER_ONLY',
+               'official_pinned_library':'2.3.4',
+               'trueNAS':'25.04.2.6',
+               'source_sha':checked_out,
+               'compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+               'services':sorted(services),
+               'private_source':'NOT_PRESENT',
+               'real_takeout':'NOT_RUN',
+               'job_completion_observer':'NOT_QUALIFIED',
+               'guest':'NOT_RUN',
+               'physical_apply':'HOLD'}
+          print(json.dumps(out,sort_keys=True))
+          PY
+
+      - name: Prepare exact one-field guest-local image binding PLAN (never apply)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import copy,hashlib,json,os
+          original=Path(os.environ['RUNNER_TEMP'])/'takeout-rendered-private.json'
+          source=json.loads(original.read_text())
+          manifest=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          transport=manifest['synthetic_transport_evidence']
+          assert transport['source_commit']=='144aa93eb93fe1fab4a08f780506a1d77f0d5d09'
+          assert transport['loaded_image_config_sha256']=='sha256:86de81f4401811f145c0569a210482a559746aa337f28554bb751ece08f77b7c'
+          assert transport['independent_latest_zip_blob_audit']=='PASS'
+          assert manifest['source_only'] is True and manifest['product_image']=='UNPUBLISHED'
+          assert manifest['claims']['physical_apply']=='HOLD'
+          assert manifest['claims']['disposable_truenas']=='NOT_RUN'
+          worker=source['services']['takeoutsynthetic']
+          assert worker['image']=='ghcr.io/sempersupra/takeout-synthetic:0.0.0-UNPUBLISHED'
+          assert 'permissions' in source['services'], 'Bounded helper sidecar must not disappear'
+          planned=copy.deepcopy(source)
+          planned['services']['takeoutsynthetic']['image']='takeout-synthetic:local'
+          assert planned['services']['takeoutsynthetic']['image']=='takeout-synthetic:local'
+          reversible=copy.deepcopy(planned)
+          reversible['services']['takeoutsynthetic']['image']=worker['image']
+          assert reversible==source, 'More than one normalized Compose value changed'
+          assert planned['services']['permissions']==source['services']['permissions']
+          assert planned['services']['takeoutsynthetic']['read_only'] is True
+          assert planned['services']['takeoutsynthetic'].get('restart') == 'no'
+          assert str(planned['services']['takeoutsynthetic']['user']) in ('10001:10001','10001')
+          assert all(not v.get('ports') and not v.get('privileged')
+                     for v in planned['services'].values())
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-local-PREVIEW-ONLY.json'
+          p.write_text(json.dumps(planned,sort_keys=True,indent=2)+'\n')
+          p.chmod(0o600)
+          print(json.dumps({'classification':'POST_RENDER_ONE_FIELD_IMAGE_BINDING_PLAN_ONLY',
+                            'original_compose_sha256':hashlib.sha256(original.read_bytes()).hexdigest(),
+                            'planned_compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+                            'diff_pointer':'/services/takeoutsynthetic/image',
+                            'worker_image':'takeout-synthetic:local',
+                            'permission_sidecar_image':'PINNED_BUT_NOT_PRELOADED',
+                            'source_render_unchanged':True,
+                            'foundry_artifact_accepted':False,
+                            'target_guest':'NOT_RUN',
+                            'physical_apply':'HOLD'},sort_keys=True))
+          PY
+
+      - name: Prepare isolated hostpath source probe, not a product edit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy,json,shutil
+          from pathlib import Path
+          import yaml
+          source=Path('candidates/takeout-synthetic-app/ix-dev/community/takeoutsynthetic')
+          probe=Path('candidates/takeout-synthetic-app/hostpath-probe-only/ix-dev/community/takeoutsynthetic')
+          assert not probe.exists()
+          probe.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copytree(source,probe)
+          defaults=yaml.safe_load((probe/'ix_values.yaml').read_text())
+          questions=yaml.safe_load((probe/'questions.yaml').read_text())
+          fixture=yaml.safe_load((source/'templates/test_values/basic-values.yaml').read_text())
+          for role in ('archives','state'):
+              path='/mnt/rdtepool/takeout-synthetic/'+role
+              storage={'type':'host_path',
+                       'host_path_config':{'path':path,'acl_enable':False,
+                                           'auto_permissions':False}}
+              defaults['storage'][role]=copy.deepcopy(storage)
+              fixture['storage'][role]=copy.deepcopy(storage)
+              q=next(x for x in questions['questions'] if x['variable']=='storage')
+              slot=next(x for x in q['schema']['attrs'] if x['variable']==role)
+              slot['schema']['attrs']=[
+                  {'variable':'type','label':'Storage Type','schema':{
+                      'type':'string','default':'host_path','hidden':True,
+                      'required':True,'enum':[{'value':'host_path','description':'Guest external dataset'}]}},
+                  {'variable':'host_path_config','label':'Existing guest dataset','schema':{
+                      'type':'dict','attrs':[
+                          {'variable':'path','label':'Path','schema':{'type':'hostpath','required':True,'default':path}},
+                          {'variable':'acl_enable','label':'ACL','schema':{'type':'boolean','default':False}},
+                          {'variable':'auto_permissions','label':'Auto permissions',
+                           'schema':{'type':'boolean','default':False}}
+                      ]}}
+              ]
+          fixture.pop('ix_volumes',None)
+          (probe/'ix_values.yaml').write_text(yaml.safe_dump(defaults,sort_keys=False))
+          (probe/'questions.yaml').write_text(yaml.safe_dump(questions,sort_keys=False))
+          materialized=probe/'templates/test_values/hostpath-probe-values.yaml'
+          materialized.write_text(yaml.safe_dump(fixture,sort_keys=False))
+          candidate=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          assert candidate['product_image']=='UNPUBLISHED' and candidate['source_only'] is True
+          candidate['source_path']=str(probe)
+          candidate['phase']='EPHEMERAL_HOSTPATH_SOURCE_PROBE_NOT_DEPLOYABLE'
+          (probe.parents[2]/'hostpath-probe-candidate.json').write_text(json.dumps(candidate))
+          assert yaml.safe_load((source/'ix_values.yaml').read_text())['storage']['archives']['type']=='ix_volume'
+          print('SOURCE_VARIANT_ISOLATED_HOLD_PASS')
+          PY
+      - name: Qualify official iX source render for external archive retention shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/takeout-synthetic-app/hostpath-probe-only/hostpath-probe-candidate.json \
+            --values candidates/takeout-synthetic-app/hostpath-probe-only/ix-dev/community/takeoutsynthetic/templates/test_values/hostpath-probe-values.yaml \
+            --output-compose "$RUNNER_TEMP/takeout-guest-hostpath-rendered-private.json"
+      - name: Prove external archive roles and permission helper elimination without apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'takeout-guest-hostpath-rendered-private.json'
+          document=json.loads(p.read_text())
+          services=document.get('services') or {}
+          assert set(services)=={'takeoutsynthetic'}, sorted(services)
+          worker=services['takeoutsynthetic']
+          assert worker['read_only'] is True
+          assert worker.get('restart') == 'no', 'retained exited one-shot must not restart'
+          assert str(worker['user']) in ('10001:10001','10001')
+          assert not worker.get('ports') and not worker.get('privileged')
+          assert worker.get('network_mode') == 'none'
+          serialized=json.dumps(worker.get('volumes',[]))
+          for role in ('archives','state'):
+              assert '/mnt/rdtepool/takeout-synthetic/'+role in serialized
+          assert '/archive' in serialized and '/state' in serialized
+          manifest=json.loads(Path('candidates/takeout-synthetic-app/candidate.json').read_text())
+          assert manifest['source_only'] is True
+          assert manifest['claims']['physical_apply']=='HOLD'
+          print(json.dumps({'classification':'EXTERNAL_HOST_PATH_SOURCE_RENDER_ONLY',
+                            'services':sorted(services),
+                            'host_path_roles':['archive','state'],
+                            'preexisting_guest_datasets_required':True,
+                            'permission_helper_skipped':True,
+                            'compose_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+                            'zfs_retention':'NOT_RUN',
+                            'guest':'NOT_RUN',
+                            'physical_apply':'HOLD'},sort_keys=True))
+          PY
