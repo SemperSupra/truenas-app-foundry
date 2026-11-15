@@ -28,7 +28,7 @@ def validate(value):
         errors.append("private product code cannot be a public fixture")
     image = value.get("image")
     if not isinstance(image, str) or not re.fullmatch(
-        r"registry\\.invalid/foundry-rdte/synthetic-go@sha256:[0-9a-f]{64}", image
+        r"registry\.invalid/foundry-rdte/synthetic-go@sha256:[0-9a-f]{64}", image
     ):
         errors.append("fixture requires an intentionally nonpullable digest-form image")
     storage = value.get("storage")
