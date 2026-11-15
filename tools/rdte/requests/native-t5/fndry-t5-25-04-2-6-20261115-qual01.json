@@ -1,0 +1,10 @@
+{
+  "schema": "foundry-native-truenas-platform-t5-request/v1",
+  "request_id": "fndry-t5-25-04-2-6-20261115-qual01",
+  "version": "25.04.2.6",
+  "rung": "t5",
+  "t3_run_id": 43693936694,
+  "t3_head_sha": "0fc794c3547f02ee2b7477ca739bc4b3cbd6867d",
+  "t3_artifact_id": 14153412513,
+  "scope": "public-disposable-platform-nginx-only"
+}
