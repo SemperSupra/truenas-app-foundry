@@ -1,0 +1,63 @@
+name: Foundry exact TrueNAS 25.10.7 native T3 ZFS (no AD)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualify-foundry-native-truenas-25-10-7-t3.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  exact-zfs-t3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify original T2 and T3 source provenance
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_foundry_vendored_truenas_t2.py tools/rdte/test_foundry_native_truenas_t3.py
+          bash -n tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh
+          test -c /dev/kvm
+      - name: Install bounded QEMU tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+      - name: Installer plus independently verified native ZFS mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/foundry-t3-state"
+          out="$RUNNER_TEMP/foundry-t3-receipt.json"
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh --target-version 25.10.7 --rung t3 --out "$out" --state-dir "$state"
+          python3 - "$out" "$state" <<'PY'
+          import pathlib,json,sys
+          v=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert v["contract"]=="gha-kvm-system-lab/v1"
+          assert v["target"]["version"]=="25.10.7" and v["target"]["rung"]=="T3"
+          assert v["classification"]=="SUPPORTED" and v["oracleSatisfied"] is True
+          oracles=v["oracles"]
+          for field in ("vendor_iso_digest","installer_rpc_readonly","installer_install_completed","installed_middleware_authenticated","data_pool_created"):
+            assert oracles[field] is True,field
+          assert oracles["apps_runtime_exercised"] is False
+          assert v["requested_shape"]["data_pool"]=={"name":"rdtepool","topology":"MIRROR"}
+          assert len(v["requested_shape"]["data_disks"])==2
+          assert not pathlib.Path(sys.argv[2]).exists(),"guest residue"
+          print("FOUNDRY_25_10_7_NATIVE_T3_ZFS_VERIFIED_PASS")
+          print("T4_T5_AND_PRODUCT_F0_F5_NOT_YET_ACCEPTED")
+          PY
+      - name: Upload terminal or failure-classified receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-native-25-10-7-t3-zfs
+          path: ${{ runner.temp }}/foundry-t3-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
