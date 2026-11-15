@@ -1,0 +1,21 @@
+name: Qualify synthetic Go control-worker containers
+on:
+  pull_request:
+    paths:
+      - 'tools/fixtures/ad-foundry-go/**'
+      - '.github/workflows/qualify-ad-foundry-go-synthetic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-oci-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Run no-credential Go and OCI synthetic lifecycle
+        run: bash tools/fixtures/ad-foundry-go/run-public-smoke.sh

@@ -1,0 +1,27 @@
+# PUBLIC SYNTHETIC ONLY: local test image, synthetic external host paths.
+services:
+  control:
+    image: foundry-ad-synthetic:local
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=64m"]
+    ports: ["127.0.0.1:18091:8080"]
+    volumes:
+      - "${SYNTH_CUSTODY:?required}:/custody:ro"
+      - "${SYNTH_LEDGER:?required}:/ledger:rw"
+    command: [serve]
+    restart: "no"
+  worker:
+    image: foundry-ad-synthetic:local
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=64m"]
+    volumes:
+      - "${SYNTH_CUSTODY:?required}:/custody:ro"
+      - "${SYNTH_LEDGER:?required}:/ledger:rw"
+    command: [worker]
+    restart: "no"
