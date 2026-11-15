@@ -1,0 +1,84 @@
+name: Direct Foundry public GHA KVM bootstrap (no Agent Dispatch)
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/direct_foundry_kvm_probe.py'
+      - 'tools/fixtures/ad-foundry-go/**'
+      - '.github/workflows/qualify-ad-foundry-direct-kvm.yml'
+      - 'docs/rdte/foundry-direct-gha-bootstrap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-direct-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kvm-abi-observation:
+    name: Observe native KVM host without Agent Dispatch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read-only KVM ABI and capacity inspection (no guest)
+        run: sudo -n python3 tools/rdte/direct_foundry_kvm_probe.py --evidence direct-foundry-kvm-evidence.json
+      - name: Upload diagnostic receipt even if preflight is blocked
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-direct-public-kvm-capability
+          path: direct-foundry-kvm-evidence.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  synthetic-image-handoff:
+    name: Build disposable public Go image without registry or Agent Dispatch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build scratch Go control/worker and validate unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd tools/fixtures/ad-foundry-go
+          go test -count=1 ./...
+          mkdir -p "${GITHUB_WORKSPACE}/build-direct-foundry"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+            -o "${GITHUB_WORKSPACE}/build-direct-foundry/agent-dispatch-synthetic" .
+          docker build --no-cache -t foundry-ad-synthetic:gha -f Containerfile "${GITHUB_WORKSPACE}/build-direct-foundry"
+      - name: Export explicitly synthetic image archive and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build-direct-foundry
+          image_before="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Id}}')"
+          image_user="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Config.User}}')"
+          test "$image_user" = '65532:65532'
+          docker save foundry-ad-synthetic:gha -o foundry-ad-synthetic-docker.tar
+          sha256sum foundry-ad-synthetic-docker.tar > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
+          # Prove this archive reimports without any registry or dispatcher.
+          docker image rm foundry-ad-synthetic:gha >/dev/null
+          docker load -i foundry-ad-synthetic-docker.tar
+          image_after="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Id}}')"
+          test "$image_before" = "$image_after"
+          echo "PUBLIC_SYNTHETIC_IMAGE_CONFIG_ID=$image_after"
+          printf '%s\n' 'PUBLIC_SYNTHETIC_IMAGE_ARCHIVE_REIMPORT_PASS'
+          printf '%s\n' 'NOT_A_NATIVE_TRUENAS_F0_F5_RESULT'
+      - name: Upload short-lived synthetic public artifact for future guest qualification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-ad-synthetic-go-amd64-docker-archive
+          path: |
+            build-direct-foundry/foundry-ad-synthetic-docker.tar
+            build-direct-foundry/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
