@@ -2,9 +2,15 @@ name: Foundry direct native TrueNAS T2 install and middleware (no AD)
 on:
   pull_request:
     paths:
-      - 'tools/rdte/vendor/truenas-kvm/**'
+      # Only the six T2 source inputs can trigger this heavyweight guest.
+      # Never replay T2 when later T3–T6 product probes are introduced.
+      - 'tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_rdte_target.py'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_installer_rpc_probe.py'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_installer_rpc_install.py'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_ddp_probe.py'
+      - 'tools/rdte/vendor/truenas-kvm/config/truenas-rdte-targets.json'
       - 'tools/rdte/test_foundry_vendored_truenas_t2.py'
-      - '.github/workflows/qualify-foundry-native-truenas-t2.yml'
   workflow_dispatch:
 
 permissions:
