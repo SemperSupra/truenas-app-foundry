@@ -33,7 +33,7 @@ for x in (c,w):
  assert "ALL" in x["cap_drop"]
  assert "no-new-privileges:true" in x["security_opt"]
  assert len(x["volumes"])==2
- assert sorted((m["target"],m["read_only"]) for m in x["volumes"])==[("/custody",True),("/ledger",False)]
+ assert sorted((m["target"],m.get("read_only",False)) for m in x["volumes"])==[("/custody",True),("/ledger",False)]
 assert c["ports"]==[{"mode":"ingress","target":8080,"published":"18092","protocol":"tcp","host_ip":"127.0.0.1"}]
 assert not w.get("ports")
 print("PUBLIC_SYNTHETIC_TWO_SERVICE_SOURCE_CONTRACT_PASS")
