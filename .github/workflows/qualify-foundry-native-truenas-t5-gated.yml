@@ -31,19 +31,14 @@ jobs:
           mapfile -t requests < <(find tools/rdte/requests/native-t5 -maxdepth 1 -type f -name '*.json' -print | sort)
           (("${#requests[@]}" == 1)) || { echo 'exactly one unique T5 request required'; exit 2; }
           python3 tools/rdte/foundry_t5_request.py --request "${requests[0]}"
-          # Public evidence is read only through GitHub REST, no GITHUB_TOKEN needed.
-          python3 - "${requests[0]}" "$REPO" <<'PY'
-          import json,sys,urllib.request
-          obj=json.load(open(sys.argv[1],encoding="utf-8"))
-          repo=sys.argv[2]
-          rid=obj["t3_run_id"]
-          url=f"https://api.github.com/repos/{repo}/actions/runs/{rid}"
-          req=urllib.request.Request(url,headers={"Accept":"application/vnd.github+json","User-Agent":"foundry-t5-source-gate"})
-          with urllib.request.urlopen(req,timeout=20) as resp: data=json.load(resp)
-          assert data["id"]==rid and data["head_sha"]==obj["t3_head_sha"]
-          assert data["status"]=="completed" and data["conclusion"]=="success"
-          assert data["name"]=="Foundry direct native TrueNAS T3 ZFS (no AD)"
-          print("T3_GHA_TERMINAL_SUCCESS_INDEPENDENTLY_OBSERVED")
+          # Public run+artifact IDs are independently rebound before guest effects.
+          python3 - "${requests[0]}" <<'PY'
+          import json,sys
+          from tools.rdte.github_t3_evidence import verify
+          with open(sys.argv[1],encoding="utf-8") as source:
+              request=json.load(source)
+          assert verify(request)
+          print("T3_GHA_TERMINAL_ARTIFACT_SHA_REBOUND_PASS")
           PY
       - name: Install generic QEMU tooling
         run: |
