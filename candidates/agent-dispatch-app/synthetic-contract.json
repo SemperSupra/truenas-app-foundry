@@ -1,0 +1,56 @@
+{
+  "schema": "truenas-foundry-agent-dispatch-synthetic-contract/v1",
+  "classification": "public-synthetic",
+  "release_or_deployment_authority": "none",
+  "source_is_private_product": false,
+  "image": "registry.invalid/foundry-rdte/synthetic-go@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "storage": {
+    "custody": "/synthetic/custody",
+    "custody_mode": "ro",
+    "ledger": "/synthetic/ledger",
+    "ledger_mode": "rw",
+    "retain_on_app_delete": true
+  },
+  "services": {
+    "control": {
+      "role": "control",
+      "user": "65532:65532",
+      "read_only": true,
+      "privileged": false,
+      "host_network": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "ports": [
+        "127.0.0.1:18081:8080"
+      ],
+      "mounts": [
+        "/synthetic/custody:/custody:ro",
+        "/synthetic/ledger:/ledger:rw"
+      ],
+      "health_path": "/readyz"
+    },
+    "worker": {
+      "role": "worker",
+      "user": "65532:65532",
+      "read_only": true,
+      "privileged": false,
+      "host_network": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "ports": [],
+      "mounts": [
+        "/synthetic/custody:/custody:ro",
+        "/synthetic/ledger:/ledger:rw"
+      ],
+      "health_path": null
+    }
+  }
+}
