@@ -1,0 +1,19 @@
+{
+  "schema": "foundry-vendored-native-truenas-source/v1",
+  "source_repository": "SemperSupra/agent-dispatch",
+  "source_branch": "experiment/gha-kvm-system-rdte",
+  "source_commit": "8744304c3c0a332460b1c5db97a2fb1e9562b222",
+  "authority": "SemperSupra/truenas-app-foundry-private#353",
+  "source_purpose": "reference executable public KVM TrueNAS system qualification, no Agent Dispatch service",
+  "files": {
+    "scripts/gha_kvm_truenas_rdte.sh": "aee419c4a97829da4d2d7e833aa070d943b2f66e",
+    "scripts/truenas_rdte_target.py": "363e0c860c899dc0cce11e9b34604afaf0359e7c",
+    "scripts/truenas_installer_rpc_probe.py": "2da88925c53d1654dd9d5c78571bfff3d8d33299",
+    "scripts/truenas_installer_rpc_install.py": "6ceede879e2735f3d2d1f783d092f41c9b7f3db3",
+    "scripts/truenas_middleware_ddp_probe.py": "4266563ce4d9ed55edcdea31da980faf6e8aeec1",
+    "config/truenas-rdte-targets.json": "cccf012e251fcce414fa7faaec7d7d13a3ebce06"
+  },
+  "supported_rung": "t2",
+  "truenas_version": "25.04.2.6",
+  "no_product_F0_F5_claim": true
+}
