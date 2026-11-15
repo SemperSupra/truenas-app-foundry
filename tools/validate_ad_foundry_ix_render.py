@@ -6,6 +6,7 @@ Never runs a TrueNAS API call, pulls an image, or touches private product/source
 from __future__ import annotations
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -89,9 +90,18 @@ def qualify():
         lib_src=checkout/"ix-dev/community/ntfy/templates/library"/lib
         if not lib_src.is_dir(): raise RenderFailure("pinned upstream ix_lib not found")
         shutil.copytree(lib_src,target/"templates/library"/lib)
-        run(["python3",".github/scripts/ci.py","--app",NAME,"--train","community",
-             "--test-file","basic-values.yaml","--render-only=true"],cwd=checkout)
-        rendered=target/"templates/rendered/docker-compose.yaml"
+        rendered_root=target/"templates/rendered"
+        try:
+            run(["python3",".github/scripts/ci.py","--app",NAME,"--train","community",
+                 "--test-file","basic-values.yaml","--render-only=true"],cwd=checkout)
+        finally:
+            # Upstream validation Docker writes root-owned render output. Restore only
+            # this disposable contained directory before TemporaryDirectory cleanup.
+            if rendered_root.exists():
+                if rendered_root.is_symlink() or not rendered_root.resolve().is_relative_to(checkout.resolve()):
+                    raise RenderFailure("render output escapes disposable checkout")
+                run(["sudo","-n","chown","-hR",f"{os.getuid()}:{os.getgid()}",str(rendered_root)])
+        rendered=rendered_root/"docker-compose.yaml"
         if not rendered.is_file():raise RenderFailure("missing upstream rendered compose")
         output=run(["docker","compose","-p","foundry-ad-synthetic","-f",str(rendered),"config","--format","json"])
         compose=json.loads(output)
