@@ -1,0 +1,107 @@
+{
+  "name": "foundry-agentlike-public-25107",
+  "services": {
+    "control": {
+      "image": "nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "entrypoint": [
+        "/bin/sh",
+        "-c"
+      ],
+      "command": [
+        "sleep 3600"
+      ],
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,noexec,size=16m"
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "rdte_agentlike_custody",
+          "target": "/custody",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "rdte_agentlike_ledger",
+          "target": "/ledger",
+          "read_only": false
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "test -d /custody && test -d /ledger"
+        ],
+        "interval": "20s",
+        "timeout": "5s",
+        "retries": 3
+      },
+      "restart": "unless-stopped"
+    },
+    "worker": {
+      "image": "nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "entrypoint": [
+        "/bin/sh",
+        "-c"
+      ],
+      "command": [
+        "sleep 3600"
+      ],
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,noexec,size=16m"
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "rdte_agentlike_custody",
+          "target": "/custody",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "rdte_agentlike_ledger",
+          "target": "/ledger",
+          "read_only": true
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "test -d /custody && test -d /ledger"
+        ],
+        "interval": "20s",
+        "timeout": "5s",
+        "retries": 3
+      },
+      "restart": "unless-stopped"
+    }
+  },
+  "volumes": {
+    "rdte_agentlike_custody": {
+      "external": true
+    },
+    "rdte_agentlike_ledger": {
+      "external": true
+    }
+  }
+}
