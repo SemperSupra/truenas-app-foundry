@@ -2,7 +2,7 @@
 images:
   image:
     repository: registry.invalid/foundry-rdte/synthetic-go@sha256
-    tag: 0000000000000000000000000000000000000000000000000000000000000000
+    tag: '0000000000000000000000000000000000000000000000000000000000000000'
 consts:
   control_container_name: agent-dispatch-rdte-control
   worker_container_name: agent-dispatch-rdte-worker
