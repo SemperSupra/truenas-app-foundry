@@ -1,0 +1,27 @@
+name: Validate native TrueNAS T4 T5 source provenance (no guest)
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_pool_probe.py'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_app_probe.py'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_app_lifecycle_probe.py'
+      - 'tools/rdte/test_foundry_native_truenas_apps_source.py'
+      - '.github/workflows/validate-foundry-native-apps-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-authenticity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify public source SHA and native lifecycle calls
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_foundry_native_truenas_apps_source.py
+          python3 -m py_compile tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_pool_probe.py tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_app_probe.py tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_app_lifecycle_probe.py
