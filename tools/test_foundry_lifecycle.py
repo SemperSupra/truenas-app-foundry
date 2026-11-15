@@ -321,6 +321,53 @@ class LifecycleV2Tests(unittest.TestCase):
             got["preconditions"]["reconcile_ambiguous_operation_before_retry"]
         )
 
+    def test_missing_or_wrong_app_name_cannot_be_adopted(self):
+        registry = qualified_registry()
+        for bad_name in (None, "unrelated-app"):
+            obs = observation()
+            if bad_name is None:
+                del obs["app"]["name"]
+            else:
+                obs["app"]["name"] = bad_name
+            with self.subTest(name=bad_name):
+                planned = MOD.plan(obs, intent("ENSURE_RUNNING"), registry)
+                self.assertEqual(planned["status"], "BLOCKED")
+                self.assertEqual(planned["action"], "BLOCKED")
+                self.assertTrue(any("App name" in b for b in planned["blockers"]))
+                verified = MOD.verify(obs, intent("ENSURE_RUNNING"), registry)
+                self.assertEqual(verified["status"], "VERIFY_FAILED")
+                self.assertTrue(any("App name" in b for b in verified["failures"]))
+
+    def test_redeploy_completed_token_does_not_adopt_foreign_or_missing_app(self):
+        registry = qualified_registry()
+        for kind in ("foreign", "missing", "mismatched-identity", "wrong-adapter"):
+            obs = observation(completed_tokens=["completed-transaction"])
+            if kind == "foreign":
+                obs["ownership"]["state"] = "foreign"
+            elif kind == "missing":
+                obs["app"]["present"] = False
+            elif kind == "mismatched-identity":
+                obs["app"]["materialization_identity"] = "sha256:other"
+            elif kind == "wrong-adapter":
+                obs["app"]["custom_app"] = False
+            with self.subTest(kind=kind):
+                got = MOD.plan(obs, intent("REDEPLOY", token="completed-transaction"), registry)
+                self.assertEqual(got["status"], "BLOCKED")
+                self.assertEqual(got["action"], "BLOCKED")
+        valid = MOD.plan(
+            observation(completed_tokens=["completed-transaction"]),
+            intent("REDEPLOY", token="completed-transaction"),
+            registry,
+        )
+        self.assertEqual((valid["status"], valid["action"]), ("READY", "NOOP"))
+
+    def test_ambiguous_redeploy_replay_fails_closed_even_with_completed_token(self):
+        registry = qualified_registry()
+        obs = observation(operation_state="ambiguous", completed_tokens=["r-1"])
+        got = MOD.plan(obs, intent("REDEPLOY", token="r-1"), registry)
+        self.assertEqual((got["status"], got["action"]), ("BLOCKED", "BLOCKED"))
+        self.assertTrue(any("reconciliation is required" in b for b in got["blockers"]))
+
     def test_recipe_names_complete_f0_f5_contract(self):
         recipe = MOD.lifecycle_recipe()
         self.assertEqual(

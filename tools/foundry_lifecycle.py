@@ -157,7 +157,7 @@ def _stable_owned(
         blockers.append("lifecycle mutation requires freshly observed owned state")
     if app.get("present") is not True:
         blockers.append("lifecycle mutation requires the exact App to be present")
-    if app.get("name") not in {None, intent["app_name"]}:
+    if app.get("name") != intent["app_name"]:
         blockers.append("observed App name does not match lifecycle intent")
     if str(app.get("materialization_identity", "")) != intent["materialization_identity"]:
         blockers.append("materialization identity does not match lifecycle intent")
@@ -234,10 +234,11 @@ def plan(
                         required_method = METHODS["STOP"]
         elif operation == "REDEPLOY":
             token = intent["operation_token"]
-            if token in completed_tokens:
+            # A completed token does not confer ownership of a foreign/missing App.
+            blockers.extend(_stable_owned(app, ownership, intent))
+            if not blockers and token in completed_tokens:
                 action = "NOOP"
             else:
-                blockers.extend(_stable_owned(app, ownership, intent))
                 action = "REDEPLOY" if not blockers else "BLOCKED"
                 required_method = METHODS["REDEPLOY"]
         elif operation == "UPGRADE":
@@ -352,6 +353,8 @@ def verify(
             failures.append("target App is not observed owned")
         if not present:
             failures.append("target App is absent")
+        if app.get("name") != intent["app_name"]:
+            failures.append("observed App name does not match lifecycle intent")
         if str(app.get("materialization_identity", "")) != intent["materialization_identity"]:
             failures.append("materialization identity changed")
         if present and not _adapter_matches(intent["adapter"], app):
