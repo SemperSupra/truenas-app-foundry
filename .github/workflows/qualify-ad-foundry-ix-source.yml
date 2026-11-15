@@ -1,0 +1,25 @@
+name: Qualify Agent Dispatch synthetic iX source render
+on:
+  pull_request:
+    paths:
+      - 'candidates/agent-dispatch-app/ix-dev/**'
+      - 'tools/validate_ad_foundry_ix_render.py'
+      - 'tools/test_ad_foundry_ix_render.py'
+      - '.github/workflows/qualify-ad-foundry-ix-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-upstream-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Offline negative oracle
+        run: python3 -m unittest -v tools/test_ad_foundry_ix_render.py
+      - name: Pinned upstream vendor source render and Compose normalization
+        run: python3 tools/validate_ad_foundry_ix_render.py

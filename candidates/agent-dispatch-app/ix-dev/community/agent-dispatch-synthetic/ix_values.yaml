@@ -1,0 +1,10 @@
+# Intentionally nonpullable image: source render only; never deploy.
+images:
+  image:
+    repository: registry.invalid/foundry-rdte/synthetic-go@sha256
+    tag: '0000000000000000000000000000000000000000000000000000000000000000'
+consts:
+  control_container_name: agent-dispatch-rdte-control
+  worker_container_name: agent-dispatch-rdte-worker
+  runtime_uid: 65532
+  runtime_gid: 65532

@@ -1,0 +1,139 @@
+groups:
+  - name: Synthetic Network
+    description: Loopback-only control ingress for source-render tests.
+  - name: Synthetic Storage
+    description: Two pre-created external synthetic directories, never production paths.
+  - name: Resources Configuration
+    description: CPU and memory limits for source rendering.
+questions:
+  - variable: network
+    label: ""
+    group: Synthetic Network
+    schema:
+      type: dict
+      attrs:
+        - variable: control_port
+          label: Synthetic Control Port
+          schema:
+            type: dict
+            attrs:
+              - variable: bind_mode
+                label: Bind Mode
+                schema:
+                  type: string
+                  default: published
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: published
+                      description: Host loopback
+              - variable: port_number
+                label: Host Port
+                schema:
+                  type: int
+                  default: 18091
+                  required: true
+                  min: 1
+                  max: 65535
+              - variable: container_port
+                label: Container Port
+                schema:
+                  type: int
+                  default: 8080
+                  hidden: true
+                  required: true
+              - variable: host_ips
+                label: Bind Host IPs
+                schema:
+                  type: list
+                  default: ["127.0.0.1"]
+                  items:
+                    - variable: host_ip
+                      label: Host IP
+                      schema:
+                        type: string
+                        required: true
+                        $ref:
+                          - definitions/node_bind_ip
+  - variable: storage
+    label: ""
+    group: Synthetic Storage
+    schema:
+      type: dict
+      attrs:
+        - variable: custody
+          label: Synthetic Read-only Custody
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Mount Type
+                schema:
+                  type: string
+                  default: host_path
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: host_path
+                      description: Pre-created external directory
+              - variable: host_path_config
+                label: Synthetic Custody Directory
+                schema:
+                  type: dict
+                  attrs:
+                    - variable: path
+                      label: Host Path
+                      schema:
+                        type: hostpath
+                        required: true
+        - variable: ledger
+          label: Synthetic Writable Ledger
+          schema:
+            type: dict
+            attrs:
+              - variable: type
+                label: Mount Type
+                schema:
+                  type: string
+                  default: host_path
+                  hidden: true
+                  required: true
+                  enum:
+                    - value: host_path
+                      description: Pre-created external directory
+              - variable: host_path_config
+                label: Synthetic Ledger Directory
+                schema:
+                  type: dict
+                  attrs:
+                    - variable: path
+                      label: Host Path
+                      schema:
+                        type: hostpath
+                        required: true
+  - variable: resources
+    label: ""
+    group: Resources Configuration
+    schema:
+      type: dict
+      attrs:
+        - variable: limits
+          label: Limits
+          schema:
+            type: dict
+            attrs:
+              - variable: cpus
+                label: CPUs
+                schema:
+                  type: float
+                  required: true
+                  default: 1
+                  min: 1
+              - variable: memory
+                label: Memory
+                schema:
+                  type: int
+                  required: true
+                  default: 512
+                  min: 256
+                  unit: MiB
