@@ -1,0 +1,27 @@
+name: Validate Foundry native T5 request contract (no guest)
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/foundry_t5_request.py'
+      - 'tools/rdte/test_foundry_t5_request.py'
+      - '.github/workflows/qualify-foundry-native-truenas-t5-gated.yml'
+      - '.github/workflows/validate-foundry-native-t5-request-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Qualify exact request schema without native guest
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_foundry_t5_request.py tools/rdte/test_foundry_native_truenas_apps_source.py
+          python3 -m py_compile tools/rdte/foundry_t5_request.py
+          echo T5_REQUEST_SOURCE_ONLY_PASS_NO_GUEST
