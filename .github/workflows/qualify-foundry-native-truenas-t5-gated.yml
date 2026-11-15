@@ -1,0 +1,82 @@
+name: Foundry exact native TrueNAS platform T5 gated request
+on:
+  pull_request:
+    paths:
+      # No native guest runs merely because this workflow or code is edited.
+      # The one-use request is created only AFTER T3 has an accepted receipt.
+      - 'tools/rdte/requests/native-t5/*.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  supported-platform-app-t5:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Reject requests not anchored to actual observed native T3
+        env:
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_foundry_vendored_truenas_t2.py tools/rdte/test_foundry_native_truenas_apps_source.py tools/rdte/test_foundry_t5_request.py
+          mapfile -t requests < <(find tools/rdte/requests/native-t5 -maxdepth 1 -type f -name '*.json' -print | sort)
+          (("${#requests[@]}" == 1)) || { echo 'exactly one unique T5 request required'; exit 2; }
+          python3 tools/rdte/foundry_t5_request.py --request "${requests[0]}"
+          # Public evidence is read only through GitHub REST, no GITHUB_TOKEN needed.
+          python3 - "${requests[0]}" "$REPO" <<'PY'
+          import json,sys,urllib.request
+          obj=json.load(open(sys.argv[1],encoding="utf-8"))
+          repo=sys.argv[2]
+          rid=obj["t3_run_id"]
+          url=f"https://api.github.com/repos/{repo}/actions/runs/{rid}"
+          req=urllib.request.Request(url,headers={"Accept":"application/vnd.github+json","User-Agent":"foundry-t5-source-gate"})
+          with urllib.request.urlopen(req,timeout=20) as resp: data=json.load(resp)
+          assert data["id"]==rid and data["head_sha"]==obj["t3_head_sha"]
+          assert data["status"]=="completed" and data["conclusion"]=="success"
+          assert data["name"]=="Foundry direct native TrueNAS T3 ZFS (no AD)"
+          print("T3_GHA_TERMINAL_SUCCESS_INDEPENDENTLY_OBSERVED")
+          PY
+      - name: Install generic QEMU tooling
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+      - name: Install real TrueNAS and qualify native platform T4 plus T5 lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/foundry-native-t5-state"
+          out="$RUNNER_TEMP/foundry-native-t5-receipt.json"
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh --target-version 25.04.2.6 --rung t5 --out "$out" --state-dir "$state"
+          python3 - "$out" "$state" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert d["contract"]=="gha-kvm-system-lab/v1"
+          assert d["target"]["rung"]=="T5" and d["target"]["version"]=="25.04.2.6"
+          assert d["classification"]=="SUPPORTED" and d["oracleSatisfied"] is True
+          o=d["oracles"]
+          for k in ("vendor_iso_digest","installer_rpc_readonly","installer_install_completed",
+                    "installed_middleware_authenticated","data_pool_created","apps_runtime_exercised","app_lifecycle_exercised"):
+            assert o[k] is True,k
+          assert o["foundry_materialization_exercised"] is False
+          assert not pathlib.Path(sys.argv[2]).exists(),"QEMU guest residue"
+          print("FOUNDRY_NATIVE_TRUENAS_PLATFORM_T4_T5_PASS")
+          print("AGENT_DISPATCH_APP_F0_F5_NOT_YET_ACCEPTED")
+          PY
+      - name: Preserve public-safe terminal or negative receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-direct-truenas-25-04-2-6-platform-t5
+          path: ${{ runner.temp }}/foundry-native-t5-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
