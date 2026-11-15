@@ -1,0 +1,32 @@
+app_version: 0.0.1-public-synthetic
+capabilities: []
+categories:
+- development
+changelog_url: https://github.com/SemperSupra/truenas-app-foundry
+date_added: '2026-11-15'
+description: Non-deployable synthetic control/worker package for Foundry TrueNAS renderer RDTE.
+home: https://github.com/SemperSupra/truenas-app-foundry
+host_mounts: []
+icon: https://raw.githubusercontent.com/github/explore/main/topics/github-actions/github-actions.png
+keywords:
+- synthetic
+- rdte
+- agent-dispatch
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+- name: SemperSupra
+  url: https://github.com/SemperSupra
+name: agent-dispatch-synthetic
+run_as_context:
+- description: Strict nonroot synthetic Go container.
+  gid: 65532
+  group_name: synthetic
+  uid: 65532
+  user_name: synthetic
+screenshots: []
+sources:
+- https://github.com/SemperSupra/truenas-app-foundry
+title: Agent Dispatch Synthetic RDTE (not deployable)
+train: community
+version: 0.0.1
