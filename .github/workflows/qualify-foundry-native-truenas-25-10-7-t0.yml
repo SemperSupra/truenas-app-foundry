@@ -1,0 +1,81 @@
+name: Foundry exact TrueNAS 25.10.7 disposable native T0 (no AD)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualify-foundry-native-truenas-25-10-7-t0.yml'
+
+permissions:
+  contents: read
+
+# Reuse the existing single heavyweight TrueNAS/KVM capacity slot.
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  exact-native-25-10-7-t0:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Bind exact vendor registry and source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh
+          test "$(git hash-object tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh)" = "aee419c4a97829da4d2d7e833aa070d943b2f66e"
+          python3 - <<'PY'
+          import json, pathlib
+          p=pathlib.Path("tools/rdte/vendor/truenas-kvm/config/truenas-rdte-targets.json")
+          j=json.loads(p.read_text(encoding="utf-8"))
+          targets=[t for t in j["targets"] if t["version"]=="25.10.7"]
+          assert len(targets)==1
+          t=targets[0]
+          assert t["iso_name"]=="TrueNAS-SCALE-25.10.7.iso"
+          assert t["system_version"]=="TrueNAS-25.10.7"
+          assert t["iso_url"].startswith("https://download.sys.truenas.net/TrueNAS-SCALE-Goldeye/25.10.7/")
+          assert t["sha256_url"]==t["iso_url"]+".sha256"
+          assert t["installer_rpc_path"]=="/ws" and t["installer_rpc_guest_port"]==8080
+          print("EXACT_25_10_7_SOURCE_TARGET_BOUND")
+          PY
+          test -c /dev/kvm
+      - name: Install disposable QEMU tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+      - name: Boot exact verified vendor TrueNAS 25.10.7 ISO
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/foundry-native-25-10-7-t0-state"
+          out="$RUNNER_TEMP/foundry-native-25-10-7-t0-receipt.json"
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh \
+            --target-version 25.10.7 --rung t0 --out "$out" --state-dir "$state"
+          python3 - "$out" "$state" <<'PY'
+          import json,pathlib,sys
+          r=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert r["contract"]=="gha-kvm-system-lab/v1"
+          assert r["target"]["version"]=="25.10.7" and r["target"]["rung"]=="T0"
+          assert r["classification"]=="SUPPORTED" and r["oracleSatisfied"] is True
+          o=r["oracles"]
+          assert o["vendor_iso_digest"] is True
+          assert o["installer_serial_marker_observed"] is True
+          assert o["installed_middleware_authenticated"] is False
+          assert o["apps_runtime_exercised"] is False
+          assert o["foundry_materialization_exercised"] is False
+          assert not pathlib.Path(sys.argv[2]).exists(), "guest residue"
+          print("FOUNDRY_25_10_7_NATIVE_T0_ACCEPTED_ONLY")
+          print("T2_T5_AND_PRODUCT_F0_F5_NOT_TESTED")
+          PY
+      - name: Preserve classified success or failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-native-truenas-25-10-7-t0-receipt
+          path: ${{ runner.temp }}/foundry-native-25-10-7-t0-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
