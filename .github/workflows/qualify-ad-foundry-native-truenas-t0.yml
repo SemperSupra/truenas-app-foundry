@@ -1,0 +1,59 @@
+name: Foundry native TrueNAS KVM T0 without Agent Dispatch
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/direct_truenas_t0.sh'
+      - 'tools/rdte/test_direct_truenas_t0.py'
+      - '.github/workflows/qualify-ad-foundry-native-truenas-t0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  exact-vendor-t0:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Preflight source and shell syntax
+        run: |
+          set -euo pipefail
+          bash -n tools/rdte/direct_truenas_t0.sh
+          python3 -m unittest -v tools/rdte/test_direct_truenas_t0.py
+          test -c /dev/kvm
+      - name: Install generic QEMU and ISO tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils xorriso
+      - name: Boot exact vendor TrueNAS installer in disposable native KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/rdte/direct_truenas_t0.sh \
+            --out "$RUNNER_TEMP/foundry-truenas-t0-receipt.json" \
+            --state-dir "$RUNNER_TEMP/foundry-truenas-ephemeral-state"
+          python3 - "$RUNNER_TEMP/foundry-truenas-t0-receipt.json" <<'PY'
+          import json, pathlib, sys
+          r=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert r["classification"]=="SUPPORTED" and r["oracleSatisfied"] is True
+          assert r["zero_residue"] is True and r["agent_dispatch_runtime_used"] is False
+          assert r["serial_trueNAS_marker"] is True and r["native_app_f0_f5_accepted"] is False
+          print("NATIVE_TRUENAS_T0_ACCEPTED_F0_F5_NOT_TESTED")
+          PY
+      - name: Upload verified or failure-classified guest evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-native-truenas-25-04-2-6-t0-receipt
+          path: ${{ runner.temp }}/foundry-truenas-t0-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
