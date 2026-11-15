@@ -1,0 +1,25 @@
+name: Qualify synthetic two-service Foundry contract
+on:
+  pull_request:
+    paths:
+      - 'candidates/agent-dispatch-app/**'
+      - 'tools/validate_synthetic_dispatch_app.py'
+      - 'tools/test_synthetic_dispatch_app.py'
+      - '.github/workflows/qualify-agent-dispatch-synthetic-foundry.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-source-oracle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Falsify synthetic contract drift
+        run: python3 -m unittest -v tools/test_synthetic_dispatch_app.py
+      - name: Verify deny-by-default source contract
+        run: python3 tools/validate_synthetic_dispatch_app.py
