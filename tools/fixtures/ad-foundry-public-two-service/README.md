@@ -1,0 +1,5 @@
+# Separate public pullable two-service behavioral surrogate
+
+This is **not** an Agent Dispatch Go image and is deliberately a separate source/OCI experiment from the existing stdlib Go scratch image artifact. It uses an existing public BusyBox release at a digest **resolved at test execution time**, without publishing any image, to exercise the specific TrueNAS-targeted security/topology behaviors on a standard disposable GitHub Linux runner: two independently named services with one immutable image identity, nonroot UID, no privileges, loopback-only HTTP control, no worker ingress, custody read-only, external ledger writable, and ledger 1→2 after full teardown/recreate.
+
+The public CI output records the exact obtained OCI digest so a follow-up native TrueNAS source profile can pin it immutably. Mutable BusyBox tag is acquisition-only; Docker Compose itself receives only an exact digest. This does not prove native TrueNAS Apps, the private Go product binary or actual custody/ledger migration. It is a candidate solution for native test transport **without a new GHCR publication**; do not promote source tests to F0–F5.
