@@ -1,0 +1,22 @@
+name: Qualify pullable public two-service surrogate (no guest)
+on:
+  pull_request:
+    paths:
+      - 'tools/fixtures/ad-foundry-public-two-service/**'
+      - '.github/workflows/qualify-ad-foundry-public-pullable-surrogate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-oci-behavior:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify real public pullable digest-bound control+worker persistence
+        shell: bash
+        run: bash tools/fixtures/ad-foundry-public-two-service/run-public-qualification.sh
