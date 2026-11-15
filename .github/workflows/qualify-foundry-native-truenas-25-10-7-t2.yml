@@ -1,0 +1,76 @@
+name: Foundry exact TrueNAS 25.10.7 native T2 install/middleware (no AD)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualify-foundry-native-truenas-25-10-7-t2.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  exact-native-25-10-7-t2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Rebind verified T0 prerequisite and exact vendor registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh
+          test "$(git hash-object tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh)" = "aee419c4a97829da4d2d7e833aa070d943b2f66e"
+          python3 -m unittest -v tools/rdte/test_foundry_vendored_truenas_t2.py
+          python3 - <<'PY'
+          import json,pathlib
+          data=json.loads(pathlib.Path("tools/rdte/vendor/truenas-kvm/config/truenas-rdte-targets.json").read_text())
+          t=[x for x in data["targets"] if x["version"]=="25.10.7"]
+          assert len(t)==1 and t[0]["system_version"]=="TrueNAS-25.10.7"
+          assert t[0]["iso_name"]=="TrueNAS-SCALE-25.10.7.iso"
+          assert t[0]["sha256_url"]==t[0]["iso_url"]+".sha256"
+          assert t[0]["installer_rpc_path"]=="/ws" and t[0]["installer_rpc_guest_port"]==8080
+          print("EXACT_25_10_7_T2_TARGET_BOUND")
+          PY
+          test -c /dev/kvm
+      - name: Install disposable KVM/ISO utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+      - name: Install exact vendor TrueNAS 25.10.7 and verify native middleware
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/foundry-native-25-10-7-t2-state"
+          out="$RUNNER_TEMP/foundry-native-25-10-7-t2-receipt.json"
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh \
+            --target-version 25.10.7 --rung t2 --out "$out" --state-dir "$state"
+          python3 - "$out" "$state" <<'PY'
+          import json,pathlib,sys
+          r=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert r["contract"]=="gha-kvm-system-lab/v1"
+          assert r["target"]["version"]=="25.10.7" and r["target"]["rung"]=="T2"
+          assert r["classification"]=="SUPPORTED" and r["oracleSatisfied"] is True
+          o=r["oracles"]
+          for k in ("vendor_iso_digest","installer_rpc_readonly","installer_install_completed","installed_middleware_authenticated"):
+              assert o[k] is True, k
+          assert o["data_pool_created"] is False and o["apps_runtime_exercised"] is False
+          assert o["foundry_materialization_exercised"] is False
+          assert not pathlib.Path(sys.argv[2]).exists(), "guest residue"
+          print("FOUNDRY_25_10_7_NATIVE_T2_ACCEPTED_ONLY")
+          print("T3_T5_AND_PRODUCT_F0_F5_NOT_TESTED")
+          PY
+      - name: Preserve terminal classified guest receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-native-truenas-25-10-7-t2-receipt
+          path: ${{ runner.temp }}/foundry-native-25-10-7-t2-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
