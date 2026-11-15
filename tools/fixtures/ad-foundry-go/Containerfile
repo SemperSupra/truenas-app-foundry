@@ -1,0 +1,5 @@
+# CI-built public synthetic Go binary. FROM scratch: no credentials or private image.
+FROM scratch
+COPY agent-dispatch-synthetic /app
+USER 65532:65532
+ENTRYPOINT ["/app"]
