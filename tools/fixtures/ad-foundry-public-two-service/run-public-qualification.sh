@@ -17,7 +17,8 @@ printf 'PUBLIC_SYNTHETIC_READY\n' > "$SYNTH_CUSTODY/readyz"
 
 docker pull busybox:1.36.1
 export SYNTH_IMAGE="$(docker image inspect busybox:1.36.1 --format '{{index .RepoDigests 0}}')"
-[[ "$SYNTH_IMAGE" =~ ^(docker\\.io/library/)?busybox@sha256:[a-f0-9]{64}$ ]] ||
+{ [[ "$SYNTH_IMAGE" == busybox@sha256:* ]] || [[ "$SYNTH_IMAGE" == docker.io/library/busybox@sha256:* ]]; } &&
+  [[ "${SYNTH_IMAGE##*@sha256:}" =~ ^[a-f0-9]{64}$ ]] ||
   { echo 'cannot bind exact public OCI digest' >&2; exit 2; }
 docker compose -f compose.yaml -p foundrytwoservice config --quiet
 docker compose -f compose.yaml -p foundrytwoservice config --format json > "$work/rendered.json"
