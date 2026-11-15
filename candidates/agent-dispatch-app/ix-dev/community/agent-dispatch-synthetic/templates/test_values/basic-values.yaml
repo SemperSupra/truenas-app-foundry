@@ -1,0 +1,25 @@
+resources:
+  limits:
+    cpus: 1.0
+    memory: 512
+
+network:
+  control_port:
+    bind_mode: published
+    port_number: 18091
+    container_port: 8080
+    host_ips: ["127.0.0.1"]
+
+storage:
+  custody:
+    type: host_path
+    host_path_config:
+      path: /mnt/synthetic/agent-dispatch-rdte/custody
+      create_host_path: false
+      acl_enable: false
+  ledger:
+    type: host_path
+    host_path_config:
+      path: /mnt/synthetic/agent-dispatch-rdte/ledger
+      create_host_path: false
+      acl_enable: false
