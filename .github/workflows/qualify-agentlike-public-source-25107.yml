@@ -1,0 +1,58 @@
+name: Foundry 25.10.7 public synthetic two-service source contract
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/fixtures/agent_like_25107.compose.json'
+      - 'tools/rdte/test_agent_like_25107_source.py'
+      - '.github/workflows/qualify-agentlike-public-source-25107.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-25107-synthetic-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  public-synthetic-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Qualify exact source-only synthetic fixture with adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_agent_like_25107_source.py
+          docker compose -f tools/rdte/fixtures/agent_like_25107.compose.json config --format json > "$RUNNER_TEMP/normalized.json"
+          python3 - "$RUNNER_TEMP/normalized.json" "$RUNNER_TEMP/agentlike-source-receipt.json" <<'PY'
+          import hashlib,json,os,pathlib,sys
+          from tools.rdte.test_agent_like_25107_source import PUBLIC_IMAGE
+          cfg=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert set(cfg["services"])=={"control","worker"}
+          assert all(s["image"]==PUBLIC_IMAGE for s in cfg["services"].values())
+          assert not any(s.get("ports") or s.get("privileged") or s.get("network_mode")=="host" for s in cfg["services"].values())
+          assert all(v.get("external") is True for v in cfg["volumes"].values())
+          receipt={
+            "schema":"foundry-public-synthetic-source/v1",
+            "classification":"SOURCE_CONTRACT_PASS_NOT_NATIVE_PRODUCT_F0",
+            "target":"25.10.7","head_sha":os.environ["GITHUB_SHA"],
+            "synthetic":True,"trueNAS_guest_exercised":False,
+            "private_app_image_exercised":False,
+            "normalized_compose_sha256":hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest(),
+            "service_names":sorted(cfg["services"]),"explicit_stop":"NO_PRODUCT_F0_F5_ACCEPTANCE"
+          }
+          pathlib.Path(sys.argv[2]).write_text(json.dumps(receipt,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+          print("FOUNDRY_PUBLIC_25107_AGENTLIKE_SOURCE_ONLY_PASS")
+          print("AGENT_DISPATCH_PRODUCT_F0_F5_NOT_TESTED")
+          PY
+      - name: Upload public synthetic source receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-25107-agentlike-source-only
+          path: ${{ runner.temp }}/agentlike-source-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
