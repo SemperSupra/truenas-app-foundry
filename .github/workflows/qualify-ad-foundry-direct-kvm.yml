@@ -58,11 +58,20 @@ jobs:
         run: |
           set -euo pipefail
           cd build-direct-foundry
+          image_before="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Id}}')"
+          image_user="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Config.User}}')"
+          test "$image_user" = '65532:65532'
           docker save foundry-ad-synthetic:gha -o foundry-ad-synthetic-docker.tar
           sha256sum foundry-ad-synthetic-docker.tar > SHA256SUMS
-          docker image inspect foundry-ad-synthetic:gha --format 'PUBLIC_SYNTHETIC_IMAGE_CONFIG_ID={{.Id}}'
+          cat SHA256SUMS
           sha256sum -c SHA256SUMS
-          printf '%s\n' 'PUBLIC_SYNTHETIC_IMAGE_ARCHIVE_PASS'
+          # Prove this archive reimports without any registry or dispatcher.
+          docker image rm foundry-ad-synthetic:gha >/dev/null
+          docker load -i foundry-ad-synthetic-docker.tar
+          image_after="$(docker image inspect foundry-ad-synthetic:gha --format '{{.Id}}')"
+          test "$image_before" = "$image_after"
+          echo "PUBLIC_SYNTHETIC_IMAGE_CONFIG_ID=$image_after"
+          printf '%s\n' 'PUBLIC_SYNTHETIC_IMAGE_ARCHIVE_REIMPORT_PASS'
           printf '%s\n' 'NOT_A_NATIVE_TRUENAS_F0_F5_RESULT'
       - name: Upload short-lived synthetic public artifact for future guest qualification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
