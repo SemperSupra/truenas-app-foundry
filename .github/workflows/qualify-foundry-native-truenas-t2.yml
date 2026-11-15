@@ -1,0 +1,75 @@
+name: Foundry direct native TrueNAS T2 install and middleware (no AD)
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/vendor/truenas-kvm/**'
+      - 'tools/rdte/test_foundry_vendored_truenas_t2.py'
+      - '.github/workflows/qualify-foundry-native-truenas-t2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+
+jobs:
+  exact-installer-middleware-t2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Demand exact vendored original source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools/rdte/test_foundry_vendored_truenas_t2.py
+          bash -n tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh
+          test -c /dev/kvm
+      - name: Install KVM ISO and source test utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils xorriso
+      - name: Run exact vendor installer and middleware T2 via standalone local source
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/foundry-t2-native-state"
+          out="$RUNNER_TEMP/foundry-t2-native-receipt.json"
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh \
+            --target-version 25.04.2.6 --rung t2 \
+            --out "$out" --state-dir "$state"
+          # Original harness can exit zero for a properly classified RED.
+          # Fail the workflow unless independently observed evidence passes.
+          python3 - "$out" "$state" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert d["contract"]=="gha-kvm-system-lab/v1"
+          assert d["target"]["version"]=="25.04.2.6"
+          assert d["target"]["rung"]=="T2"
+          assert d["classification"]=="SUPPORTED" and d["oracleSatisfied"] is True
+          s=d["source"]
+          assert s["expected_sha256"]==s["observed_sha256"] and bool(s["expected_sha256"])
+          o=d["oracles"]
+          assert o["installer_rpc_readonly"] is True
+          assert o["installer_install_completed"] is True
+          assert o["installed_middleware_authenticated"] is True
+          assert o["apps_runtime_exercised"] is False
+          assert not pathlib.Path(sys.argv[2]).exists(), "disposable guest residue"
+          print("FOUNDRY_STANDALONE_NATIVE_TRUENAS_T2_PASS")
+          print("NOT_FOUNDRY_APP_F0_F5")
+          PY
+      - name: Upload classified source/guest evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-direct-truenas-25-04-2-6-t2-middleware
+          path: ${{ runner.temp }}/foundry-t2-native-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
