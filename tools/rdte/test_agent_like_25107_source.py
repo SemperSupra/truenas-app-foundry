@@ -186,5 +186,40 @@ class NativeGarmT6AdmissionContract(unittest.TestCase):
                     self.assertIn("HOLD_GARM_F0F5_SELECTOR_OVERRIDE", bad.stderr)
 
 
+    def test_probe_present_forwards_exact_selector_and_arguments(self):
+        """A synthetic vendor stub observes argv; never start a real guest."""
+        source = pathlib.Path(__file__).parent / "guard_garm_controller_f0f5.sh"
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            guard = root / source.name
+            guard.write_bytes(source.read_bytes())
+            vendor = root / "vendor" / "truenas-kvm" / "scripts"
+            vendor.mkdir(parents=True)
+            (vendor / "truenas_middleware_garm_f0_f5_probe.py").write_text(
+                "# public synthetic presence sentinel only\n", encoding="utf-8"
+            )
+            (vendor / "gha_kvm_truenas_rdte.sh").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n", encoding="utf-8"
+            )
+            args = [
+                "--target-version", "25.10.7",
+                "--foundry-control-dir", str(root / "synthetic-control"),
+                "--foundry-commit", "a" * 40,
+                "--out", str(root / "receipt.json"),
+                "--state-dir", str(root / "guest-state"),
+            ]
+            observed = subprocess.run(
+                ["bash", str(guard), *args],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(observed.returncode, 0, observed.stderr)
+            self.assertEqual(
+                observed.stdout.splitlines(),
+                ["--rung", "t6", "--t6-product", "garm-controller-f0f5", *args],
+            )
+            self.assertFalse((root / "guest-state").exists())
+            self.assertFalse((root / "receipt.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
