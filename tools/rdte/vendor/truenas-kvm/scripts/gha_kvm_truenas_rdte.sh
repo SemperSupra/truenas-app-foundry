@@ -79,6 +79,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$OUT" ]] || { usage >&2; exit 2; }
+# Admission guard before registry lookup, state allocation, ISO download or KVM boot.
+# This selector currently points to an unshipped oracle; do not consume a
+# disposable native runner and then classify a missing source file as product failure.
+if [[ "$RUNG" == "t6" && "$T6_PRODUCT" == "garm-controller-f0f5" &&
+      ! -f "$SCRIPT_DIR/truenas_middleware_garm_f0_f5_probe.py" ]]; then
+  echo "HOLD_NATIVE_GARM_F0F5_ORACLE_MISSING: no installed GARM F0-F5 native probe; source qualification required before KVM admission" >&2
+  exit 2
+fi
 [[ -f "$TARGET_REGISTRY" ]] || { echo "missing exact TrueNAS target registry: $TARGET_REGISTRY" >&2; exit 2; }
 TARGET_ENV="$(python3 "$SCRIPT_DIR/truenas_rdte_target.py" --registry "$TARGET_REGISTRY" --version "$TARGET_VERSION" --shell)" || exit 2
 # truenas_rdte_target.py emits only shell-quoted values after strict registry validation.
