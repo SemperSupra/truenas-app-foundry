@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "agent_like_25107.compose.json"
@@ -141,6 +143,48 @@ class PublicSourceContract(unittest.TestCase):
         obj = copy.deepcopy(self.obj)
         obj["services"]["control"]["healthcheck"]["test"] = ["CMD", "echo", "ready"]
         self.assertIn("control:inert-readiness-oracle-required", validate(obj))
+
+
+class NativeT6AdmissionGuard(unittest.TestCase):
+    """Missing native GARM F0-F5 probe must not consume a QEMU slot.
+
+    Copy the existing entrypoint into an isolated directory with *no* probe
+    or registry: a safe regression against accidentally starting expensive
+    native qualification. A present future probe is never executed.
+    """
+
+    def test_missing_native_probe_fails_before_state_allocation(self):
+        source = (
+            pathlib.Path(__file__).parent
+            / "vendor" / "truenas-kvm" / "scripts" / "gha_kvm_truenas_rdte.sh"
+        )
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            entrypoint = root / "gha_kvm_truenas_rdte.sh"
+            entrypoint.write_bytes(source.read_bytes())
+            state, receipt = root / "vm-state", root / "receipt.json"
+            cmd = [
+                "bash", str(entrypoint),
+                "--out", str(receipt),
+                "--state-dir", str(state),
+                "--target-version", "25.10.7",
+                "--rung", "t6",
+                "--t6-product", "garm-controller-f0f5",
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10, check=False)
+            self.assertEqual(proc.returncode, 2, proc.stderr)
+            self.assertIn("HOLD_NATIVE_GARM_F0F5_ORACLE_MISSING", proc.stderr)
+            self.assertFalse(state.exists(), "preflight must not allocate VM state")
+            self.assertFalse(receipt.exists(), "missing oracle must not fabricate success receipt")
+
+            # The guard is scoped to this product, not to all T6 selectors.
+            alternate = cmd[:-1] + ["garm"]
+            other = subprocess.run(
+                alternate, capture_output=True, text=True, timeout=10, check=False
+            )
+            self.assertEqual(other.returncode, 2, other.stderr)
+            self.assertNotIn("HOLD_NATIVE_GARM_F0F5_ORACLE_MISSING", other.stderr)
+            self.assertIn("missing exact TrueNAS target registry", other.stderr)
 
 
 if __name__ == "__main__":
