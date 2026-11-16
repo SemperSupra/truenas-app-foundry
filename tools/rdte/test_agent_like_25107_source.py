@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "agent_like_25107.compose.json"
@@ -141,6 +143,47 @@ class PublicSourceContract(unittest.TestCase):
         obj = copy.deepcopy(self.obj)
         obj["services"]["control"]["healthcheck"]["test"] = ["CMD", "echo", "ready"]
         self.assertIn("control:inert-readiness-oracle-required", validate(obj))
+
+
+class NativeGarmT6AdmissionContract(unittest.TestCase):
+    """A missing GARM product probe must not consume a native KVM allocation."""
+
+    def test_no_oracle_exits_before_guest_or_receipt(self):
+        source = pathlib.Path(__file__).parent / "guard_garm_controller_f0f5.sh"
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            guard = root / source.name
+            guard.write_bytes(source.read_bytes())
+            state = root / "guest-state"
+            receipt = root / "guest-receipt.json"
+            args = [
+                "bash", str(guard), "--target-version", "25.10.7",
+                "--out", str(receipt), "--state-dir", str(state),
+            ]
+            result = subprocess.run(
+                args, capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("HOLD_NATIVE_GARM_F0F5_ORACLE_MISSING", result.stderr)
+            self.assertFalse(state.exists(), "missing native probe cannot start guest")
+            self.assertFalse(receipt.exists(), "missing native probe cannot emit success")
+
+            # CLI discoverability and enforced selector are both part of the
+            # existing runner-composition contract; neither can start KVM.
+            help_result = subprocess.run(
+                ["bash", str(guard), "--help"],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(help_result.returncode, 0, help_result.stderr)
+            self.assertIn("garm-controller-f0f5", help_result.stdout)
+            for selector in ("--rung", "--t6-product", "--rung=t5"):
+                with self.subTest(selector=selector):
+                    bad = subprocess.run(
+                        args + [selector, "t5"],
+                        capture_output=True, text=True, check=False, timeout=10,
+                    )
+                    self.assertEqual(bad.returncode, 2)
+                    self.assertIn("HOLD_GARM_F0F5_SELECTOR_OVERRIDE", bad.stderr)
 
 
 if __name__ == "__main__":
