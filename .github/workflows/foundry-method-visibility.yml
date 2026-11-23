@@ -1,0 +1,46 @@
+name: TrueNAS Foundry exact-source private/public method visibility oracle
+on:
+  push:
+    branches: ['review/issue-356-method-visibility-v1']
+    paths:
+      - 'tools/truenas_method_visibility.py'
+      - 'tools/test_truenas_method_visibility.py'
+      - '.github/workflows/foundry-method-visibility.yml'
+  pull_request:
+    paths:
+      - 'tools/truenas_method_visibility.py'
+      - 'tools/test_truenas_method_visibility.py'
+      - '.github/workflows/foundry-method-visibility.yml'
+permissions:
+  contents: read
+concurrency:
+  group: method-visibility-oracle-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-visibility-deny-admission:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-26]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Three independent repetitions; exercise negative proof and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          for rep in 1 2 3;do
+            python3 -m unittest -v tools.test_truenas_method_visibility
+          done
+          python3 -m unittest -v tools.test_truenas_target_profile tools.test_foundry_lifecycle
+          python3 - <<'PY'
+          import json,subprocess
+          s=subprocess.check_output(['python3','tools/truenas_method_visibility.py'],text=True)
+          x=json.loads(s)
+          assert x['admission']=='SOURCE_ORACLE_ONLY_NOT_PRODUCTION'
+          assert list(x['pinned_source'])==['25.04.2.6']
+          print('PASS: immutable public/private taxonomy evidence, legacy generic Foundry regression unchanged')
+          PY
