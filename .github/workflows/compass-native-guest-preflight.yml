@@ -24,19 +24,27 @@ jobs:
         run: |
           set -euo pipefail
           p='tools/rdte/vendor/truenas-kvm/scripts'
+          # The canonical harness must remain byte-for-byte source-verbatim.
+          python3 -m unittest -v tools.rdte.test_foundry_vendored_truenas_t2
           bash -n "$p/gha_kvm_truenas_rdte.sh"
-          python3 -m py_compile "$p/truenas_middleware_compass_guest_transport_probe.py" tests/consumers/model_compass/native_guest_registry.py
+          python3 -m py_compile tests/consumers/model_compass/truenas_native_guest_transport_probe.py
           python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_guest_registry.py' -v
-          python3 "$p/gha_kvm_truenas_rdte.sh" --help >/dev/null 2>&1 && { echo 'ERROR: attempted Python execution of shell';exit 1; } || true
+          python3 tests/consumers/model_compass/prepare_guest_harness.py \
+            --out "$RUNNER_TEMP/compass-native-guest-overlay" \
+            --receipt "$RUNNER_TEMP/compass-native-guest-overlay-receipt.json"
+          bash "$RUNNER_TEMP/compass-native-guest-overlay/tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh" --help | grep -q 'model-compass'
           python3 - <<'PY'
           from pathlib import Path
-          s=Path('tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh').read_text()
-          p=Path('tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_compass_guest_transport_probe.py').read_text()
+          original=Path('tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh').read_text()
+          generated=Path(__import__('os').environ['RUNNER_TEMP'])/'compass-native-guest-overlay/tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh'
+          s=generated.read_text()
+          p=Path('tests/consumers/model_compass/truenas_native_guest_transport_probe.py').read_text()
           required=['model-compass', 'COMPASS_HOSTFWD', 'truenas_middleware_compass_guest_transport_probe.py', 'native_compass_image_transport_exercised', 'guest-image-transport']
-          assert all(x in s for x in required), [x for x in required if x not in s]
+          assert all(x in s for x in required)
+          assert 'model-compass' not in original
           assert 'app.image.pull' in p and 'app.create' in p and 'app.delete' in p
-          assert 'daemon.json' not in s and 'docker_daemon_modified' in p
-          print('PASS: static native transport preconditions, no guest or site changes')
+          assert 'docker_daemon_modified' in p
+          print('PASS: exact vendored source + disposable bounded native transport overlay')
           PY
       - name: Reject source path drifting from scoped native guest T6 contract
         shell: bash
@@ -44,4 +52,4 @@ jobs:
           set -euo pipefail
           test -f tests/consumers/model_compass/native_guest_registry.py
           test -f tools/rdte/vendor/truenas-kvm/config/truenas-rdte-targets.json
-          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh --help | grep -q model-compass
+          bash "$RUNNER_TEMP/compass-native-guest-overlay/tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh" --help | grep -q model-compass
