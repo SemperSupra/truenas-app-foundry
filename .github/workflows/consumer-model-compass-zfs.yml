@@ -1,0 +1,44 @@
+name: Model Compass native TrueNAS retained ZFS state safety oracle
+on:
+  pull_request:
+    paths:
+      - 'tests/consumers/model_compass/native_zfs_retention.py'
+      - 'tests/consumers/model_compass/test_native_zfs_retention.py'
+      - '.github/workflows/consumer-model-compass-zfs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: compass-zfs-contract-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-state-source-contract:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run 3 independent deterministic safety reps with no host effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          for rep in 1 2 3;do
+            python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_zfs_retention.py' -v
+          done
+          python3 tests/consumers/model_compass/native_zfs_retention.py > "$RUNNER_TEMP/compass-zfs-source-contract.json"
+          python3 - "$RUNNER_TEMP/compass-zfs-source-contract.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          assert data['native_F2_F6']=='NOT_RUN'
+          assert data['live_trueNAS_hil']=='NOT_RUN'
+          assert data['app_lifecycle_executor']=='EXISTING_FOUNDRY_GENERIC_ONLY'
+          assert data['dataset_delete_policy']=='never_by_app_lifecycle'
+          assert data['filesystem_file_receive_public_api'] is False
+          print('PASS: public source-only read-only persistent-state policy; no guest/site writes')
+          PY
