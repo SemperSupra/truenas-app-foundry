@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""Source-bound TrueNAS Foundry consumer rehearsal, no target network or secrets.
+
+SemperSupra/truenas-app-foundry-private#355 owns the private site admission.
+This script uses existing Foundry generic packaging rather than a new actuator.
+"""
+from __future__ import annotations
+
+import argparse
+import copy
+import importlib.util
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
+
+HERE = pathlib.Path(__file__).resolve().parent
+FOUNDRY = HERE.parents[2]
+sys.path.insert(0, str(FOUNDRY / "tools"))
+from package_truenas_deployment_artifact import build_artifact  # noqa: E402
+
+PRODUCT = "https://github.com/SemperSupra/model-spelunker.git"
+PIN = "94b387e540b74ec7f917b8fc5416a6c79cb7c290"
+DIGEST_A = "sha256:" + "a" * 64  # synthetic, NEVER a claimed product OCI digest
+DIGEST_B = "sha256:" + "b" * 64
+APP_NAME = "model-compass"
+
+
+def run(args: list[str], cwd: pathlib.Path, env: dict[str, str] | None = None) -> str:
+    cp = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, check=False, timeout=180)
+    if cp.returncode:
+        raise RuntimeError("public source/render failure: " + (cp.stderr or cp.stdout)[-1000:])
+    return cp.stdout.strip()
+
+
+def checkout_source(root: pathlib.Path, sha: str) -> pathlib.Path:
+    if not re.fullmatch(r"[a-f0-9]{40}", sha):
+        raise ValueError("source ref must be an exact commit SHA")
+    p = root / "model-spelunker"
+    run(["git", "init", "-q", str(p)], root)
+    run(["git", "-C", str(p), "remote", "add", "origin", PRODUCT], root)
+    run(["git", "-C", str(p), "fetch", "--no-tags", "--depth=1", "origin", sha], root)
+    actual = run(["git", "-C", str(p), "rev-parse", "FETCH_HEAD"], root)
+    if actual != sha:
+        raise RuntimeError("untrusted source checkout/ref drift")
+    run(["git", "-C", str(p), "checkout", "-q", "--detach", sha], root)
+    return p
+
+
+def render(source: pathlib.Path, root: pathlib.Path, digest: str) -> dict:
+    app = source / "deploy" / "model-compass"
+    compose = app / "truenas-compose.yaml"
+    verifier = app / "verify_compose.py"
+    if not compose.is_file() or not verifier.is_file():
+        raise RuntimeError("source-bound app artifact missing")
+    env = os.environ.copy()
+    env.update({
+        "MODEL_COMPASS_IMAGE": "ghcr.io/synthetic/model-compass@" + digest,
+        "MODEL_COMPASS_PORT": "18088",
+        "MODEL_COMPASS_STATE_DIR": "/tmp/synthetic-zfs-owned-state",
+        "MODEL_COMPASS_TOKEN_FILE": "/tmp/synthetic-token-mode-0400",
+    })
+    raw = run(["docker", "compose", "-f", str(compose), "config", "--format", "json"], root, env)
+    data = json.loads(raw)
+    if data.get("services") is None:
+        raise RuntimeError("no normalized compose services")
+    rendered = root / "normalized.json"
+    rendered.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+    run([sys.executable, str(verifier), str(rendered)], root)
+    return data
+
+
+def verify_generic_lifecycle_contract(materialization_identity: str) -> int:
+    """Simulate planner decisions; no middleware, installed App or guest HIL."""
+    import foundry_lifecycle as lifecycle
+
+    registry = lifecycle.target.load_registry(
+        FOUNDRY / ".foundry" / "truenas-target-tracks.json"
+    )
+    methods = [
+        "system.version", "core.get_methods", "app.query", "app.config",
+        "app.create", "app.update", "app.start", "app.stop", "app.redeploy",
+        "app.delete",
+    ]
+    baseline = {
+        "schema_version": 1,
+        "system": {"version": "TrueNAS-25.04.2.6", "platform": "linux-amd64"},
+        "capabilities": {"methods": methods},
+        "ownership": {"state": "owned"},
+        "app": {
+            "name": APP_NAME,
+            "present": True,
+            "state": "RUNNING",
+            "materialization_identity": materialization_identity,
+            "active_workloads": 1,
+            "custom_app": True,
+        },
+        "operation": {"state": "stable", "completed_tokens": []},
+    }
+
+    def intent(operation: str, **kwargs):
+        return {
+            "schema": lifecycle.SCHEMA,
+            "operation": operation,
+            "adapter": "foundry-custom",
+            "app_name": APP_NAME,
+            "materialization_identity": materialization_identity,
+            **kwargs,
+        }
+
+    def check(observed, operation, wanted_status, wanted_action, **kw):
+        result = lifecycle.plan(observed, intent(operation, **kw), registry)
+        if (result["status"], result["action"]) != (wanted_status, wanted_action):
+            raise RuntimeError(
+                f"generic lifecycle expected {wanted_status}/{wanted_action}, "
+                f"got {result['status']}/{result['action']}: {result['blockers']}"
+            )
+        assert result["preconditions"]["delete_owned_storage_allowed"] is False
+        assert result["preconditions"]["foreign_state_adoption_allowed"] is False
+        return result
+
+    # Only this exact target's generic profile is marked apply-qualified;
+    # this fact does NOT mean the new Model Compass App has been qualified.
+    check(baseline, "ENSURE_RUNNING", "READY", "NOOP")
+    check(baseline, "ENSURE_STOPPED", "READY", "STOP")
+    stopped = copy.deepcopy(baseline)
+    stopped["app"]["state"] = "STOPPED"
+    stopped["app"]["active_workloads"] = 0
+    check(stopped, "ENSURE_RUNNING", "READY", "START")
+    check(stopped, "ENSURE_STOPPED", "READY", "NOOP")
+    check(baseline, "REDEPLOY", "READY", "REDEPLOY", operation_token="synthetic-1")
+    check(
+        baseline, "ENSURE_ABSENT", "READY", "DELETE", delete_policy="retain-data"
+    )
+    check(
+        baseline, "REINSTALL", "READY", "DELETE_FOR_REINSTALL",
+        delete_policy="retain-data", operation_token="synthetic-2",
+    )
+    absent = copy.deepcopy(baseline)
+    absent["app"]["present"] = False
+    absent["app"]["state"] = "ABSENT"
+    absent["app"]["active_workloads"] = 0
+    absent["ownership"]["state"] = "absent"
+    created = check(
+        absent, "REINSTALL", "READY", "CREATE_HANDOFF",
+        delete_policy="retain-data", operation_token="synthetic-2",
+    )
+    assert created["handoff"] == "truenas_target_profile.plan"
+    assert lifecycle.verify(
+        baseline, intent("ENSURE_RUNNING"), registry
+    )["status"] == "VERIFIED"
+
+    adversarial = [
+        ("foreign_ownership", lambda o: o["ownership"].update(state="foreign")),
+        ("foreign_name", lambda o: o["app"].update(name="foreign-app")),
+        ("foreign_materialization", lambda o: o["app"].update(
+            materialization_identity="sha256:unexpected")),
+        ("ambiguous_effect", lambda o: o["operation"].update(state="ambiguous")),
+        ("unqualified_other_version", lambda o: o["system"].update(
+            version="TrueNAS-25.10.7")),
+    ]
+    for name, poison in adversarial:
+        obs = copy.deepcopy(baseline)
+        poison(obs)
+        denied = lifecycle.plan(obs, intent("ENSURE_RUNNING"), registry)
+        if denied["status"] != "BLOCKED":
+            raise RuntimeError(f"unsafe native lifecycle admitted {name}: {denied}")
+    return 5
+
+def verify(source: pathlib.Path, root: pathlib.Path, sha: str) -> dict:
+    original = render(source, root, DIGEST_A)
+    provenance = {"product_repo": "SemperSupra/model-spelunker", "product_source_commit": sha,
+                  "qualification_stage": "public-source-only", "oci_image": "synthetic-not-published"}
+    first = build_artifact(APP_NAME, original, provenance)
+    duplicate = build_artifact(APP_NAME, copy.deepcopy(original), provenance)
+    if first != duplicate:
+        raise RuntimeError("identical source/IR produced non-deterministic materialization identity")
+    if first.get("schema") != "truenas-foundry-deployment-artifact/v1":
+        raise RuntimeError("not the existing generic Foundry deployment schema")
+    if first.get("create_payload", {}).get("custom_app") is not True:
+        raise RuntimeError("native Custom App source path lost")
+    if first["create_payload"]["custom_compose_config"] != original:
+        raise RuntimeError("normalized IR altered during packaging")
+    if first["create_payload"]["custom_compose_config"]["services"][APP_NAME]["read_only"] is not True:
+        raise RuntimeError("stateless rootfs not preserved")
+    updated = render(source, root, DIGEST_B)
+    replaced = build_artifact(APP_NAME, updated, provenance)
+    if replaced["materialization_identity"] == first["materialization_identity"]:
+        raise RuntimeError("OCI immutable image digest change did not invalidate artifact")
+    # Deliberately use the product's public source validator. No duplicate
+    # private or application-specific lifecycle executor is created here.
+    validator_file = source / "deploy" / "model-compass" / "verify_compose.py"
+    spec = importlib.util.spec_from_file_location("compass_source_validator", validator_file)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for variant, poison in [
+        ("foreign_privileged", lambda a: a["services"][APP_NAME].update(privileged=True)),
+        ("unbound_port", lambda a: a["services"][APP_NAME]["ports"][0].update(host_ip="0.0.0.0")),
+        ("writable_state", lambda a: a["services"][APP_NAME]["volumes"][0].update(read_only=False)),
+        ("docker_socket", lambda a: a["services"][APP_NAME]["volumes"].append(
+            {"type": "bind", "source": "/var/run/docker.sock", "target": "/var/run/docker.sock", "read_only": False})),
+    ]:
+        mutated = copy.deepcopy(original)
+        poison(mutated)
+        try:
+            module.verify(mutated)
+        except SystemExit as exc:
+            if not str(exc).startswith("REFUSE:"):
+                raise RuntimeError("unexpected negative result for " + variant) from exc
+        else:
+            raise RuntimeError("malicious Compose variant accepted: " + variant)
+    lifecycle_fail_closed = verify_generic_lifecycle_contract(
+        first["materialization_identity"]
+    )
+    return {
+        "lifecycle_planner": "SYNTHETIC_ONLY_F2_TO_F6_NOT_RUN",
+        "generic_lifecycle_negative_oracles": lifecycle_fail_closed,
+        "status": "PASS",
+        "profile": "public-Foundry-F0-F1-source-only",
+        "product_source_sha": sha,
+        "artifact_schema": first["schema"],
+        "materialization_identity": first["materialization_identity"],
+        "image_digest_change": "DIFFERENT",
+        "repeated_plan": "IDENTICAL",
+        "negative_oracles": 4,
+        "F2_through_F6": "NOT_RUN",
+        "actual_oci_image": "NOT_PUBLISHED",
+        "truenas_hil": "NOT_RUN",
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--product-sha", default=PIN)
+    args = ap.parse_args()
+    try:
+        with tempfile.TemporaryDirectory(prefix="foundry-compass-") as tmp:
+            root = pathlib.Path(tmp)
+            source = checkout_source(root, args.product_sha)
+            result = verify(source, root, args.product_sha)
+            print(json.dumps(result, sort_keys=True))
+    except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as exc:
+        print("BLOCKED: " + str(exc), file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
