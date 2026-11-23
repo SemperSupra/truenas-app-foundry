@@ -73,6 +73,103 @@ def render(source: pathlib.Path, root: pathlib.Path, digest: str) -> dict:
     return data
 
 
+def verify_generic_lifecycle_contract(materialization_identity: str) -> int:
+    """Simulate planner decisions; no middleware, installed App or guest HIL."""
+    import foundry_lifecycle as lifecycle
+
+    registry = lifecycle.target.load_registry(
+        FOUNDRY / ".foundry" / "truenas-target-tracks.json"
+    )
+    methods = [
+        "system.version", "core.get_methods", "app.query", "app.config",
+        "app.create", "app.update", "app.start", "app.stop", "app.redeploy",
+        "app.delete",
+    ]
+    baseline = {
+        "schema_version": 1,
+        "system": {"version": "TrueNAS-25.04.2.6", "platform": "linux-amd64"},
+        "capabilities": {"methods": methods},
+        "ownership": {"state": "owned"},
+        "app": {
+            "name": APP_NAME,
+            "present": True,
+            "state": "RUNNING",
+            "materialization_identity": materialization_identity,
+            "active_workloads": 1,
+            "custom_app": True,
+        },
+        "operation": {"state": "stable", "completed_tokens": []},
+    }
+
+    def intent(operation: str, **kwargs):
+        return {
+            "schema": lifecycle.SCHEMA,
+            "operation": operation,
+            "adapter": "foundry-custom",
+            "app_name": APP_NAME,
+            "materialization_identity": materialization_identity,
+            **kwargs,
+        }
+
+    def check(observed, operation, wanted_status, wanted_action, **kw):
+        result = lifecycle.plan(observed, intent(operation, **kw), registry)
+        if (result["status"], result["action"]) != (wanted_status, wanted_action):
+            raise RuntimeError(
+                f"generic lifecycle expected {wanted_status}/{wanted_action}, "
+                f"got {result['status']}/{result['action']}: {result['blockers']}"
+            )
+        assert result["preconditions"]["delete_owned_storage_allowed"] is False
+        assert result["preconditions"]["foreign_state_adoption_allowed"] is False
+        return result
+
+    # Only this exact target's generic profile is marked apply-qualified;
+    # this fact does NOT mean the new Model Compass App has been qualified.
+    check(baseline, "ENSURE_RUNNING", "READY", "NOOP")
+    check(baseline, "ENSURE_STOPPED", "READY", "STOP")
+    stopped = copy.deepcopy(baseline)
+    stopped["app"]["state"] = "STOPPED"
+    stopped["app"]["active_workloads"] = 0
+    check(stopped, "ENSURE_RUNNING", "READY", "START")
+    check(stopped, "ENSURE_STOPPED", "READY", "NOOP")
+    check(baseline, "REDEPLOY", "READY", "REDEPLOY", operation_token="synthetic-1")
+    check(
+        baseline, "ENSURE_ABSENT", "READY", "DELETE", delete_policy="retain-data"
+    )
+    check(
+        baseline, "REINSTALL", "READY", "DELETE_FOR_REINSTALL",
+        delete_policy="retain-data", operation_token="synthetic-2",
+    )
+    absent = copy.deepcopy(baseline)
+    absent["app"]["present"] = False
+    absent["app"]["state"] = "ABSENT"
+    absent["app"]["active_workloads"] = 0
+    absent["ownership"]["state"] = "absent"
+    created = check(
+        absent, "REINSTALL", "READY", "CREATE_HANDOFF",
+        delete_policy="retain-data", operation_token="synthetic-2",
+    )
+    assert created["handoff"] == "truenas_target_profile.plan"
+    assert lifecycle.verify(
+        baseline, intent("ENSURE_RUNNING"), registry
+    )["status"] == "VERIFIED"
+
+    adversarial = [
+        ("foreign_ownership", lambda o: o["ownership"].update(state="foreign")),
+        ("foreign_name", lambda o: o["app"].update(name="foreign-app")),
+        ("foreign_materialization", lambda o: o["app"].update(
+            materialization_identity="sha256:unexpected")),
+        ("ambiguous_effect", lambda o: o["operation"].update(state="ambiguous")),
+        ("unqualified_other_version", lambda o: o["system"].update(
+            version="TrueNAS-25.10.7")),
+    ]
+    for name, poison in adversarial:
+        obs = copy.deepcopy(baseline)
+        poison(obs)
+        denied = lifecycle.plan(obs, intent("ENSURE_RUNNING"), registry)
+        if denied["status"] != "BLOCKED":
+            raise RuntimeError(f"unsafe native lifecycle admitted {name}: {denied}")
+    return 5
+
 def verify(source: pathlib.Path, root: pathlib.Path, sha: str) -> dict:
     original = render(source, root, DIGEST_A)
     provenance = {"product_repo": "SemperSupra/model-spelunker", "product_source_commit": sha,
@@ -116,7 +213,12 @@ def verify(source: pathlib.Path, root: pathlib.Path, sha: str) -> dict:
                 raise RuntimeError("unexpected negative result for " + variant) from exc
         else:
             raise RuntimeError("malicious Compose variant accepted: " + variant)
+    lifecycle_fail_closed = verify_generic_lifecycle_contract(
+        first["materialization_identity"]
+    )
     return {
+        "lifecycle_planner": "SYNTHETIC_ONLY_F2_TO_F6_NOT_RUN",
+        "generic_lifecycle_negative_oracles": lifecycle_fail_closed,
         "status": "PASS",
         "profile": "public-Foundry-F0-F1-source-only",
         "product_source_sha": sha,
