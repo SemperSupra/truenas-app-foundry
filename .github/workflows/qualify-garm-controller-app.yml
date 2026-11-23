@@ -5,12 +5,14 @@ on:
     paths:
       - 'candidates/garm-controller-app/**'
       - 'tools/validate_garm_controller_app.py'
+      - 'tools/render_truenas_candidate.py'
       - '.github/workflows/qualify-garm-controller-app.yml'
   push:
     branches: [main]
     paths:
       - 'candidates/garm-controller-app/**'
       - 'tools/validate_garm_controller_app.py'
+      - 'tools/render_truenas_candidate.py'
       - '.github/workflows/qualify-garm-controller-app.yml'
   workflow_dispatch:
 
@@ -82,6 +84,95 @@ jobs:
           grep -Eq '^ +min_length: 32$' "$questions"
           grep -Eq '^ +max_length: 32$' "$questions"
 
+      - name: Qualify private-value renderer with public fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          python3 tools/render_truenas_candidate.py \
+            --candidate candidates/garm-controller-app/candidate.json \
+            --values candidates/garm-controller-app/ix-dev/community/garm/templates/test_values/basic-values.yaml \
+            --output-compose "$out"
+          test "$(stat -c '%a' "$out")" = 600
+          # Compare rendered image against the pinned candidate manifest, not a stale fixture digest.
+          expected_image="$(jq -er '.appliance.reference' candidates/garm-controller-app/candidate.json)"
+          case "$expected_image" in
+            ghcr.io/sempersupra/garm-appliance@sha256:*) ;;
+            *) echo 'Candidate has an unexpected appliance image reference' >&2; exit 2 ;;
+          esac
+          jq -e --arg expected_image "$expected_image" '
+            (.services | keys | sort) == ["garm","garm-config-seed"] and
+            .services.garm.image == $expected_image and
+            .services."garm-config-seed".image == $expected_image
+          ' "$out" >/dev/null
+          rm -f "$out"
+
+      - name: Verify private Compose atomic-write and symlink safety
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import stat
+          import tempfile
+          from pathlib import Path
+
+          from tools.render_truenas_candidate import (
+              RenderError, checkout_upstream, write_private_output,
+              write_private_yaml,
+          )
+          import yaml
+
+          payload = {"services": {"fixture": {"image": "synthetic-only"}}}
+          with tempfile.TemporaryDirectory() as directory:
+              root = Path(directory)
+              victim = root / "untouched.txt"
+              victim.write_text("UNCHANGED", encoding="utf-8")
+              target = root / "private-compose.json"
+              target.symlink_to(victim)
+              write_private_output(target, payload)
+              assert not target.is_symlink(), "destination symlink was followed"
+              assert victim.read_text(encoding="utf-8") == "UNCHANGED"
+              assert stat.S_IMODE(target.stat().st_mode) == 0o600
+              assert json.loads(target.read_text(encoding="utf-8")) == payload
+              assert not list(root.glob(".private-compose.json.*")), "temp file leaked"
+
+              # Private site input YAML is also secret-bearing: detect transient
+              # world-readable creation and destination-symlink overwrite bugs.
+              yaml_victim = root / "yaml-victim.txt"
+              yaml_victim.write_text("UNCHANGED", encoding="utf-8")
+              yaml_target = root / "private-values.yaml"
+              yaml_target.symlink_to(yaml_victim)
+              payload_values = {"tls": {"test_only": "synthetic"}}
+              write_private_yaml(yaml_target, payload_values)
+              assert not yaml_target.is_symlink(), "private YAML symlink was followed"
+              assert yaml_victim.read_text(encoding="utf-8") == "UNCHANGED"
+              assert stat.S_IMODE(yaml_target.stat().st_mode) == 0o600
+              assert yaml.safe_load(yaml_target.read_text(encoding="utf-8")) == payload_values
+              assert not list(root.glob(".private-values.yaml.*")), "private YAML temp leaked"
+              yaml_target.chmod(0o644)
+              write_private_yaml(yaml_target, payload_values)
+              assert stat.S_IMODE(yaml_target.stat().st_mode) == 0o600
+
+              target.chmod(0o644)
+              write_private_output(target, payload)
+              assert stat.S_IMODE(target.stat().st_mode) == 0o600
+              for url, revision in [
+                  ("https://untrusted.invalid/apps.git", "a" * 40),
+                  ("file:///tmp/apps.git", "a" * 40),
+                  ("https://github.com/truenas/apps.git", "X" * 40),
+              ]:
+                  try:
+                      checkout_upstream(root, {
+                          "source_materializer": {
+                              "repository": url, "commit": revision,
+                          },
+                      })
+                  except RenderError:
+                      continue
+                  raise AssertionError("Untrusted renderer origin accepted")
+          print("Atomic output, symlink and untrusted-origin negatives PASS")
+          PY
+
       - name: Resolve exact appliance identity
         id: appliance
         shell: bash
@@ -129,7 +220,7 @@ jobs:
             --evidence garm-controller-app-evidence.json
 
       - name: Capture controller startup diagnostics on qualification failure
-        if: failure()
+        if: failure() && steps.appliance.outputs.image != ''
         env:
           IMAGE: ${{ steps.appliance.outputs.image }}
         shell: bash
