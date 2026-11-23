@@ -277,8 +277,9 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
                        *, token: str | None = None, completed: list[str] | None = None):
         intent = {"schema": lifecycle.SCHEMA, "operation": operation,
                   "adapter": "foundry-custom", "app_name": APP,
-                  "materialization_identity": identity(expected_compose or current_compose),
-                  "delete_policy": "retain-data"}
+                  "materialization_identity": identity(expected_compose or current_compose)}
+        if operation in {"ENSURE_ABSENT", "REINSTALL"}:
+            intent["delete_policy"] = "retain-data"
         if token:
             intent["operation_token"] = token
         snapshot = observed(expected_compose, completed)
