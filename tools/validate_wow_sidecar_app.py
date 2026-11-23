@@ -93,7 +93,13 @@ def mount_by_target(service: dict[str, Any], target: str) -> dict[str, Any]:
         raise ValidationError(f"expected exactly one mount at {target}, got {len(matches)}")
     return matches[0]
 
-def assert_common_wow_security(name: str, service: dict[str, Any], *, network_none: bool) -> None:
+def assert_common_wow_security(
+    name: str,
+    service: dict[str, Any],
+    *,
+    network_none: bool,
+    rootfs_read_only: bool,
+) -> None:
     if service.get("privileged"):
         raise ValidationError(f"{name}: privileged mode materialized")
     if str(service.get("user") or "") != "10001:10001":
@@ -104,8 +110,10 @@ def assert_common_wow_security(name: str, service: dict[str, Any], *, network_no
     opts = {str(v).lower().replace(":", "=") for v in service.get("security_opt") or []}
     if not any(v.startswith("no-new-privileges=true") for v in opts):
         raise ValidationError(f"{name}: no-new-privileges missing")
-    if service.get("read_only") is not True:
+    if rootfs_read_only and service.get("read_only") is not True:
         raise ValidationError(f"{name}: root filesystem is not read-only")
+    if not rootfs_read_only and service.get("read_only") is True:
+        raise ValidationError(f"{name}: bounded writable rootfs exception regressed to read-only")
     if service.get("network_mode") == "host":
         raise ValidationError(f"{name}: host network materialized")
     if network_none and service.get("network_mode") != "none":
@@ -149,8 +157,12 @@ def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[s
     if perms.get("image") != helper:
         raise ValidationError("permissions helper image does not match immutable reference")
 
-    assert_common_wow_security("wow-sidecar", worker, network_none=False)
-    assert_common_wow_security("wow-sidecar-config-seed", seed, network_none=True)
+    assert_common_wow_security(
+        "wow-sidecar", worker, network_none=False, rootfs_read_only=True
+    )
+    assert_common_wow_security(
+        "wow-sidecar-config-seed", seed, network_none=True, rootfs_read_only=False
+    )
 
     groups = {str(v) for v in worker.get("group_add") or []}
     if groups != {"568"}:
@@ -192,6 +204,19 @@ def assert_render(compose: dict[str, Any], candidate: dict[str, Any]) -> tuple[s
     seed_config = mount_by_target(seed, "/etc/wow-sidecar")
     if seed_config.get("read_only") is True:
         raise ValidationError("seed config mount unexpectedly read-only")
+
+    seed_inputs = {
+        str(item.get("target") or ""): str(item.get("mode") or "")
+        for item in (seed.get("configs") or [])
+        if isinstance(item, dict)
+    }
+    expected_seed_inputs = {
+        "/seed/github-app.pem": "0444",
+        "/seed/operator-profile.json": "0444",
+    }
+    if seed_inputs != expected_seed_inputs:
+        raise ValidationError(f"seed inline config mode/target drift: {seed_inputs!r}")
+
     script = extract_seed_script(seed)
     for required in (
         ".initialized-v1", "github-app.pem", "profiles/operator.json",
@@ -247,7 +272,7 @@ def seed_behavior(image: str, script: str, root: Path) -> None:
         cp = run([
             "docker", "run", "--rm", "--network", "none", "--user", "10001:10001",
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges=true",
-            "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=10001,gid=10001",
+            "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=10001,gid=10001",
             "--entrypoint", "/bin/sh",
             "-v", f"{config}:/etc/wow-sidecar",
             "-v", f"{seed_dir / 'github-app.pem'}:/seed/github-app.pem:ro",
@@ -273,7 +298,70 @@ def seed_behavior(image: str, script: str, root: Path) -> None:
     if key_path.read_bytes() != first[0] or profile_path.read_bytes() != first[1]:
         raise ValidationError("partial-state refusal mutated managed configuration")
 
+def full_compose_behavior(compose: dict[str, Any], root: Path) -> None:
+    fixture_root = Path("/opt/tests/mnt/wow-sidecar")
+    config = fixture_root / "config"
+    state = fixture_root / "state"
+    project = "foundry-wow-sidecar-full"
+    compose_path = root / "wow-sidecar-full-compose.json"
+    compose_path.write_text(json.dumps(compose, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    shutil.rmtree(fixture_root, ignore_errors=True)
+    config.mkdir(parents=True)
+    state.mkdir(parents=True)
+    os.chown(config, 0, 0)
+    os.chown(state, 0, 0)
+    os.chmod(config, 0o750)
+    os.chmod(state, 0o750)
+
+    base = ["docker", "compose", "-p", project, "-f", str(compose_path)]
+    try:
+        up = run(base + ["up", "-d"], check=False)
+        if up.returncode:
+            logs = run(base + ["logs", "--no-color", "--tail", "100"], check=False)
+            detail = (up.stderr or up.stdout or "")[-3000:] + "\n" + (logs.stdout or logs.stderr or "")[-5000:]
+            raise ValidationError(f"full Compose graph failed to start: {detail}")
+
+        running = set(run(base + ["ps", "--services", "--status", "running"]).stdout.split())
+        exited = set(run(base + ["ps", "--services", "--status", "exited"]).stdout.split())
+        if "wow-sidecar" not in running:
+            raise ValidationError(f"worker is not running after full Compose start: {sorted(running)}")
+        if not {"permissions", "wow-sidecar-config-seed"}.issubset(exited):
+            raise ValidationError(f"one-shot helpers did not exit after full Compose start: {sorted(exited)}")
+
+        expected = {
+            config: (10001, 10001, 0o750),
+            state: (10001, 10001, 0o750),
+            config / "github-app.pem": (10001, 10001, 0o400),
+            config / "profiles" / "operator.json": (10001, 10001, 0o400),
+            config / ".initialized-v1": (10001, 10001, 0o444),
+        }
+        for target, (uid, gid, mode) in expected.items():
+            st = target.stat()
+            if (st.st_uid, st.st_gid, st.st_mode & 0o777) != (uid, gid, mode):
+                raise ValidationError(
+                    f"full Compose metadata drift at {target}: "
+                    f"{st.st_uid}:{st.st_gid}:{oct(st.st_mode & 0o777)}"
+                )
+
+        # The synthetic key is intentionally invalid. The service loop must fail closed per-cycle, not exit.
+        import time
+        time.sleep(6)
+        running = set(run(base + ["ps", "--services", "--status", "running"]).stdout.split())
+        if "wow-sidecar" not in running:
+            logs = run(base + ["logs", "--no-color", "--tail", "50", "wow-sidecar"], check=False)
+            raise ValidationError(f"worker exited under public fixture: {(logs.stdout or logs.stderr or '')[-3000:]}")
+    finally:
+        run(base + ["down", "--remove-orphans"], check=False)
+        shutil.rmtree(fixture_root, ignore_errors=True)
+
+
 def validate(public_pull: bool) -> dict[str, Any]:
+    template_source = (SOURCE / "templates" / "docker-compose.yaml").read_text(encoding="utf-8")
+    if "{% do seed.set_read_only(false) %}" not in template_source:
+        raise ValidationError("seed writable-rootfs exception is not explicit in App source")
+    if "{% do worker.set_read_only(true) %}" not in template_source:
+        raise ValidationError("worker read-only rootfs invariant is not explicit in App source")
     for tool in ("git", "docker", "python3"):
         if not shutil.which(tool):
             raise ValidationError(f"required tool missing: {tool}")
@@ -288,6 +376,7 @@ def validate(public_pull: bool) -> dict[str, Any]:
         compose = render_candidate(checkout, app_dir)
         image, seed_script = assert_render(compose, candidate)
         seed_behavior(image, seed_script, root)
+        full_compose_behavior(compose, root)
 
         worker_help = run(["docker", "run", "--rm", image, "--help"])
         if "bounded trusted-host worker" not in (worker_help.stdout + worker_help.stderr):
@@ -307,7 +396,11 @@ def validate(public_pull: bool) -> dict[str, Any]:
                 "wow_runtime_uid_gid": "10001:10001",
                 "wow_cap_drop_all": True,
                 "wow_no_new_privileges": True,
-                "wow_rootfs_read_only": True,
+                "worker_rootfs_read_only": True,
+                "seed_rootfs_read_only": False,
+                "seed_rootfs_exception": "inline-content configs require writable one-shot service rootfs",
+                "seed_inline_config_mode": "0444",
+                "persisted_managed_config_mode": "0400",
                 "wow_config_read_only": True,
                 "host_paths_allowed_by_source_schema": False,
                 "runtime_socket_allowed": False,
@@ -316,6 +409,7 @@ def validate(public_pull: bool) -> dict[str, Any]:
                 "permissions_helper_scope": "ixVolume ownership only",
             },
             "seed_behavior": "PASS:create-once/preserve/fail-partial",
+            "full_compose_behavior": "PASS:permissions/seed/worker",
             "ghcr_anonymous_pull": public_pull,
             "non_claims": [
                 "no TrueNAS runtime realization",

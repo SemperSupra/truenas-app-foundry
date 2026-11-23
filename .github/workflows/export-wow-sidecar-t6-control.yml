@@ -1,0 +1,129 @@
+name: Export WOW Sidecar TrueNAS T6 control
+
+on:
+  workflow_call:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: Exact SemperSupra/truenas-app-foundry commit to export; blank uses this workflow commit
+        required: false
+        type: string
+  push:
+    branches:
+      - prep/wow-sidecar-t6-control-v1
+    paths:
+      - ".github/workflows/export-wow-sidecar-t6-control.yml"
+      - "tools/build_wow_sidecar_t6_control.py"
+      - "tests/test_build_wow_sidecar_t6_control.py"
+      - "tests/fixtures/wow-sidecar/t6-truenas-values.yaml"
+      - "candidates/wow-sidecar-app/**"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Resolve exact Foundry source
+        id: source
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.foundry_ref }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED_REF:-}"
+          if [[ -z "$ref" ]]; then ref="$GITHUB_SHA"; fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact public Foundry source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: SemperSupra/truenas-app-foundry
+          ref: ${{ steps.source.outputs.ref }}
+          persist-credentials: false
+
+      - name: Verify source and exporter contract
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ steps.source.outputs.ref }}" ]]
+          python3 -m unittest -v tests/test_build_wow_sidecar_t6_control.py
+          python3 tools/validate_wow_sidecar_candidate.py --candidate candidates/wow-sidecar-app/candidate.json
+
+      - name: Materialize exact candidate into pinned TrueNAS Apps source
+        id: materialize
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=candidates/wow-sidecar-app/candidate.json
+          repo="$(jq -r '.truenas_source.repository' "$manifest")"
+          commit="$(jq -r '.truenas_source.commit' "$manifest")"
+          train="$(jq -r '.truenas_source.train' "$manifest")"
+          lib_version="$(jq -r '.truenas_source.lib_version' "$manifest")"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+          git init -q /tmp/apps
+          git -C /tmp/apps remote add origin "$repo"
+          git -C /tmp/apps fetch --quiet --depth=1 origin "$commit"
+          git -C /tmp/apps checkout -q --detach FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$commit" ]]
+          destination="/tmp/apps/ix-dev/$train/wow-sidecar"
+          cp -a candidates/wow-sidecar-app/ix-dev/community/wow-sidecar "$destination"
+          lib_name="base_v${lib_version//./_}"
+          mkdir -p "$destination/templates/library"
+          cp -a "/tmp/apps/ix-dev/community/ntfy/templates/library/$lib_name" "$destination/templates/library/$lib_name"
+          cp tests/fixtures/wow-sidecar/t6-truenas-values.yaml "$destination/templates/test_values/t6-truenas-values.yaml"
+          echo "train=$train" >> "$GITHUB_OUTPUT"
+
+      - name: Render exact App through pinned TrueNAS path
+        working-directory: /tmp/apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ./.github/scripts/ci.py             --train "${{ steps.materialize.outputs.train }}"             --app wow-sidecar             --test-file t6-truenas-values.yaml             --render-only=true
+          rendered="ix-dev/${{ steps.materialize.outputs.train }}/wow-sidecar/templates/rendered/docker-compose.yaml"
+          test -s "$rendered"
+          docker compose -f "$rendered" config --format json > /tmp/wow-sidecar-t6-compose.json
+
+      - name: Assert public-safe runtime invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_image="$(jq -r '.container.registry_reference' candidates/wow-sidecar-app/candidate.json)"
+          expected_helper="$(jq -r '.permissions_helper.reference' candidates/wow-sidecar-app/candidate.json)"
+          jq -e --arg image "$expected_image" --arg helper "$expected_helper" '
+            (.services | keys | sort) == ["permissions","wow-sidecar","wow-sidecar-config-seed"] and
+            .services["wow-sidecar"].image == $image and
+            .services["wow-sidecar-config-seed"].image == $image and
+            .services.permissions.image == $helper and
+            .services["wow-sidecar"].user == "10001:10001" and
+            .services["wow-sidecar"].read_only == true and
+            .services["wow-sidecar-config-seed"].network_mode == "none" and
+            .services.permissions.network_mode == "none"
+          ' /tmp/wow-sidecar-t6-compose.json >/dev/null
+          grep -q 'PUBLIC-QUALIFICATION-FIXTURE' /tmp/wow-sidecar-t6-compose.json
+          ! grep -E -q 'SemperSupra/[A-Za-z0-9_.-]+-private|ghp_|sk-' /tmp/wow-sidecar-t6-compose.json
+
+      - name: Build reusable WOW T6 control bundle
+        run: |
+          set -euo pipefail
+          python3 tools/build_wow_sidecar_t6_control.py             --candidate candidates/wow-sidecar-app/candidate.json             --compose /tmp/wow-sidecar-t6-compose.json             --output /tmp/wow-sidecar-t6-control             --foundry-ref "${{ steps.source.outputs.ref }}"             | tee /tmp/wow-sidecar-t6-export-result.json
+          jq -e '
+            .schema == "semper-supra.wow-sidecar-truenas-t6-control/1" and
+            .secrets_captured == false and
+            .runtime.production_credentials_present == false
+          ' /tmp/wow-sidecar-t6-control/control.json >/dev/null
+
+      - name: Upload exact Foundry-produced WOW T6 control
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wow-sidecar-truenas-t6-control
+          path: /tmp/wow-sidecar-t6-control/
+          if-no-files-found: error
+          retention-days: 7
