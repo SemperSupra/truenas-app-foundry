@@ -1,0 +1,39 @@
+name: TrueNAS Foundry Model Compass Exact-Source F0-F1 Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'tests/consumers/model_compass/**'
+      - '.github/workflows/consumer-model-compass.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-compass-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-source-materialization:
+    name: public F0-F1 Custom App normalized Compose/artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Fetch exact proposed Foundry source, no retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Source identity and generic materialization rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/consumers/model_compass/qualify.py
+      - name: Fail closed on branch/floating source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 tests/consumers/model_compass/qualify.py --product-sha main >/dev/null 2>&1; then
+            echo 'ERROR: accepted floating product source'
+            exit 1
+          fi
