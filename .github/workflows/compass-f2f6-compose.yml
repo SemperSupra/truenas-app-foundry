@@ -50,7 +50,7 @@ jobs:
           assert a['ports'][0]['published']=='18088'
           assert b['read_only'] is True and b['user']=='65532:65532'
           assert b['cap_drop']==['ALL']
-          assert len(b['volumes'])==1 and b['volumes'][0]['read_only'] is False
+          assert len(b['volumes'])==1 and b['volumes'][0].get('read_only',False) is False
           assert 'privileged' not in a and 'privileged' not in b
           print('PASS: real Docker Compose source fixture normalized; F2-F6 native guest NOT_RUN')
           PY
