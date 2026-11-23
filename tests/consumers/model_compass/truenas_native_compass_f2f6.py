@@ -333,6 +333,14 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
         # Existing Foundry generic target planner owns all materialization choices.
         desired = {"app_name": APP, "materialization_identity": identity(current_compose)}
         p = lifecycle.target.plan(observed(None), desired, registry)
+        native["generic_create_plan"] = {
+            "status": p.get("status"),
+            "action": p.get("action"),
+            "blockers": p.get("blockers", [])[:8],
+            "missing_public_methods": p.get("missing_methods", []),
+            "profile_missing_methods": p.get("target", {}).get("missing_profile_methods", []),
+            "target_apply_qualified": p.get("target", {}).get("apply_qualified"),
+        }
         require(p["status"] == "READY" and p["action"] == "CREATE",
                 "Foundry generic materialization denied CREATE")
         job(call("app.create", [{"app_name": APP, "custom_app": True,
