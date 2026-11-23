@@ -23,7 +23,7 @@ sys.path.insert(0, str(FOUNDRY / "tools"))
 from package_truenas_deployment_artifact import build_artifact  # noqa: E402
 
 PRODUCT = "https://github.com/SemperSupra/model-spelunker.git"
-PIN = "ff98313c199038551aec66e0caaeabaacc2c2e5d"
+PIN = "94b387e540b74ec7f917b8fc5416a6c79cb7c290"
 DIGEST_A = "sha256:" + "a" * 64  # synthetic, NEVER a claimed product OCI digest
 DIGEST_B = "sha256:" + "b" * 64
 APP_NAME = "model-compass"
