@@ -594,11 +594,6 @@ import socket
 s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()
 PY
 )"
-if [[ "$RUNG" == "t6" && "$T6_PRODUCT" == "model-compass" ]]; then
-  # Unique QEMU user-network forwarding: runner loopback -> isolated guest.
-  # No private LAN/host routing and no external OCI registry publication.
-  COMPASS_HOSTFWD=",hostfwd=tcp:127.0.0.1:15431-:15431"
-fi
 : >"$STATE_DIR/serial.log"
 sudo -n qemu-system-x86_64 \
   -enable-kvm -cpu host -smp "$VCPUS" -m "$RAM_MIB" \
@@ -732,6 +727,10 @@ FOLIORELAY_HOSTFWD=""
 MINECRAFT_HOST_PORT=""
 MINECRAFT_HOSTFWD=""
 COMPASS_HOSTFWD=""
+if [[ "$RUNG" == "t6" && "$T6_PRODUCT" == "model-compass" ]]; then
+  # Bind only the disposable runner loopback to installed guest port.
+  COMPASS_HOSTFWD=",hostfwd=tcp:127.0.0.1:15431-:15431"
+fi
 if [[ "$RUNG" == "t6" && ( "$T6_PRODUCT" == "minecraft-paper" || "$T6_PRODUCT" == "collage-native-paper" || "$T6_PRODUCT" == "minecraft-vanilla-263" ) ]]; then
   MINECRAFT_HOST_PORT="$(python3 - <<'PY'
 import socket
