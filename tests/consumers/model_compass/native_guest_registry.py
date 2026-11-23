@@ -14,6 +14,8 @@ import json
 import re
 from typing import Any
 
+PRODUCT_SOURCE_SHA = "6e88ccbe09f7f0989a8db4e75967654d409f8f64"
+
 REGISTRY_REF = (
     "registry@sha256:"
     "a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
@@ -133,7 +135,7 @@ def verify_plan_contract(result: dict[str, Any]) -> None:
 
 if __name__ == "__main__":
     # Public default is the exact synthetic *integrated* product candidate.
-    source = "6e88ccbe09f7f0989a8db4e75967654d409f8f64"
+    source = PRODUCT_SOURCE_SHA
     print(json.dumps(plan(
         product_commit=source,
         target_version=TARGET,
