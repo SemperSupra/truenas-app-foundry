@@ -1,0 +1,389 @@
+{
+  "schema": "truenas-foundry-product-target-matrix/v1",
+  "authority": "SemperSupra/truenas-app-foundry-private#282",
+  "parent_authority": "SemperSupra/truenas-app-foundry-private#274",
+  "target_registry": ".foundry/truenas-target-tracks.json",
+  "required_target_versions": [
+    "25.04.1",
+    "25.04.2.6",
+    "25.10.7",
+    "26.0.0-BETA.3"
+  ],
+  "policy": {
+    "exact_target_cell_required": true,
+    "system_substrate_evidence_not_inherited": true,
+    "control_evidence_not_product_evidence": true,
+    "source_or_render_evidence_not_runtime_evidence": true,
+    "workflow_green_not_acceptance": true,
+    "matrix_growth_invalidates_stale_coverage": true
+  },
+  "entries": [
+    {
+      "id": "garm-controller-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/garm-controller-app/candidate.json"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37611502673,
+            "artifact_id": 11479660363,
+            "artifact_digest": "sha256:1d68abfced364a48d119bab769c8ed86dd2170e15a2d2b78189f7e2b542512f1",
+            "profile_identity": "truenas-app-foundry@bfbf2158c3f679c3422e6035bdb67e7874a5c07a:.foundry/truenas-compatibility/25.04.1-materialization.json#800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
+            "source_identity": "agent-dispatch@a9abde50b886b814d79ce2210b4b38f18b0115db; Foundry control bfbf2158c3f679c3422e6035bdb67e7874a5c07a; control artifact 11477548819 sha256:629b78a6b2c17dea86e8a84c19f94f25328f3f30f3754c2638e1e064f6bf5793; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "25.04.2.6": {
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37604815062,
+            "artifact_id": 11474852889,
+            "artifact_digest": "sha256:afaac92394961484fe18ba5fa232474bf3e26b52f7db8a8c5596dddd03091eec",
+            "profile_identity": "truenas-app-foundry@bfbf2158c3f679c3422e6035bdb67e7874a5c07a:.foundry/truenas-compatibility/25.04.2.6-materialization.json#631467044411c96a0fe6d361688b99a794f07c80",
+            "source_identity": "agent-dispatch@ad26a75c0f321ec8df19b793bd49a63a16bd5048; Foundry control bfbf2158c3f679c3422e6035bdb67e7874a5c07a; control artifact 11474516513 sha256:9bf9c9612ad3f2bfeb6ddadad97bb652b76d4ce967ffdee1529c02773e0b28af; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "25.10.7": {
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37599994362,
+            "artifact_id": 11473008105,
+            "artifact_digest": "sha256:a0b34f0c07345ec21274b7f18d797a2c9960017ea9e5052d3caadf76b694b875",
+            "profile_identity": "truenas-app-foundry@bfbf2158c3f679c3422e6035bdb67e7874a5c07a:.foundry/truenas-compatibility/25.10.7-materialization.json#1320cc849a9cc1e7ff6bd78989fc0e4708397248",
+            "source_identity": "agent-dispatch@f861c79cca2ef048a16c29a3bde863a627d1a940; Foundry control bfbf2158c3f679c3422e6035bdb67e7874a5c07a; control artifact 11472008964 sha256:89880851465ffaafc47c3b84a86c49c6d42b21820d0ba1fbcdcf10c397d55646; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "26.0.0-BETA.3": {
+          "status": "PASS",
+          "evidence": {
+            "run_id": 37587664305,
+            "artifact_id": 11467413455,
+            "artifact_digest": "sha256:9c0459400adaeebaf441ac3cdb18b235f6f7aace73bff1cfdeb4e59ade96040d",
+            "profile_identity": "truenas-app-foundry@bfbf2158c3f679c3422e6035bdb67e7874a5c07a:.foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json#a8ebc533dc84172520eba2237ffeeb52b102dc24",
+            "source_identity": "agent-dispatch@1b1aa006fdc2705d6ebf28d90425c115156b044c; Foundry control bfbf2158c3f679c3422e6035bdb67e7874a5c07a; control artifact 11467258652 sha256:488a6b270b64183a1856ac6059481d927aca920381362c20d09bb71c6e5108e1; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "prior_partial_evidence": {
+            "run_id": 36790011622,
+            "artifact_id": 11131414132,
+            "artifact_digest": "sha256:2db7bfb199e79a39814ab6f1c10445cb7269436fcfc3bf62bda60f3ce8b98542",
+            "source_identity": "Foundry control 7fd0d2474248b61cf8e290fc80f40b761cea5e98; appliance ghcr.io/sempersupra/garm-appliance@sha256:1af67841ddd4589e3798dcda8be49230565c849d07ab57fd05899432dcdabca9",
+            "scope": "G1a product-specific controller realization",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 controller realization with config/db persistence, HTTPS health, stop/start persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5/G1b matrix recipe."
+          },
+          "additional_partial_evidence": {
+            "g2_provider_run_id": 36812808256,
+            "g2_artifact_id": 11141155297,
+            "g2_artifact_digest": "sha256:7d984b6a02b4032968bd15e60f51f2e9660ebe51df7be47d970607b72b36bc77",
+            "scope": "provider transport/adoption only",
+            "note": "Accepted G2 provider WSS/API-key transport/adoption evidence is retained as adjacent product evidence; it does not replace G1b/F0-F5 App lifecycle qualification."
+          }
+        }
+      }
+    },
+    {
+      "id": "wow-sidecar-truenas-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "foundry-candidate",
+        "candidate_path": "candidates/wow-sidecar-app/candidate.json",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#276"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36804168961,
+            "artifact_id": 11137183004,
+            "artifact_digest": "sha256:7c510524f72c2360416b115c3fc5c842c22219b4a7425dea722399e35d34cace",
+            "source_identity": "Foundry ref 9ac2eef97581caff5b0de740560c55a778fa3f1c",
+            "scope": "corrected product-specific T6",
+            "note": "Accepted SUPPORTED/oracleSatisfied nested BETA.3 WOW realization with exact image/config readback, permissions/create-once seed behavior, worker RUNNING, restart persistence and zero-residue cleanup. It predates and does not satisfy the complete generic Foundry F0-F5 matrix recipe."
+          }
+        }
+      }
+    },
+    {
+      "id": "litellm-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#262"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null,
+          "prior_partial_evidence": {
+            "run_id": 36746485575,
+            "artifact_id": 11113851964,
+            "artifact_digest": "sha256:a4031c69ed45b173f9196c231efaaf098a9d8442485e89265e4bb54c3bdc8ae0",
+            "note": "Accepted product-specific T6 evidence exists, but it predates the complete profile-driven F0-F5 recipe and therefore does not satisfy this matrix cell."
+          }
+        }
+      }
+    },
+    {
+      "id": "foliorelay-app",
+      "classification": "product",
+      "required_for_all_products_claim": true,
+      "source": {
+        "kind": "external-foundry-product-authority",
+        "product_authority": "SemperSupra/truenas-app-foundry-private#273",
+        "public_product_authority": "SemperSupra/folio-relay#29"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "PASS",
+          "historical_acceptance_evidence": {
+            "run_id": 37572795630,
+            "artifact_id": 11461469097,
+            "artifact_digest": "sha256:5142c17cbe96fd3b80cccb09e15754a16346144e3fdac4ddb20e3050dae35b3e",
+            "profile_identity": "truenas-app-foundry@6494dbd336260b549772ffa5c398d7a104fabf15:.foundry/truenas-compatibility/25.04.1-materialization.json#800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
+            "source_identity": "agent-dispatch@413c853e7f6b93d32cd3cf79c39a1fd9d4130049; Foundry control 6494dbd336260b549772ffa5c398d7a104fabf15; FolioRelay product tree 042a43a983537cb42c78c4a7a7233672a717f561 (qualified head 22e83c0ab08884e5c7eb827383e6c2016b0a7784; authority merge 7cffca5b8f596f6321ba065ff955be37362a505c); publication run 37457117549 artifact 11410550658; control sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "evidence": {
+            "run_id": 37815256028,
+            "artifact_id": 11567681986,
+            "artifact_digest": "sha256:575a43e596f4890766901e56871013f2ce21011a7fc62a29f0bc4fc3b83ea2b0",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/25.04.1-materialization.json#800aca038ded29e6a91bfc4c1b1fe2d2199182e8",
+            "source_identity": "agent-dispatch@a2b0a5ba8516d85efd18dc08dd6a49c2a55ee26b; evidence-envelope repair c96defde83ee2c0220b1cd549b8f9e7ef5bbf73a; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11567041802 sha256:4644e5bbd10cbc67239c04329aa3e3eaa2f4819dbf384927529d8e7a1a10175d; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814; requested_shape image pair source-bound to admitted control bundle",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "25.04.2.6": {
+          "status": "PASS",
+          "historical_acceptance_evidence": {
+            "run_id": 37541235642,
+            "artifact_id": 11452368990,
+            "artifact_digest": "sha256:536d7f53d6a95807f8f9fba2cba58c80bbc6434ba3cf84ae2d3f675e49e50d37",
+            "profile_identity": "truenas-app-foundry@6494dbd336260b549772ffa5c398d7a104fabf15:.foundry/truenas-compatibility/25.04.2.6-materialization.json#631467044411c96a0fe6d361688b99a794f07c80",
+            "source_identity": "agent-dispatch@ac0dc4511faebe15e8a9c42ae0209ba03482d60a; Foundry control 6494dbd336260b549772ffa5c398d7a104fabf15; FolioRelay product tree 042a43a983537cb42c78c4a7a7233672a717f561 (qualified head 22e83c0ab08884e5c7eb827383e6c2016b0a7784; authority merge 7cffca5b8f596f6321ba065ff955be37362a505c); publication run 37457117549 artifact 11410550658; control sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "evidence": {
+            "run_id": 37804886742,
+            "artifact_id": 11563572047,
+            "artifact_digest": "sha256:e72774d83aa789a25513f056164f6317513b3d4646c2925a4116c7b5426dd085",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/25.04.2.6-materialization.json#631467044411c96a0fe6d361688b99a794f07c80",
+            "source_identity": "agent-dispatch@57d8a200d28a51799ad8508aca168a76d6211878; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11561963045 sha256:9628b50d4ea020c5585435b44a3b425bc632ba30ef3d068a19af575a3d010ff2; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "25.10.7": {
+          "status": "PASS",
+          "prior_failure_evidence": [
+            {
+              "run_id": 37348626079,
+              "artifact_id": 11361973439,
+              "artifact_digest": "sha256:4f8e0b817665ab96ea673f5ec14d1a5e0f15ac0245c32e23438ac072867804ed",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 row 001",
+              "note": "Control and CUPS reached RUNNING but the direct discovery container crashed under the host Avahi UDP/5353 boundary; this falsified competing mDNS-stack ownership."
+            },
+            {
+              "run_id": 37357850252,
+              "artifact_id": 11365424219,
+              "artifact_digest": "sha256:6402c65cc5a4b0ed1be179cfbccb56d0fefd8a392141f6bcb441f2ff8c380096",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 diagnostic row 002",
+              "note": "Retained discovery stderr proved `bind UDP/5353 for mDNS: address already in use`, earning the cooperative-Avahi architecture pivot."
+            },
+            {
+              "run_id": 37525243099,
+              "artifact_id": 11442956191,
+              "artifact_digest": "sha256:1ea29dfe2e329d35f1e1dd6d89289784073a52f4153bdd97bc4a8e8f300757fe",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 cooperative-Avahi rep 004",
+              "note": "Cooperative-Avahi product reached the appliance but the provider-owned control bind root was 0700, preventing discovery uid 65534/gid 10001 from traversing to the canonical identity; cleanup remained zero-residue."
+            },
+            {
+              "run_id": 37528565732,
+              "artifact_id": 11444211449,
+              "artifact_digest": "sha256:74f3680f0ff84f4e41f9d06770ab257215541cdeb7e63d003fcab846be31fdcd",
+              "classification": "ORACLE_FAILURE",
+              "scope": "25.10.7 cooperative-Avahi rep 005",
+              "note": "0710 control-root correction brought control, CUPS, and discovery to RUNNING; the independent observer then failed binding UDP/5353, isolating the final harness boundary."
+            }
+          ],
+          "historical_acceptance_evidence": {
+            "run_id": 37531471852,
+            "artifact_id": 11446110117,
+            "artifact_digest": "sha256:bb07082df88b2d46206aafec483838e1f965c997a2c438d14ade7eeb7e9782d4",
+            "profile_identity": "truenas-app-foundry@e44bc2271de4c2065c68a8f7db53034fff36b4c5:.foundry/truenas-compatibility/25.10.7-materialization.json#1320cc849a9cc1e7ff6bd78989fc0e4708397248",
+            "source_identity": "agent-dispatch@43d2910a0cf51d3bf7ccccbc004035e364d49c19; Foundry control e44bc2271de4c2065c68a8f7db53034fff36b4c5; FolioRelay product tree 042a43a983537cb42c78c4a7a7233672a717f561 (qualified head 22e83c0ab08884e5c7eb827383e6c2016b0a7784; authority merge 7cffca5b8f596f6321ba065ff955be37362a505c); publication run 37457117549 artifact 11410550658; control sha256:c8d5787162db919f84e9607d13f368995138861355f3fa269cbb10561f24d80d; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "evidence": {
+            "run_id": 37786363218,
+            "artifact_id": 11560897748,
+            "artifact_digest": "sha256:d9e7d1ab92d78917dedae29eeeb1d6c2c6a939b2e02abbc3c3f82ce1d8eebfcc",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/25.10.7-materialization.json#1320cc849a9cc1e7ff6bd78989fc0e4708397248",
+            "source_identity": "agent-dispatch@92ba0a9e3809f948d5dcbe3131465f42bdeeab27; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11554237614 sha256:0e90784f327b338ce1959a7f13dd66424366587a20597f4431f2e9e3102835b1; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        },
+        "26.0.0-BETA.3": {
+          "status": "PASS",
+          "prior_failure_evidence": [
+            {
+              "run_id": 37139185156,
+              "artifact_id": 11280350346,
+              "artifact_digest": "sha256:9d08b14cf045c084f6e3fff58146248aab9c6a1e965a80aa89e77d66b9e8bd5b",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 001",
+              "note": "External UUID parser stripped the canonical urn:uuid prefix; retained as harness-oracle falsifier, not product support evidence."
+            },
+            {
+              "run_id": 37141238936,
+              "artifact_id": 11280818150,
+              "artifact_digest": "sha256:0e1095185a208e9154e75e736872c2a150175acc00572ef3f64296252b189be9",
+              "classification": "ORACLE_FAILURE",
+              "scope": "nested T6 rep 002",
+              "note": "UUID parser correction advanced to public-URI coherence; retained as causal failure evidence only. No product support claim."
+            },
+            {
+              "run_id": 37713944837,
+              "artifact_id": 11522564752,
+              "artifact_digest": "sha256:1a1d0207a3bd93c931e7ad34a6dc1180db90069e168c9208c92eac42a20d1dcd",
+              "classification": "ORACLE_FAILURE",
+              "scope": "post-WebUI/HTTPS BETA.3 rep 014",
+              "note": "Control and CUPS reached running but discovery inherited the control-image HTTP healthcheck while running foliorelay-dnssd, so the App never reached RUNNING; cleanup was zero-residue. Foundry #112 disabled that inapplicable inherited healthcheck."
+            },
+            {
+              "run_id": 37728706076,
+              "artifact_id": 11532640048,
+              "artifact_digest": "sha256:2ee846a9d97ecf833d09cc98daeaa84ad1f8548e7869e0107abd12a401f31767",
+              "classification": "ORACLE_FAILURE",
+              "scope": "post-WebUI/HTTPS BETA.3 rep 015",
+              "note": "All three exact product containers reached RUNNING and Compose readback passed; the external HTTPS readyz probe failed because Agent Dispatch QEMU still forwarded management traffic to private guest port 18080 instead of published HTTPS 18443. Cleanup was zero-residue. Agent Dispatch #362 corrected only that host-forward edge."
+            }
+          ],
+          "historical_acceptance_evidence": {
+            "run_id": 37345529487,
+            "artifact_id": 11360599004,
+            "artifact_digest": "sha256:2514b27b8b2854ff23ad7f31b554b286ad8aecf78b185f582082c830b8861d82",
+            "profile_identity": "truenas-app-foundry@15cb445722aad3aa62fa8075df83240ff13b51df:.foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json#a8ebc533dc84172520eba2237ffeeb52b102dc24",
+            "source_identity": "agent-dispatch@fb92e0a0b275a28f9b3a0be4f3221f6df46a5568; Foundry control fb41afd3d112f361b8c490aeb5915a978b956b20; FolioRelay control sha256:0ffabcc1ced0325c41c54d860c6fe248e4fc8afeea3994dcebb999d6a14ee1ce; cups sha256:b644b4b1e064a1d10c18fbbb9f9aa09a2835e7e9a48ccda5a67d44cbda006b4f",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          },
+          "evidence": {
+            "run_id": 37738679873,
+            "artifact_id": 11535248795,
+            "artifact_digest": "sha256:3714603f431362c4c06aacf58074aa9dd4698a6c26e4203ac949ed98fe45dc25",
+            "profile_identity": "truenas-app-foundry@81deb97185760975fd8d3162df42056c77b3c0fd:.foundry/truenas-compatibility/26.0.0-BETA.3-materialization.json#a8ebc533dc84172520eba2237ffeeb52b102dc24",
+            "source_identity": "agent-dispatch@3b5bb1942e43ef12904c38c5ebf665b57154eb44; Foundry control 81deb97185760975fd8d3162df42056c77b3c0fd; control artifact 11532747949 sha256:a4921231ee6f00a218c0c687ccbb56f1ba57d12b08d040463aacdf475c9d359a; FolioRelay source 1c50579209d513e7bf9fe405062ed9b641a048b5; publication run 37689994361 artifact 11513650340; control sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5; cups sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+            "classification": "SUPPORTED",
+            "oracle_satisfied": true,
+            "f0_f5_complete": true
+          }
+        }
+      },
+      "current_candidate": {
+        "product_revision": "1c50579209d513e7bf9fe405062ed9b641a048b5",
+        "publication_run": 37689994361,
+        "publication_artifact_id": 11513650340,
+        "control_image": "sha256:d0ba6d1efbed0d9f84b20d374eeb44ee28ab0874a683396e628850f159193cf5",
+        "cups_image": "sha256:0997ad2054ca5e57f34291372aed55f549eee9ff201f171b430436b0655c0814",
+        "foundry_ref": "81deb97185760975fd8d3162df42056c77b3c0fd",
+        "qualification_state": "PASS"
+      }
+    },
+    {
+      "id": "foundry-rdte-probe",
+      "classification": "qualification-control",
+      "required_for_all_products_claim": false,
+      "source": {
+        "kind": "foundry-born-control",
+        "public_pr": "SemperSupra/truenas-app-foundry#82",
+        "private_authority": "SemperSupra/truenas-app-foundry-private#274"
+      },
+      "matrix_authority": "SemperSupra/truenas-app-foundry-private#282",
+      "target_status": {
+        "25.04.1": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.04.2.6": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "25.10.7": {
+          "status": "OPEN",
+          "evidence": null
+        },
+        "26.0.0-BETA.3": {
+          "status": "OPEN",
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "all_required_product_cells_qualified": false,
+  "claim_boundary": "Registry/coverage contract only. OPEN cells are explicit non-claims; no target/product runtime qualification is implied.",
+  "required_external_product_ids": [
+    "litellm-app",
+    "foliorelay-app"
+  ]
+}
