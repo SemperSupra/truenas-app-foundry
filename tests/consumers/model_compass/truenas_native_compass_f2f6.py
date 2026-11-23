@@ -140,13 +140,28 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
     seed_owned = False
     dataset_owned = False
     current_compose = compose(guest_ref)
+    # TrueNAS 25.04.2.6 core_service.py marks core.get_methods @private.
+    # It deliberately does NOT advertise itself in its public introspection.
+    # This exact authenticated DDP call succeeded: record that evidence
+    # separately, never pretend it was present in the public method list.
     profile_methods = call("core.get_methods", [])
     if isinstance(profile_methods, dict):
-        all_methods = sorted(profile_methods)
-    elif isinstance(profile_methods, list):
-        all_methods = sorted(profile_methods)
+        public_methods = set(profile_methods)
+    elif isinstance(profile_methods, list) and all(isinstance(x, str) for x in profile_methods):
+        public_methods = set(profile_methods)
     else:
         raise NativeQualificationError("missing independently observed public middleware method inventory")
+    native["private_discovery_proof"] = {
+        "method": "core.get_methods",
+        "visibility": "PRIVATE_IN_PINNED_TRUENAS_SOURCE",
+        "evidence": "AUTHENTICATED_DDP_INVOCATION_SUCCEEDED",
+        "returned_as_public_method": "core.get_methods" in public_methods,
+    }
+    # The legacy generic Foundry registry tracks *available* methods under
+    # required_public_methods, including this private discoverability API.
+    # Only the successful authenticated call is admitted as executable proof;
+    # an unknown/private mutation method is NEVER inferred or admitted here.
+    all_methods = sorted(public_methods | {"core.get_methods"})
     expected_methods = {
         "app.query", "app.config", "app.create", "app.stop", "app.start",
         "app.update", "app.redeploy", "app.delete", "pool.dataset.create",
@@ -154,7 +169,7 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
     }
     require(expected_methods.issubset(set(all_methods)),
             "exact guest lacks expected native lifecycle/ZFS/permission methods")
-    native["method_contract"] = "LIVE_MIDDLEWARE_LIST_VERIFIED"
+    native["method_contract"] = "LIVE_PUBLIC_METHODS_PLUS_EXPLICITLY_INVOKED_PRIVATE_DISCOVERY"
 
     def query_app(name: str):
         result = call("app.query", [[[ "id", "=", name ]]])
