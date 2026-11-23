@@ -1,0 +1,32 @@
+drasl:
+  domain: drasl.example.test
+  base_url: http://drasl.example.test:30085
+  instance_name: Foundry Drasl
+  application_owner: SemperSupra
+  default_admins: []
+  player_uuid_generation: random
+  sign_public_keys: true
+  allow_password_registration: true
+  require_invite: true
+
+network:
+  http_port:
+    bind_mode: published
+    port_number: 30085
+    container_port: 25585
+    host_ips: []
+
+ix_volumes:
+  drasl-state: /opt/tests/mnt/drasl/state
+
+storage:
+  state:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: drasl-state
+      create_host_path: true
+
+resources:
+  limits:
+    cpus: 1.0
+    memory: 512

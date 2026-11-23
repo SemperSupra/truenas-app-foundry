@@ -1,0 +1,83 @@
+name: Qualify Drasl TrueNAS App
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/drasl-app/**'
+      - 'tools/validate_drasl_app.py'
+      - '.github/workflows/qualify-drasl-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'candidates/drasl-app/**'
+      - 'tools/validate_drasl_app.py'
+      - '.github/workflows/qualify-drasl-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drasl-app-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Pinned render and real Drasl runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Verify qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          python3 --version
+          git --version
+          curl --version | head -1
+          sudo -n true
+
+      - name: Verify source-schema boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root='candidates/drasl-app/ix-dev/community/drasl'
+          questions="$source_root/questions.yaml"
+          template="$source_root/templates/docker-compose.yaml"
+
+          test ! -e "$source_root/item.yaml"
+
+          grep -Eq '^ +default: ix_volume$' "$questions"
+          if grep -Eq 'value: *host_path|type: *hostpath|host_path_config|additional_storage' "$questions"; then
+            echo 'Host-path or arbitrary additional-storage option leaked into the source schema.' >&2
+            exit 2
+          fi
+
+          grep -Fq 'drasl.set_user(values.consts.run_as_uid, values.consts.run_as_gid)' "$template"
+          grep -Fq 'drasl.healthcheck.disable()' "$template"
+          grep -Fq 'RequireInvite = ' "$template"
+
+      - name: Qualify pinned TrueNAS source and exact Drasl release
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 tools/validate_drasl_app.py \
+            --evidence drasl-app-evidence.json
+
+      - name: Record public-safe qualification evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Drasl native TrueNAS App qualification'
+            if [[ -f drasl-app-evidence.json ]]; then
+              cat drasl-app-evidence.json
+            else
+              echo 'No PASS evidence file was produced; inspect the failed qualification step.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
