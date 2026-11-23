@@ -30,6 +30,23 @@ def load_json(path: Path) -> Any:
         raise ArtifactError(f"cannot read JSON {path}: {exc}") from exc
 
 
+def require_immutable_images(compose: dict[str, Any]) -> None:
+    """Optional product-admission gate: refuse mutable or missing OCI image references.
+
+    Source rendering may legitimately carry mutable tags; runtime admission cannot
+    silently mistake a source candidate for a distribution-pinned deployment.
+    """
+    services = compose.get("services")
+    if not isinstance(services, dict) or not services:
+        raise ArtifactError("immutable image gate requires non-empty Compose services")
+    for name, service in services.items():
+        if not isinstance(service, dict):
+            raise ArtifactError(f"{name}: Compose service must be a mapping")
+        reference = service.get("image")
+        if not isinstance(reference, str) or not re.fullmatch(r"[A-Za-z0-9._:/-]+@sha256:[0-9a-f]{64}", reference):
+            raise ArtifactError(f"{name}: immutable image required (repository@sha256:<64 hex>); tag-only/build-only is not admitted")
+
+
 def build_artifact(app_name: str, compose: dict[str, Any], provenance: dict[str, Any] | None = None) -> dict[str, Any]:
     if not APP_NAME_RE.fullmatch(app_name) or len(app_name) > 40:
         raise ArtifactError("app name does not satisfy the TrueNAS App naming contract")
@@ -69,6 +86,7 @@ def main() -> int:
     parser.add_argument("--app-name", required=True)
     parser.add_argument("--compose", type=Path, required=True)
     parser.add_argument("--provenance", type=Path)
+    parser.add_argument("--require-immutable-images", action="store_true", help="fail closed unless every service image has a sha256 distribution pin")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -76,6 +94,8 @@ def main() -> int:
         compose = load_json(args.compose)
         if not isinstance(compose, dict):
             raise ArtifactError("compose document must be an object")
+        if args.require_immutable_images:
+            require_immutable_images(compose)
         provenance = None
         if args.provenance:
             provenance = load_json(args.provenance)
