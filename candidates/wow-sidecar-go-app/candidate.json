@@ -1,0 +1,121 @@
+{
+  "schema_version": 2,
+  "candidate": "wow-sidecar-go-truenas-app",
+  "phase": "public-render-qualified-private-hil-ready",
+  "wow_source": {
+    "repository": "https://github.com/SemperSupra/wow-sidecar.git",
+    "public_candidate_revision": "86891777c37116393760d844dad0dc1ca8e835bb",
+    "hosted_qualification_runs": {
+      "conformance": 37228478935,
+      "container": 37228479040,
+      "native_architecture": 37228478859,
+      "peer_federation": 37228478901
+    },
+    "release_prep": {
+      "head": "86891777c37116393760d844dad0dc1ca8e835bb",
+      "run": 37455868913,
+      "qualification": "PASS",
+      "evidence_scope": "authorized main publication with native amd64/arm64 verification",
+      "publish": "PASS",
+      "native_verify": "PASS",
+      "receipt": "PASS",
+      "receipt_schema_prepared": "wow-sidecar.go-publication-receipt.v2",
+      "receipt_artifact_id": 11409228068,
+      "receipt_artifact_digest": "sha256:27c64a56ccc97ce3a28e7b89d6b1d2e30f88425ee25216d765f990f2469e62ed",
+      "immutable_tag": "go-source-86891777c37116393760d844dad0dc1ca8e835bb",
+      "manifest_digest": "sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d",
+      "platform_digests": {
+        "linux/amd64": "sha256:0a73aabe5b65e38df26714197d68284f1e5627f7e23c33112fae5f606bd258c6",
+        "linux/arm64": "sha256:c32ea61512a03ebefdaf248d7d28d9e1038bd2ce493adfc24f8e495f1a7f115e"
+      },
+      "build_recipe": {
+        "dockerfile": "Dockerfile.wow-go",
+        "workflow": ".github/workflows/go-container-publication.yml",
+        "go_toolchain": "1.24.13",
+        "buildkit_image": "moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea",
+        "provenance": "mode=max",
+        "sbom": true
+      },
+      "receipt_contract_qualified": true,
+      "receipt_contract_qualification": "PASS",
+      "receipt_required_fields": [
+        "source_sha",
+        "immutable_tag",
+        "manifest_digest",
+        "platform_digests.linux/amd64",
+        "platform_digests.linux/arm64",
+        "publication.run_id",
+        "publication.run_attempt",
+        "publication.workflow_sha",
+        "build_recipe.dockerfile",
+        "build_recipe.workflow",
+        "build_recipe.go_toolchain",
+        "build_recipe.buildkit_image",
+        "build_recipe.provenance",
+        "build_recipe.sbom"
+      ]
+    },
+    "accepted_runtime_revision": "cd2d073f7d4366fa4165b8875e19d286da4e8784"
+  },
+  "container": {
+    "build_recipe": "scratch-plus-ca-certificates",
+    "registry_reference": "ghcr.io/sempersupra/wow-sidecar@sha256:2d248590ddad5a6c82b29ec0da8d851a3985b893273f16282c851b09a2b9188d",
+    "synthetic_digest_fixture": false,
+    "publication_state": "published-verified",
+    "entrypoint": "/wow-sidecar",
+    "runtime_user": "10001:10001",
+    "github_cli_required": false,
+    "shell_required": false
+  },
+  "truenas_source": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242",
+    "source_path": "candidates/wow-sidecar-go-app/ix-dev/community/wow-sidecar"
+  },
+  "permissions_helper": {
+    "candidate": "ixsystems/container-utils:1.0.2",
+    "reference": "ixsystems/container-utils@sha256:46eba20714c1cc6784f60e245c32c33a2d9f616e47d804694a9854248c89a992"
+  },
+  "truenas_contract": {
+    "deployment_kind": "custom-app",
+    "state_storage": "ix_volume",
+    "state_mount": "/var/lib/wow-sidecar",
+    "github_app_secret_mount": "/run/secrets/github-app.pem",
+    "peer_credentials_mount": "/run/secrets/wow-peer-credentials.json",
+    "root_filesystem_read_only": true,
+    "temporary_filesystem": "/tmp",
+    "runtime_uid": 10001,
+    "runtime_gid": 10001,
+    "supplemental_groups": [
+      568
+    ],
+    "cap_drop_all_for_wow_containers": true,
+    "no_new_privileges": true,
+    "privileged": false,
+    "host_network": false,
+    "host_paths_allowed": false,
+    "container_runtime_socket_allowed": false,
+    "seed_helper_required": false,
+    "permissions_helper_scope": "ixVolume ownership only"
+  },
+  "gates": {
+    "runtime_hosted_qualified": true,
+    "runtime_independent_accepted": true,
+    "registry_image_published": true,
+    "public_app_render_qualified": true,
+    "private_truenas_hil_qualified": false,
+    "state_preserving_cutover_qualified": false,
+    "hil_eligible": true
+  },
+  "claim_boundary": "Published exact-image TrueNAS App has PASSed public official-materializer qualification and is eligible for private read-only/HIL qualification. No physical TrueNAS mutation, production credential use, state migration, cutover, or rollback qualification has occurred.",
+  "public_render_evidence": {
+    "run": 37458833914,
+    "qualification_head": "bcb20a3915e2d01f47f31b9a5fc8f0fe1b61b637",
+    "compose_sha256": "c79915ed6c3d22a746fdaed7aba2943e3645a2efc4a5f18143cc4e5c790bb926",
+    "evidence_file": "candidates/wow-sidecar-go-app/evidence/public-render-qualification-37458833914.json",
+    "result": "PASS"
+  }
+}
