@@ -1,0 +1,445 @@
+name: Qualify LiteLLM MVP projection
+
+on:
+  pull_request:
+    paths:
+      - "images/litellm-appliance/**"
+      - "contracts/litellm/**"
+      - "candidates/litellm-app/**"
+      - "tools/materialize_truenas_candidate.py"
+      - "tools/validate_litellm_candidate.py"
+      - "tools/package_truenas_catalog_overlay.py"
+      - "tools/reconcile_truenas_catalog_overlay.py"
+      - "tests/test_materialize_truenas_candidate.py"
+      - "tests/test_litellm_candidate.py"
+      - "tests/test_package_truenas_catalog_overlay.py"
+      - "tests/test_reconcile_truenas_catalog_overlay.py"
+      - "tests/fixtures/litellm/**"
+      - ".github/workflows/qualify-litellm-mvp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litellm-mvp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      APPLIANCE_CONTEXT: images/litellm-appliance
+      FIXTURE_CONFIG: tests/fixtures/litellm/proxy_server_config.yaml
+      VALIDATOR: ghcr.io/truenas/apps_validation@sha256:3f38cdaa6ed9c54e5c9c43ec15790aabc0028631dd3f0c28129832a69fd1f30c
+      SOURCE_DATE_EPOCH: "1790132651"
+    steps:
+      - name: Checkout public Foundry
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Unit-test candidate materializer and authority consistency
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/test_materialize_truenas_candidate.py -v
+          python3 -m unittest tests/test_litellm_candidate.py -v
+          python3 -m unittest tests/test_package_truenas_catalog_overlay.py -v
+          python3 -m unittest tests/test_reconcile_truenas_catalog_overlay.py -v
+          python3 tools/validate_litellm_candidate.py
+          python3 -m py_compile \
+            tools/materialize_truenas_candidate.py \
+            tools/validate_litellm_candidate.py \
+            tools/package_truenas_catalog_overlay.py \
+            tools/reconcile_truenas_catalog_overlay.py
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Validate appliance shell
+        run: |
+          set -euo pipefail
+          sh -n "$APPLIANCE_CONTEXT/semper-entrypoint.sh"
+
+      - name: Reproducibility challenge
+        id: repro
+        run: |
+          set -euo pipefail
+          for n in a b; do
+            docker buildx build \
+              --no-cache \
+              --provenance=false \
+              --sbom=false \
+              --output "type=oci,dest=/tmp/$n.tar,rewrite-timestamp=true" \
+              "$APPLIANCE_CONTEXT"
+            mkdir "/tmp/$n"
+            tar -xf "/tmp/$n.tar" -C "/tmp/$n"
+          done
+          d1="$(jq -r '.manifests[0].digest' /tmp/a/index.json)"
+          d2="$(jq -r '.manifests[0].digest' /tmp/b/index.json)"
+          [[ "$d1" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$d1" == "$d2" ]]
+          echo "oci_manifest_digest=$d1" >> "$GITHUB_OUTPUT"
+
+      - name: Build local appliance
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --load \
+            --provenance=false \
+            --sbom=false \
+            -t litellm-appliance:qualify \
+            "$APPLIANCE_CONTEXT"
+
+      - name: Negative secret-boundary tests
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/config" "$tmp/secrets"
+          cp "$FIXTURE_CONFIG" "$tmp/config/proxy_server_config.yaml"
+
+          printf '%s\n' fixture > "$tmp/secrets/bad-name"
+          set +e
+          docker run --rm \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify >/tmp/bad-name.out 2>&1
+          rc=$?
+          set -e
+          [[ "$rc" -eq 78 ]]
+          rm "$tmp/secrets/bad-name"
+
+          printf '%s\n' fixture-provider-token > "$tmp/secrets/TEST_PROVIDER_KEY"
+          set +e
+          docker run --rm \
+            -e TEST_PROVIDER_KEY=already-present \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify >/tmp/conflict.out 2>&1
+          rc=$?
+          set -e
+          [[ "$rc" -eq 78 ]]
+          ! grep -q 'fixture-provider-token' /tmp/bad-name.out /tmp/conflict.out
+
+      - name: Runtime health and secret projection
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cid=""
+          cleanup() {
+            [[ -z "$cid" ]] || docker rm -f "$cid" >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+          }
+          trap cleanup EXIT
+          mkdir -p "$tmp/config" "$tmp/secrets"
+          cp "$FIXTURE_CONFIG" "$tmp/config/proxy_server_config.yaml"
+          printf '%s\n' fixture-provider-token > "$tmp/secrets/TEST_PROVIDER_KEY"
+          chmod 0400 "$tmp/secrets/TEST_PROVIDER_KEY"
+
+          cid="$(docker run -d \
+            -p 127.0.0.1:14000:4000 \
+            -v "$tmp/config:/config:ro" \
+            -v "$tmp/secrets:/run/secrets/semper-env:ro" \
+            litellm-appliance:qualify)"
+
+          live=false
+          ready=false
+          for _ in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:14000/health/liveliness >/dev/null 2>&1 && live=true || true
+            curl -fsS http://127.0.0.1:14000/health/readiness >/dev/null 2>&1 && ready=true || true
+            [[ "$live" == true && "$ready" == true ]] && break
+            docker inspect "$cid" --format '{{.State.Running}}' | grep -qx true || {
+              docker logs "$cid"
+              exit 1
+            }
+            sleep 2
+          done
+          [[ "$live" == true ]]
+          [[ "$ready" == true ]]
+          docker exec "$cid" python -c "data=open('/proc/1/environ','rb').read().split(b'\\0'); assert b'TEST_PROVIDER_KEY=fixture-provider-token' in data"
+          ! docker inspect "$cid" | grep -q 'fixture-provider-token'
+          ! docker history --no-trunc litellm-appliance:qualify | grep -q 'fixture-provider-token'
+
+      - name: Materialize pinned TrueNAS source
+        id: materialize
+        run: |
+          set -euo pipefail
+          manifest=candidates/litellm-app/candidate.json
+          repo="$(jq -r '.source_materializer.repository' "$manifest")"
+          commit="$(jq -r '.source_materializer.commit' "$manifest")"
+          train="$(jq -r '.source_materializer.train' "$manifest")"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+
+          git init -q /tmp/apps
+          git -C /tmp/apps remote add origin "$repo"
+          git -C /tmp/apps fetch --quiet --depth=1 origin "$commit"
+          git -C /tmp/apps checkout -q -b master FETCH_HEAD
+          [[ "$(git -C /tmp/apps rev-parse HEAD)" == "$commit" ]]
+
+          destination="/tmp/apps/ix-dev/$train/litellm"
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode plan \
+            --evidence /tmp/plan.json
+          jq -e '.action == "CREATE" and .status == "PLANNED"' /tmp/plan.json >/dev/null
+
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode apply \
+            --evidence /tmp/apply.json
+          jq -e '.action == "CREATE" and .status == "APPLIED"' /tmp/apply.json >/dev/null
+
+          python3 tools/materialize_truenas_candidate.py \
+            --manifest "$manifest" \
+            --upstream-checkout /tmp/apps \
+            --destination "$destination" \
+            --mode apply \
+            --evidence /tmp/noop.json
+          jq -e '.action == "NOOP" and .status == "NOOP"' /tmp/noop.json >/dev/null
+
+          git -C /tmp/apps add -N "ix-dev/$train/litellm"
+          git -C /tmp/apps diff --name-only master | grep -q "^ix-dev/$train/litellm/"
+          echo "train=$train" >> "$GITHUB_OUTPUT"
+
+      - name: Qualify pre-upstream local catalog overlay
+        run: |
+          set -euo pipefail
+
+          # Exercise TrueNAS's own dev->published-catalog transformation against
+          # the exact materialized candidate. This is the temporary pre-upstream
+          # seam used to make the official-shaped app visible to app.create.
+          docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
+            -v /tmp/apps:/workspace \
+            --entrypoint python \
+            "$VALIDATOR" \
+            -m apps_ci.scripts.catalog_update publish --path /workspace
+
+          test -d /tmp/apps/trains/community/litellm/1.0.0
+          test -f /tmp/apps/trains/community/litellm/item.yaml
+
+          # TrueNAS's full catalog updater currently trips over unrelated
+          # historical/test-train metadata in the pinned checkout. Derive only
+          # our app through the official catalog_reader and merge that validated
+          # fragment into the already-valid catalog cache.
+          # The generated published path has no Git history, while TrueNAS
+          # catalog_reader derives last_update from Git. Preserve that semantic
+          # deterministically by binding the generated catalog metadata to the
+          # last Foundry source commit that changed this candidate.
+          source_last_update="$(TZ=UTC git log -1 --format='%ad' --date=format-local:'%Y-%m-%d %H:%M:%S' -- candidates/litellm-app)"
+          [[ "$source_last_update" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]
+
+          docker run --rm -i --platform linux/amd64 \
+            -e FAKE_ENV=1 \
+            -e SOURCE_LAST_UPDATE="$source_last_update" \
+            -v /tmp/apps:/workspace \
+            --entrypoint python \
+            "$VALIDATOR" \
+            - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from jsonschema import validate
+          from catalog_reader.app import get_app_details
+          from apps_validation.json_schema_utils import CATALOG_JSON_SCHEMA, VERSION_VALIDATION_SCHEMA
+
+          root = Path('/workspace')
+          app_path = root / 'trains' / 'community' / 'litellm'
+          details = get_app_details(
+              str(app_path),
+              None,
+              {'retrieve_versions': True, 'normalize_questions': False},
+          )
+          versions = details.pop('versions')
+          last_update = os.environ['SOURCE_LAST_UPDATE']
+          details['last_update'] = details.get('last_update') or last_update
+          for version in versions.values():
+              version['last_update'] = version.get('last_update') or last_update
+          latest = details.get('latest_version')
+          metadata = {'capabilities': [], 'run_as_context': []}
+          if latest in versions:
+              app_metadata = versions[latest].get('app_metadata') or {}
+              metadata.update({
+                  'capabilities': app_metadata.get('capabilities', []),
+                  'run_as_context': app_metadata.get('run_as_context', []),
+              })
+          details.update(metadata)
+
+          catalog_path = root / 'catalog.json'
+          catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
+          catalog.setdefault('community', {})['litellm'] = details
+
+          validate(catalog, CATALOG_JSON_SCHEMA)
+          validate(versions, VERSION_VALIDATION_SCHEMA)
+
+          catalog_path.write_text(json.dumps(catalog, indent=4) + '\n', encoding='utf-8')
+          (app_path / 'app_versions.json').write_text(
+              json.dumps(versions, indent=4) + '\n',
+              encoding='utf-8',
+          )
+          (root / 'litellm-catalog-entry.json').write_text(
+              json.dumps(details, indent=4) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+          test -s /tmp/apps/catalog.json
+          test -s /tmp/apps/trains/community/litellm/app_versions.json
+          test -s /tmp/apps/litellm-catalog-entry.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          catalog = json.loads(Path('/tmp/apps/catalog.json').read_text(encoding='utf-8'))
+          versions = json.loads(Path('/tmp/apps/trains/community/litellm/app_versions.json').read_text(encoding='utf-8'))
+
+          app = catalog.get('community', {}).get('litellm')
+          assert isinstance(app, dict), 'litellm absent from generated catalog.json'
+          assert app.get('latest_version') == '1.0.0', app.get('latest_version')
+          assert app.get('last_update') is None or isinstance(app.get('last_update'), str)
+          assert '1.0.0' in versions, versions.keys()
+          assert versions['1.0.0'].get('healthy') is True, versions['1.0.0'].get('healthy')
+          assert versions['1.0.0'].get('supported') is True, versions['1.0.0'].get('supported')
+          assert versions['1.0.0'].get('last_update') is None or isinstance(versions['1.0.0'].get('last_update'), str)
+          PY
+
+          python3 tools/package_truenas_catalog_overlay.py \
+            --published-app /tmp/apps/trains/community/litellm \
+            --catalog-entry /tmp/apps/litellm-catalog-entry.json \
+            --app litellm \
+            --train community \
+            --version 1.0.0 \
+            --output /tmp/litellm-overlay \
+            --mode apply \
+            --evidence /tmp/overlay-package.json
+          jq -e '.status == "APPLIED" and .action == "CREATE"' /tmp/overlay-package.json >/dev/null
+
+          git -C /tmp/apps worktree add --detach /tmp/catalog-live HEAD >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode plan \
+            --evidence /tmp/overlay-plan.json
+          jq -e '.status == "ABSENT" and .action == "CREATE"' /tmp/overlay-plan.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode apply \
+            --evidence /tmp/overlay-apply.json
+          jq -e '.result == "APPLIED" and .status == "OWNED_MATCH"' /tmp/overlay-apply.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode apply \
+            --evidence /tmp/overlay-noop.json
+          jq -e '.result == "NOOP" and .status == "OWNED_MATCH"' /tmp/overlay-noop.json >/dev/null
+
+          python3 tools/reconcile_truenas_catalog_overlay.py \
+            --overlay /tmp/litellm-overlay \
+            --catalog-root /tmp/catalog-live \
+            --mode revert \
+            --evidence /tmp/overlay-revert.json
+          jq -e '.result == "REVERTED" and .status == "ABSENT"' /tmp/overlay-revert.json >/dev/null
+
+      - name: Official TrueNAS dev-catalog validation
+        run: |
+          set -euo pipefail
+          docker pull "$VALIDATOR"
+
+          # The overlay qualification above intentionally publishes the new app
+          # into /tmp/apps/trains. The official dev validator compares ix-dev
+          # against the published train and would then interpret this brand-new
+          # 1.0.0 app as an unbumped modification. Validate the exact
+          # materialized dev source in a standalone clone from the same pinned
+          # TrueNAS commit. A linked worktree is not sufficient because its
+          # .git file points outside the directory mounted into the validator.
+          git clone -q --no-local /tmp/apps /tmp/apps-dev
+          git -C /tmp/apps-dev checkout -q master
+          [[ "$(git -C /tmp/apps-dev rev-parse HEAD)" == "$(git -C /tmp/apps rev-parse HEAD)" ]]
+          mkdir -p /tmp/apps-dev/ix-dev/${{ steps.materialize.outputs.train }}
+          cp -a \
+            /tmp/apps/ix-dev/${{ steps.materialize.outputs.train }}/litellm \
+            /tmp/apps-dev/ix-dev/${{ steps.materialize.outputs.train }}/litellm
+
+          mkdir -p /tmp/validator-home
+          printf '[safe]\n\tdirectory = /workspace\n' > /tmp/validator-home/.gitconfig
+          docker run --rm --platform linux/amd64 \
+            -e FAKE_ENV=1 \
+            -e HOME=/validator-home \
+            -v /tmp/validator-home:/validator-home:ro \
+            -v /tmp/apps-dev:/workspace \
+            "$VALIDATOR" \
+            apps_dev_charts_validate validate --path /workspace --base_branch master
+      - name: Official TrueNAS render path
+        working-directory: /tmp/apps
+        run: |
+          set -euo pipefail
+          python3 - "$VALIDATOR" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(".github/scripts/ci.py")
+          s = p.read_text(encoding="utf-8")
+          old = 'CONTAINER_IMAGE = "ghcr.io/truenas/apps_validation:latest"'
+          new = "CONTAINER_IMAGE = " + repr(sys.argv[1])
+          if old not in s:
+              raise SystemExit("official ci.py validator constant changed")
+          p.write_text(s.replace(old, new), encoding="utf-8")
+          PY
+          python3 ./.github/scripts/ci.py \
+            --train "${{ steps.materialize.outputs.train }}" \
+            --app litellm \
+            --test-file basic-values.yaml \
+            --render-only=true > /tmp/rendered.yaml
+          test -s /tmp/rendered.yaml
+          docker compose -f /tmp/rendered.yaml config --format json > /tmp/normalized.json
+
+      - name: Assert rendered candidate invariants
+        run: |
+          set -euo pipefail
+          expected="$(python3 - <<'PY'
+          import yaml
+          with open("candidates/litellm-app/ix-dev/community/litellm/ix_values.yaml", encoding="utf-8") as f:
+              image = yaml.safe_load(f)["images"]["image"]
+          print(f'{image["repository"]}:{image["tag"]}')
+          PY
+          )"
+          jq -e --arg expected "$expected" '
+            (.services | length) == 1 and
+            ([.services[] | select(.image == $expected)] | length) == 1 and
+            ([.services[]?.volumes[]? | select(.target == "/config" and .read_only == true)] | length) == 1 and
+            ([.services[]?.volumes[]? | select(.target == "/run/secrets/semper-env" and .read_only == true)] | length) == 1 and
+            ([.services[]? | .cap_drop[]? | select(. == "ALL")] | length) >= 1 and
+            ([.services[]? | select(.privileged == true)] | length) == 0
+          ' /tmp/normalized.json >/dev/null
+          ! grep -q 'OPENROUTER_MANAGEMENT_KEY' /tmp/rendered.yaml
+
+      - name: Emit sanitized qualification summary
+        if: always()
+        run: |
+          {
+            echo "### LiteLLM MVP public qualification"
+            echo
+            printf '%s\n' "- appliance reproducibility digest: ${{ steps.repro.outputs.oci_manifest_digest }}"
+            if [[ -f /tmp/noop.json ]]; then
+              printf '%s\n' "- materializer second apply: $(jq -r '.status' /tmp/noop.json)"
+              printf '%s\n' "- TrueNAS library source: $(jq -r '.upstream.library_source' /tmp/noop.json)"
+              printf '%s\n' "- TrueNAS library hash: $(jq -r '.upstream.library_hash' /tmp/noop.json)"
+            fi
+            if [[ -f /tmp/overlay-package.json ]]; then
+              printf '%s\n' "- catalog overlay package: $(jq -r '.status' /tmp/overlay-package.json)"
+              printf '%s\n' "- catalog overlay fingerprint: $(jq -r '.desired_fingerprint' /tmp/overlay-package.json)"
+            fi
+            if [[ -f /tmp/overlay-revert.json ]]; then
+              printf '%s\n' "- catalog overlay reversible lifecycle: $(jq -r '.result' /tmp/overlay-revert.json)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
