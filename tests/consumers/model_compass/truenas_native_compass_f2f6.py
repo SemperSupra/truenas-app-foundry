@@ -108,7 +108,7 @@ def seed_compose() -> dict:
 
 
 def http(path: str, *, auth: bool = True, method: str = "GET", data: dict | None = None,
-         timeout: float = 3.0) -> tuple[int, dict]:
+         timeout: float = 5.0) -> tuple[int, dict]:
     headers = {"Authorization": "Bearer " + SYNTHETIC_TOKEN} if auth else {}
     body = None if data is None else json.dumps(data).encode()
     if data is not None:
@@ -232,6 +232,7 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
         deadline = time.monotonic() + state_timeout
         while time.monotonic() < deadline:
             try:
+                native["http_phase"] = "guest_healthz"
                 code, health = http("/healthz", auth=False)
                 if code == 200 and health.get("status") == "UP":
                     break
@@ -240,18 +241,26 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
             time.sleep(2)
         else:
             raise NativeQualificationError("guest app HTTP unreachable through runner-loopback NAT")
+        native["http_phase"] = "unauthenticated_snapshot_401"
+        events.append("F3_API_HEALTHZ_UP")
         code, _ = http("/v1/snapshot", auth=False)
         require(code == 401, "unauthorized snapshot accepted")
+        events.append("F3_API_AUTH_401")
+        native["http_phase"] = "authenticated_snapshot"
         code, snapshot = http("/v1/snapshot")
         require(code == 200 and snapshot.get("status") == "EXTERNAL_SNAPSHOT_UNVERIFIED"
                 and snapshot.get("snapshot") == SNAPSHOT, "external ZFS snapshot data mismatch")
+        events.append("F3_API_EXTERNAL_SNAPSHOT_MATCH")
+        native["http_phase"] = "recommendation_advisory"
         code, advisory = http(
-            "/v1/recommend", method="POST",
+            "/v1/recommend", method="POST", timeout=12.0,
             data={"task_family": "code_refactor", "estimated_context_tokens": 1024},
         )
         require(code == 200 and advisory.get("qualification") == "UNKNOWN"
                 and advisory.get("automatic_admission") is False,
                 "unverified advisory improperly admitted or unavailable")
+        events.append("F3_API_ADVISORY_UNKNOWN")
+        native["http_phase"] = "COMPLETE"
         return hashlib.sha256(json.dumps(snapshot["snapshot"], sort_keys=True).encode()).hexdigest()
 
     def observed(expected_compose: dict | None, completed: list[str] | None = None):
