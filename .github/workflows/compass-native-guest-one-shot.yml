@@ -70,7 +70,8 @@ jobs:
           python3 tests/consumers/model_compass/native_guest_registry.py > "$RUNNER_TEMP/compass-guest-plan.json"
           python3 - "$RUNNER_TEMP/compass-guest-plan.json" <<'PY'
           import json,sys
-          from tests.consumers.model_compass.native_guest_registry import verify_plan_contract
+          sys.path.insert(0,'tests/consumers/model_compass')
+          from native_guest_registry import verify_plan_contract
           obj=json.load(open(sys.argv[1]))
           verify_plan_contract(obj)
           assert obj['classification']=='CANDIDATE_NOT_HIL'
