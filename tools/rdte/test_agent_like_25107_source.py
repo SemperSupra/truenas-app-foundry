@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "agent_like_25107.compose.json"
@@ -141,6 +143,82 @@ class PublicSourceContract(unittest.TestCase):
         obj = copy.deepcopy(self.obj)
         obj["services"]["control"]["healthcheck"]["test"] = ["CMD", "echo", "ready"]
         self.assertIn("control:inert-readiness-oracle-required", validate(obj))
+
+
+class NativeGarmT6AdmissionContract(unittest.TestCase):
+    """A missing GARM product probe must not consume a native KVM allocation."""
+
+    def test_no_oracle_exits_before_guest_or_receipt(self):
+        source = pathlib.Path(__file__).parent / "guard_garm_controller_f0f5.sh"
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            guard = root / source.name
+            guard.write_bytes(source.read_bytes())
+            state = root / "guest-state"
+            receipt = root / "guest-receipt.json"
+            args = [
+                "bash", str(guard), "--target-version", "25.10.7",
+                "--out", str(receipt), "--state-dir", str(state),
+            ]
+            result = subprocess.run(
+                args, capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("HOLD_NATIVE_GARM_F0F5_ORACLE_MISSING", result.stderr)
+            self.assertFalse(state.exists(), "missing native probe cannot start guest")
+            self.assertFalse(receipt.exists(), "missing native probe cannot emit success")
+
+            # CLI discoverability and enforced selector are both part of the
+            # existing runner-composition contract; neither can start KVM.
+            help_result = subprocess.run(
+                ["bash", str(guard), "--help"],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(help_result.returncode, 0, help_result.stderr)
+            self.assertIn("garm-controller-f0f5", help_result.stdout)
+            for selector in ("--rung", "--t6-product", "--rung=t5"):
+                with self.subTest(selector=selector):
+                    bad = subprocess.run(
+                        args + [selector, "t5"],
+                        capture_output=True, text=True, check=False, timeout=10,
+                    )
+                    self.assertEqual(bad.returncode, 2)
+                    self.assertIn("HOLD_GARM_F0F5_SELECTOR_OVERRIDE", bad.stderr)
+
+
+    def test_probe_present_forwards_exact_selector_and_arguments(self):
+        """A synthetic vendor stub observes argv; never start a real guest."""
+        source = pathlib.Path(__file__).parent / "guard_garm_controller_f0f5.sh"
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            guard = root / source.name
+            guard.write_bytes(source.read_bytes())
+            vendor = root / "vendor" / "truenas-kvm" / "scripts"
+            vendor.mkdir(parents=True)
+            (vendor / "truenas_middleware_garm_f0_f5_probe.py").write_text(
+                "# public synthetic presence sentinel only\n", encoding="utf-8"
+            )
+            (vendor / "gha_kvm_truenas_rdte.sh").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n", encoding="utf-8"
+            )
+            args = [
+                "--target-version", "25.10.7",
+                "--foundry-control-dir", str(root / "synthetic-control"),
+                "--foundry-commit", "a" * 40,
+                "--out", str(root / "receipt.json"),
+                "--state-dir", str(root / "guest-state"),
+            ]
+            observed = subprocess.run(
+                ["bash", str(guard), *args],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+            self.assertEqual(observed.returncode, 0, observed.stderr)
+            self.assertEqual(
+                observed.stdout.splitlines(),
+                ["--rung", "t6", "--t6-product", "garm-controller-f0f5", *args],
+            )
+            self.assertFalse((root / "guest-state").exists())
+            self.assertFalse((root / "receipt.json").exists())
 
 
 if __name__ == "__main__":
