@@ -43,7 +43,7 @@ for rep in $(seq 1 30); do
 done
 if test "$ready" -ne 1; then docker logs compass-native-guest-registry-fixture;exit 1;fi
 test "$(docker inspect compass-native-guest-registry-fixture --format '{{.HostConfig.ReadonlyRootfs}}')" = "true"
-test "$(docker inspect compass-native-guest-registry-fixture --format '{{index .HostConfig.PortBindings "5000/tcp" 0}}')" != "0.0.0.0"
+docker inspect compass-native-guest-registry-fixture --format '{{json .HostConfig.PortBindings}}' | grep -q '"HostIp":"127.0.0.1"'
 echo "PASS: guest-shape registry source image booted read-only on runner loopback, no privileged daemon edits"
 
 tag="127.0.0.1:$port/compass-guest-fixture:${source_sha:0:12}"
