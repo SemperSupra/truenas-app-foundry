@@ -51,3 +51,18 @@ jobs:
           assert doc["native_F2_F6"]=="NOT_RUN"
           print("PASS: deterministic bounded guest registry rendezvous candidate (not installed)")
           PY
+
+  registry-shape-runtime:
+    name: public read-only registry fixture + pinned real OCI push/pull
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - name: Checkout exact Foundry source; persist no credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build and prove guest-shape runner-local immutable OCI rendezvous
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/consumers/model_compass/verify_registry_runtime.sh
