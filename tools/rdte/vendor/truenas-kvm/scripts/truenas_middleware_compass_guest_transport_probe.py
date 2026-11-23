@@ -21,7 +21,7 @@ import urllib.request
 from truenas_middleware_ddp_probe import WebSocket, ddp_call, wait_for
 
 HERE = pathlib.Path(__file__).resolve()
-REPO_ROOT = HERE.parents[4]
+REPO_ROOT = HERE.parents[5]
 sys.path.insert(0, str(REPO_ROOT / "tests" / "consumers" / "model_compass"))
 from native_guest_registry import (  # noqa: E402
     GUEST_PORT,
