@@ -37,3 +37,17 @@ jobs:
             echo 'ERROR: accepted floating product source'
             exit 1
           fi
+      - name: Reject unsafe guest registry staging plans before heavyweight HIL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_guest_registry.py' -v
+          python3 tests/consumers/model_compass/native_guest_registry.py > "$RUNNER_TEMP/model-compass-guest-plan.json"
+          python3 - "$RUNNER_TEMP/model-compass-guest-plan.json" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1]))
+          assert doc["classification"]=="CANDIDATE_NOT_HIL"
+          assert doc["image_published_external"] is False
+          assert doc["native_F2_F6"]=="NOT_RUN"
+          print("PASS: deterministic bounded guest registry rendezvous candidate (not installed)")
+          PY
