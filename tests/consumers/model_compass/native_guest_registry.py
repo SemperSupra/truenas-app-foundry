@@ -70,7 +70,7 @@ def plan(
                 "cap_drop": ["ALL"],
                 "pids_limit": 64,
                 "mem_limit": 268435456,
-                "tmpfs": ["/tmp:rw,noexec,nosuid,size=8m"],
+                "tmpfs": ["/tmp:rw,noexec,nosuid,size=128m"],
                 # Fixture push data is throwaway, not a production dataset.
                 "environment": {"REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY": "/tmp/registry"},
             }
