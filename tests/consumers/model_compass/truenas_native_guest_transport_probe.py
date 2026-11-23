@@ -77,6 +77,7 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=8)
     ap.add_argument("--job-timeout", type=float, default=360)
     ap.add_argument("--state-timeout", type=float, default=240)
+    ap.add_argument("--full-lifecycle", action="store_true")
     args = ap.parse_args()
 
     receipt = {
@@ -209,6 +210,17 @@ def main() -> int:
         require(matches, "guest-native image pull lacked immutable digest readback")
         receipt["evidence"]["image_repo_digest_readback"] = "EXACT_IMMUTABLE_DIGEST"
         receipt["evidence"]["guest_image_present"] = True
+        if args.full_lifecycle:
+            from truenas_native_compass_f2f6 import run as qualify_full
+            qualify_full(
+                call, job, guest_ref, receipt,
+                state_timeout=int(args.state_timeout),
+            )
+            require(
+                receipt.get("native_F2_F6") == "GUEST_REAL_PASS",
+                "native Model Compass lifecycle was not qualified",
+            )
+            receipt["contract"] = "truenas-model-compass-native-lifecycle-f2f6/v1"
         receipt["classification"] = "SUPPORTED"
         receipt["oracleSatisfied"] = True
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, urllib.error.URLError) as ex:

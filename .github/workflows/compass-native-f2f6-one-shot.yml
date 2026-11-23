@@ -1,0 +1,130 @@
+name: TrueNAS Model Compass real native F2-F6 ZFS lifecycle — one-use public KVM
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/requests/compass-native-f2f6/*.json'
+permissions:
+  contents: read
+concurrency:
+  group: foundry-native-truenas-heavyweight
+  cancel-in-progress: false
+jobs:
+  native-compass-f2f6:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - name: Exact proposed source checkout without persistent token
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify unique single-use request, vendor provenance and scoped overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v tools.rdte.test_foundry_vendored_truenas_t2
+          python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_guest_registry.py' -v
+          python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_zfs_retention.py' -v
+          python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_compass_f2f6.py' -v
+          python3 - <<'PY'
+          import glob,json,pathlib
+          files=glob.glob('tools/rdte/requests/compass-native-f2f6/*.json')
+          assert len(files)==1,files
+          req=json.loads(pathlib.Path(files[0]).read_text())
+          assert req == {
+            'schema':'foundry-compass-native-f2f6-request/v1',
+            'product_commit':'6e88ccbe09f7f0989a8db4e75967654d409f8f64',
+            'target_version':'25.04.2.6',
+            'scope':'disposable-kvm-only',
+            'classification':'TEST_ONLY_NOT_PRODUCTION',
+            'native_product_F2_F6':'REQUEST_DISPOSABLE_GUEST_ONLY',
+            'site_host_mutation':False,
+            'registry_publication':False,
+            'production_secrets':False,
+            'owner_authorization':'SYNTHETIC_PUBLIC_KVM_ONLY',
+          }, 'foreign or altered heavyweight request'
+          print('PASS: exactly one immutable target/product/authority request')
+          PY
+          python3 tests/consumers/model_compass/prepare_guest_harness.py \
+            --out "$RUNNER_TEMP/compass-overlay" \
+            --receipt "$RUNNER_TEMP/compass-overlay-receipt.json"
+      - name: Install approved host-only QEMU tooling, verify available free-tier resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso patch
+          test -c /dev/kvm && sudo -n test -r /dev/kvm && sudo -n test -w /dev/kvm
+          test "$(nproc)" -ge 2
+          mem_kib="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)"
+          disk_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}')"
+          test "$mem_kib" -ge $((11 * 1024 * 1024))
+          test "$disk_kib" -ge $((28 * 1024 * 1024))
+          echo "PASS: resource-gated single disposable TrueNAS guest capacity on public runner"
+      - name: Fetch exact integrated public product SHA and native transport plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          product="$RUNNER_TEMP/model-spelunker-exact"
+          git init -q "$product"
+          git -C "$product" remote add origin https://github.com/SemperSupra/model-spelunker.git
+          git -C "$product" fetch -q --no-tags --depth=1 origin 6e88ccbe09f7f0989a8db4e75967654d409f8f64
+          test "$(git -C "$product" rev-parse FETCH_HEAD)" = 6e88ccbe09f7f0989a8db4e75967654d409f8f64
+          git -C "$product" checkout -q --detach FETCH_HEAD
+          python3 tests/consumers/model_compass/native_guest_registry.py > "$RUNNER_TEMP/compass-guest-plan.json"
+          python3 - "$RUNNER_TEMP/compass-guest-plan.json" <<'PY'
+          import json,sys
+          sys.path.insert(0,'tests/consumers/model_compass')
+          from native_guest_registry import verify_plan_contract
+          obj=json.load(open(sys.argv[1]))
+          verify_plan_contract(obj)
+          assert obj['classification']=='CANDIDATE_NOT_HIL'
+          assert obj['native_F2_F6']=='NOT_RUN'
+          print('PASS: source and guest registry plan pinned; no native actions yet')
+          PY
+      - name: Real native TrueNAS installed guest, app registry plus immutable image pull
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FOUNDRY_SOURCE_ROOT="$GITHUB_WORKSPACE"
+          state="$RUNNER_TEMP/compass-guest-state"
+          out="$RUNNER_TEMP/compass-f2f6-native-receipt.json"
+          bash "$RUNNER_TEMP/compass-overlay/tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh" \
+            --target-version 25.04.2.6 --rung t6 --t6-product model-compass \
+            --foundry-control-dir "$GITHUB_WORKSPACE" \
+            --foundry-commit "$GITHUB_SHA" \
+            --compass-source-dir "$RUNNER_TEMP/model-spelunker-exact" \
+            --compass-plan-file "$RUNNER_TEMP/compass-guest-plan.json" \
+            --out "$out" --state-dir "$state"
+          python3 - "$out" "$state" <<'PY'
+          import json,pathlib,sys
+          receipt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert receipt["target"]["rung"]=="T6" and receipt["target"]["version"]=="25.04.2.6"
+          assert receipt["classification"]=="SUPPORTED" and receipt["oracleSatisfied"] is True, receipt.get("classification")
+          o=receipt["oracles"]
+          assert o.get("native_compass_image_transport_exercised") is True
+          assert o.get("foundry_materialization_exercised") is True, "missing native product F2-F6 Foundry verification"
+          c=receipt["foundry_materialization"]
+          assert c["contract"]=="truenas-model-compass-native-lifecycle-f2f6/v1"
+          assert c["classification"]=="SUPPORTED" and c["oracleSatisfied"] is True
+          assert c["native_F2_F6"]=="GUEST_REAL_PASS"
+          assert c["native_product"]["full_F2_F6"]=="GUEST_REAL_PASS"
+          assert c["native_product"]["status"]=="VERIFIED"
+          assert "cleanup_error" not in c["native_product"]
+          expected={"F2_OWNED_ZFS_CREATE","F3_REAL_AUTHENTICATED_GUEST_APP_SNAPSHOT_AND_ADVISORY_UNKNOWN","F4_START_AND_EXTERNAL_ZFS_RETAINED","F5_UPDATE_GENERATION_AND_INDEPENDENT_READBACK","F5_REDEPLOY_AND_EXTERNAL_ZFS_RETAINED","F5_REPLAN_NOOP","F6_REINSTALL_RETAINED_DATA_AND_VALID_AUTH","CLEANUP_OWNED_ZFS_DATASET_ABSENT"}
+          assert expected.issubset(set(c["native_product"]["events"])), "native operation/cleanup coverage incomplete"
+          assert c["guest_compass_app_created"] is True
+          assert c["guest_registry_cleanup"]=="ABSENT"
+          assert c["evidence"]["image_repo_digest_readback"]=="EXACT_IMMUTABLE_DIGEST"
+          assert not pathlib.Path(sys.argv[2]).exists(), "QEMU guest residue"
+          print('PASS: real TrueNAS guest native Model Compass app F2–F6, external ZFS retention, generic Foundry lifecycle and owned cleanup')
+          PY
+      - name: Preserve bounded public-safe native success/failure and provenance receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compass-real-truenas-25-04-2-6-f2f6-retained-zfs
+          path: |
+            ${{ runner.temp }}/compass-f2f6-native-receipt.json
+            ${{ runner.temp }}/compass-overlay-receipt.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,12 @@
+{
+    "schema": "foundry-compass-native-f2f6-request/v1",
+    "product_commit": "6e88ccbe09f7f0989a8db4e75967654d409f8f64",
+    "target_version": "25.04.2.6",
+    "scope": "disposable-kvm-only",
+    "classification": "TEST_ONLY_NOT_PRODUCTION",
+    "native_product_F2_F6": "REQUEST_DISPOSABLE_GUEST_ONLY",
+    "site_host_mutation": false,
+    "registry_publication": false,
+    "production_secrets": false,
+    "owner_authorization": "SYNTHETIC_PUBLIC_KVM_ONLY"
+}
