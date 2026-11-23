@@ -5,6 +5,9 @@ on:
       - 'tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh'
       - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_compass_guest_transport_probe.py'
       - 'tools/rdte/requests/compass-native-guest/**'
+      - 'tests/consumers/model_compass/native_guest_harness.patch'
+      - 'tests/consumers/model_compass/prepare_guest_harness.py'
+      - 'tests/consumers/model_compass/truenas_native_guest_transport_probe.py'
       - '.github/workflows/compass-native-guest-preflight.yml'
 permissions:
   contents: read
