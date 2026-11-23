@@ -40,7 +40,7 @@ class NativeDouble:
     def call(self, method, params):
         self.history.append(method)
         if method=="core.get_methods":
-            return {name:{"description":"synthetic-only"} for name in sorted(self.methods)}
+            return {name:{"description":"synthetic-only"} for name in sorted(self.methods) if name!="core.get_methods"}
         if method=="app.query":
             name=params[0][0][2]
             return [dict(self.apps[name]["observable"])] if name in self.apps else []
@@ -136,6 +136,8 @@ class NativeF2F6MockTests(unittest.TestCase):
         self.assertEqual(receipt["native_F2_F6"],"GUEST_REAL_PASS")
         self.assertEqual(receipt["native_product"]["full_F2_F6"],"GUEST_REAL_PASS")
         self.assertEqual(receipt["native_product"]["status"],"VERIFIED")
+        self.assertFalse(receipt["native_product"]["private_discovery_proof"]["returned_as_public_method"])
+        self.assertEqual(receipt["native_product"]["private_discovery_proof"]["evidence"],"AUTHENTICATED_DDP_INVOCATION_SUCCEEDED")
         self.assertTrue(backend.deleted)
         self.assertEqual(backend.apps,{})
         self.assertFalse(backend.dataset)
