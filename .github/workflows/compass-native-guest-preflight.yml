@@ -1,0 +1,47 @@
+name: TrueNAS Model Compass native guest transport source preflight
+on:
+  pull_request:
+    paths:
+      - 'tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh'
+      - 'tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_compass_guest_transport_probe.py'
+      - 'tools/rdte/requests/compass-native-guest/**'
+      - '.github/workflows/compass-native-guest-preflight.yml'
+permissions:
+  contents: read
+concurrency:
+  group: compass-native-guest-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-static-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate exact-source Python and shell parser without a guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          p='tools/rdte/vendor/truenas-kvm/scripts'
+          bash -n "$p/gha_kvm_truenas_rdte.sh"
+          python3 -m py_compile "$p/truenas_middleware_compass_guest_transport_probe.py" tests/consumers/model_compass/native_guest_registry.py
+          python3 -m unittest discover -s tests/consumers/model_compass -p 'test_native_guest_registry.py' -v
+          python3 "$p/gha_kvm_truenas_rdte.sh" --help >/dev/null 2>&1 && { echo 'ERROR: attempted Python execution of shell';exit 1; } || true
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh').read_text()
+          p=Path('tools/rdte/vendor/truenas-kvm/scripts/truenas_middleware_compass_guest_transport_probe.py').read_text()
+          required=['model-compass', 'COMPASS_HOSTFWD', 'truenas_middleware_compass_guest_transport_probe.py', 'native_compass_image_transport_exercised', 'guest-image-transport']
+          assert all(x in s for x in required), [x for x in required if x not in s]
+          assert 'app.image.pull' in p and 'app.create' in p and 'app.delete' in p
+          assert 'daemon.json' not in s and 'docker_daemon_modified' in p
+          print('PASS: static native transport preconditions, no guest or site changes')
+          PY
+      - name: Reject source path drifting from scoped native guest T6 contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tests/consumers/model_compass/native_guest_registry.py
+          test -f tools/rdte/vendor/truenas-kvm/config/truenas-rdte-targets.json
+          bash tools/rdte/vendor/truenas-kvm/scripts/gha_kvm_truenas_rdte.sh --help | grep -q model-compass
