@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "candidate": "document-gateway-app",
+  "source_path": "candidates/document-gateway-app/ix-dev/community/document-gateway",
+  "runtime_target": "TrueNAS SCALE Apps",
+  "source_materializer": {
+    "repository": "https://github.com/truenas/apps.git",
+    "commit": "532236882212e8c5e51d5b49cfe2c6ce3dd5675e",
+    "train": "community",
+    "lib_version": "2.3.4",
+    "lib_hash": "2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242"
+  },
+  "upstream": {
+    "cups_image": "chuckcharlie/cups-avahi-airprint:2.1.3",
+    "project": "https://github.com/chuckcharlie/cups-avahi-airprint",
+    "promotion_rule": "resolve and bind the exact multi-arch OCI digest before private promotion"
+  },
+  "stable_contract": {
+    "cups_admin": "http://<gateway-address>:631",
+    "print_ingress": "/spool/pdf",
+    "scan_ingress": "/data/incoming/scan",
+    "fax_ingress": "/data/incoming/fax or /fax-source",
+    "normalized_output": "/data/output",
+    "machine_contract": "/data/.document-gateway/contract.json",
+    "machine_status": "/data/.document-gateway/status.json",
+    "event_journal": "/data/.document-gateway/events.jsonl",
+    "fax_outbox_pending": "/data/outgoing/fax/pending/<job-id>",
+    "fax_sender_status": "/data/.document-gateway/fax-sender.json",
+    "fax_sender_plugin_api": "document-gateway.fax-sender/v1",
+    "management_webui": "http://<gateway-address>:30880/",
+    "management_api": "/api/v1",
+    "management_api_version": "document-gateway.control/v1",
+    "desired_state": "/spool/control/desired.json",
+    "observed_cups_state": "/spool/control/cups-observed.json",
+    "renderer_plugin_api": "document-gateway.renderer/v1",
+    "discovery_contract": "IPP + DNS-SD driverless projection; _print + _universal on LAN discovery modes",
+    "discovery_hil_targets": [
+      "Windows",
+      "Linux",
+      "macOS",
+      "iOS/iPadOS",
+      "Android"
+    ],
+    "runtime_state_model": "stateless-disposable",
+    "persistent_roots": {
+      "config": "/config",
+      "spool": "/spool",
+      "data": "/data"
+    },
+    "runtime_replacement_invariant": "Destroy and recreate all runtime containers without persistent-store loss; desired state, user data, identities, outboxes, ledgers, and reconciliation must recover.",
+    "client_integration_strategy": "driverless-first; optional modern platform extensions only where they add capability",
+    "client_integrations": {
+      "windows": "Microsoft IPP Class Driver + optional Print Support App / Print Support Virtual Printer",
+      "android": "Default Print Service first; optional Document Gateway PrintService",
+      "ios_ipados": "AirPrint first; optional UIPrintServiceExtension + companion/share extension",
+      "macos": "AirPrint/IPP Everywhere; optional companion/provisioning utility; no custom driver",
+      "linux": "driverless CUPS/IPP Everywhere; optional CLI/tray companion; no gateway driver"
+    }
+  },
+  "claim_boundary": "Public source/render/smoke candidate. The outbound fax channel is backend-neutral and the only qualified sender is a non-transmitting null plugin. Renderer/export ABI is document-gateway.renderer/v1. LAN discovery modes target driverless IPP Everywhere/AirPrint DNS-SD publication, but Windows/Android automatic discovery, Mopria/WPP compatibility, macOS/Linux client behavior, TrueNAS runtime realization, Brother hardware interoperability, FRITZ!Box interoperability/sending, and site-specific storage/network materialization remain HIL gates. No Mopria certification is claimed. The initial management WebUI/API is trusted-LAN material and requires TLS/reverse-proxy hardening before untrusted-network exposure. Exact OCI digest binding remains a promotion gate."
+}

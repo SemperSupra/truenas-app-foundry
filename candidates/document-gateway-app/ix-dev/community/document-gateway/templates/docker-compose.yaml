@@ -1,0 +1,1072 @@
+{% set tpl = ix_lib.base.render.Render(values) %}
+{% set cups = tpl.add_container(values.consts.cups_container_name, "image") %}
+{% set normalizer = tpl.add_container(values.consts.normalizer_container_name, "image") %}
+{% if values.fax_outbox.enabled %}
+  {% set fax_sender = tpl.add_container(values.consts.fax_sender_container_name, "image") %}
+{% endif %}
+{% if values.management.enabled %}
+  {% set control = tpl.add_container(values.consts.control_container_name, "image") %}
+{% endif %}
+
+{% set gateway_config = {
+  "pdf_queue": values.gateway.pdf_queue,
+  "pdf_display_name": values.gateway.pdf_display_name,
+  "printers": values.printers,
+  "network_mode": values.network.mode
+} %}
+{% set normalizer_config = {
+  "scan_enabled": values.intake.scan_enabled,
+  "fax_mode": values.intake.fax_mode,
+  "fax_outbox_enabled": values.fax_outbox.enabled,
+  "fax_sender": values.fax_outbox.sender,
+  "naming_style": values.naming.style,
+  "preserve_original_name": values.naming.preserve_original_name,
+  "sidecars": values.naming.sidecars,
+  "stable_seconds": values.naming.stable_seconds
+} %}
+{% set fax_sender_config = {
+  "plugin_api": "document-gateway.fax-sender/v1",
+  "sender": values.fax_outbox.sender
+} %}
+{% set control_config = {
+  "api_version": "document-gateway.control/v1",
+  "admin_user": values.gateway.admin_user,
+  "admin_password": values.gateway.admin_password,
+  "bootstrap_printers": values.printers
+} %}
+
+{% set gateway_script %}
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/gateway.json")
+PDF_CONFIG = Path("/etc/cups/cups-pdf.conf")
+SPOOL_ROOT = Path("/spool")
+SPOOL = SPOOL_ROOT / "pdf"
+CONTROL = SPOOL_ROOT / "control"
+DESIRED = CONTROL / "desired.json"
+OBSERVED = CONTROL / "cups-observed.json"
+MANAGED = CONTROL / "cups-managed.json"
+
+def emit(event, **fields):
+    record = {"component": "cups", "event": event, **fields}
+    print(json.dumps(record, sort_keys=True), flush=True)
+
+def run(args, check=True, env=None):
+    cp = subprocess.run(args, text=True, capture_output=True, env=env)
+    if check and cp.returncode:
+        raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {(cp.stderr or cp.stdout).strip()}")
+    return cp
+
+def cups_local_env():
+    env = os.environ.copy()
+    socket = Path("/run/cups/cups.sock")
+    if socket.exists():
+        env["CUPS_SERVER"] = str(socket)
+    else:
+        env.pop("CUPS_SERVER", None)
+    return env
+
+def run_retry(args, attempts=20, delay=1.0, env=None):
+    last = None
+    for attempt in range(1, attempts + 1):
+        cp = run(args, check=False, env=env)
+        if cp.returncode == 0:
+            if attempt > 1:
+                emit("command_recovered", command=args[0], attempts=attempt)
+            return cp
+        last = (cp.stderr or cp.stdout or "").strip()
+        transient = (
+            "Bad file descriptor" in last
+            or "Unable to connect to server" in last
+            or "Connection refused" in last
+        )
+        if not transient or attempt == attempts:
+            raise RuntimeError(f"{args[0]} failed ({cp.returncode}): {last}")
+        emit("command_retry", command=args[0], attempt=attempt, error=last)
+        time.sleep(delay)
+    raise RuntimeError(f"{args[0]} failed after retries: {last}")
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def patch_pdf_backend():
+    SPOOL.mkdir(parents=True, exist_ok=True)
+    text = PDF_CONFIG.read_text(encoding="utf-8")
+    if re.search(r"(?m)^\s*Out\s+", text):
+        text = re.sub(r"(?m)^\s*Out\s+.*$", "Out /spool/pdf", text)
+    else:
+        text += "\nOut /spool/pdf\n"
+    PDF_CONFIG.write_text(text, encoding="utf-8")
+    emit("pdf_backend_configured", output=str(SPOOL))
+
+def wait_for_cups(timeout=75):
+    deadline = time.time() + timeout
+    last = ""
+    socket = Path("/run/cups/cups.sock")
+    while time.time() < deadline:
+        if socket.exists():
+            cp = run(["lpstat", "-r"], check=False, env=cups_local_env())
+            if cp.returncode == 0 and "running" in cp.stdout.lower():
+                return
+            last = (cp.stderr or cp.stdout).strip()
+        else:
+            last = "waiting for /run/cups/cups.sock"
+        time.sleep(1)
+    raise RuntimeError(f"CUPS did not become ready: {last}")
+
+def configure_discovery(config):
+    mode = config.get("network_mode", "published_ipp")
+    profile = "off" if mode == "published_ipp" else "driverless"
+    target = Path("/config/cupsd.conf") if Path("/config/cupsd.conf").is_file() else Path("/etc/cups/cupsd.conf")
+    text = target.read_text(encoding="utf-8")
+    text = re.sub(r"(?m)^\\s*BrowseLocalProtocols\\s+.*$\\n?", "", text)
+    text = re.sub(r"(?m)^\\s*BrowseDNSSDSubTypes\\s+.*$\\n?", "", text)
+    text = re.sub(r"(?m)^\\s*Browsing\\s+.*$\\n?", "", text)
+    if profile == "off":
+        text += "\nBrowsing Off\nBrowseLocalProtocols none\n"
+        subtypes = []
+    else:
+        text += "\nBrowsing On\nBrowseLocalProtocols dnssd\nBrowseDNSSDSubTypes _print,_universal\n"
+        subtypes = ["_print", "_universal"]
+    target.write_text(text, encoding="utf-8")
+    emit(
+        "discovery_configured",
+        network_mode=mode,
+        profile=profile,
+        config_path=str(target),
+        dnssd_subtypes=subtypes,
+    )
+
+def harden_upstream_entrypoint():
+    path = Path("/root/run_cups.sh")
+    if not path.is_file():
+        raise RuntimeError("expected upstream CUPS entrypoint missing")
+    text = path.read_text(encoding="utf-8")
+    # Upstream enables shell tracing while handling CUPSPASSWORD.  Never permit
+    # credential-bearing commands to be echoed into runtime logs.
+    text = re.sub(r"(?m)^set -x\\s*$", "set +x", text)
+    path.write_text(text, encoding="utf-8")
+    emit("upstream_entrypoint_hardened", shell_trace=False)
+
+def cups_pdf_model():
+    # The selected image explicitly installs the Alpine cups-pdf package.
+    # Avoid lpinfo model discovery here: some CUPS 2.4 client/server startup
+    # combinations return EBADF even after lpstat reports the scheduler running.
+    # The live print smoke below proves this fixed driver path on every candidate.
+    model = "drv:///cups-pdf.drv/Generic-CUPS-PDF-Printer.ppd"
+    emit("pdf_model_selected", model=model)
+    return model
+
+def provision_pdf(config):
+    model = cups_pdf_model()
+    run_retry([
+        "lpadmin", "-p", config["pdf_queue"], "-E",
+        "-v", "cups-pdf:/", "-m", model,
+        "-D", config["pdf_display_name"],
+        "-o", "printer-is-shared=true",
+    ], env=cups_local_env())
+    emit("queue_ready", queue=config["pdf_queue"], kind="pdf", model=model)
+
+def bootstrap_desired(config):
+    CONTROL.mkdir(parents=True, exist_ok=True)
+    if DESIRED.exists():
+        return
+    destinations = {}
+    for printer in config.get("printers", []):
+        queue = printer["queue_name"]
+        destinations[queue] = {
+            "id": queue,
+            "kind": "physical-print",
+            "display_name": printer["display_name"],
+            "device_uri": printer["device_uri"],
+            "driver": printer.get("driver", "everywhere"),
+            "model": printer.get("model", ""),
+            "shared": bool(printer.get("shared", True)),
+        }
+    atomic_json(DESIRED, {
+        "schema_version": 1,
+        "generation": 1,
+        "destinations": destinations,
+    })
+    emit("desired_state_bootstrapped", generation=1, destinations=sorted(destinations))
+
+def load_json(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+def apply_destination(printer):
+    model = "everywhere"
+    if printer.get("driver") == "custom":
+        model = str(printer.get("model", "")).strip()
+        if not model:
+            raise RuntimeError(f"custom model missing for {printer['id']}")
+    run_retry([
+        "lpadmin", "-p", printer["id"], "-E",
+        "-v", printer["device_uri"], "-m", model,
+        "-D", printer["display_name"],
+        "-o", "printer-is-shared=" + ("true" if printer.get("shared", True) else "false"),
+    ], env=cups_local_env())
+    emit("queue_ready", queue=printer["id"], kind="physical", driver=model)
+
+def reconcile(config, last_generation=None):
+    desired = load_json(DESIRED, {"schema_version": 1, "generation": 0, "destinations": {}})
+    generation = int(desired.get("generation", 0))
+    if generation == last_generation:
+        return generation
+
+    destinations = desired.get("destinations") or {}
+    wanted = set(destinations)
+    managed = set(load_json(MANAGED, {"queues": []}).get("queues") or [])
+
+    for queue in sorted(managed - wanted):
+        run(["lpadmin", "-x", queue], check=False, env=cups_local_env())
+        emit("queue_removed", queue=queue)
+
+    errors = {}
+    for queue in sorted(wanted):
+        spec = dict(destinations[queue])
+        spec.setdefault("id", queue)
+        try:
+            apply_destination(spec)
+        except Exception as exc:
+            errors[queue] = str(exc)
+            emit("queue_reconcile_error", queue=queue, error=str(exc))
+
+    atomic_json(MANAGED, {"schema_version": 1, "queues": sorted(wanted)})
+    status = run(["lpstat", "-p"], check=False)
+    output = status.stdout or ""
+    queues = {
+        config["pdf_queue"]: {"kind": "archive", "present": f"printer {config['pdf_queue']} " in output}
+    }
+    for queue in sorted(wanted):
+        queues[queue] = {
+            "kind": "physical-print",
+            "present": f"printer {queue} " in output,
+            "error": errors.get(queue),
+        }
+    atomic_json(OBSERVED, {
+        "schema_version": 1,
+        "desired_generation": generation,
+        "queues": queues,
+        "errors": errors,
+    })
+    emit("reconciled", generation=generation, managed=sorted(wanted), errors=errors)
+    return generation
+
+def main():
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    patch_pdf_backend()
+    bootstrap_desired(config)
+    configure_discovery(config)
+    harden_upstream_entrypoint()
+
+    child = subprocess.Popen(["/root/run_cups.sh"], env=os.environ.copy())
+    def stop(signum, frame):
+        emit("signal", signal=signum)
+        if child.poll() is None:
+            child.terminate()
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    try:
+        wait_for_cups()
+        provision_pdf(config)
+        generation = None
+        emit("ready", queue=config["pdf_queue"], desired_state=str(DESIRED))
+        while child.poll() is None:
+            generation = reconcile(config, generation)
+            time.sleep(2)
+        return child.returncode or 0
+    except Exception as exc:
+        emit("fatal", error=str(exc))
+        if child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+        return 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+{% endset %}
+
+{% set normalizer_script %}
+import hashlib
+import json
+import os
+import re
+import shutil
+import time
+from datetime import datetime
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/normalizer.json")
+DATA = Path("/data")
+SPOOL = Path("/spool")
+META = DATA / ".document-gateway"
+OUTPUT = DATA / "output"
+LEDGER = SPOOL / "state" / "normalizer.json"
+STATUS = META / "status.json"
+CONTRACT = META / "contract.json"
+JOURNAL = META / "events.jsonl"
+FAX_OUTBOX = DATA / "outgoing" / "fax"
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def emit(event, **fields):
+    record = {
+        "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "component": "normalizer",
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(record, sort_keys=True), flush=True)
+    META.mkdir(parents=True, exist_ok=True)
+    with JOURNAL.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
+
+def load_ledger():
+    try:
+        return json.loads(LEDGER.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"fax_fingerprints": {}}
+
+def save_ledger(ledger):
+    atomic_json(LEDGER, ledger)
+
+def safe_stem(value):
+    value = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())
+    value = re.sub(r"-+", "-", value).strip("-._")
+    return value[:96] or "document"
+
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+def target_name(path, source, style, preserve):
+    ts = datetime.fromtimestamp(path.stat().st_mtime).astimezone()
+    stamp = ts.strftime("%Y-%m-%d_%H-%M-%S" if style == "readable" else "%Y%m%dT%H%M%S")
+    suffix = path.suffix.lower()
+    if preserve:
+        base = safe_stem(path.stem)
+        name = f"{stamp}__{source}__{base}{suffix}"
+    else:
+        name = f"{stamp}__{source}{suffix}"
+    candidate = OUTPUT / name
+    n = 2
+    while candidate.exists():
+        candidate = OUTPUT / f"{Path(name).stem}__{n:02d}{suffix}"
+        n += 1
+    return candidate
+
+def write_contract(config, sources):
+    atomic_json(CONTRACT, {
+        "schema_version": 1,
+        "service": "document-gateway",
+        "paths": {
+            "print_ingress": "/spool/pdf",
+            "scan_ingress": "/data/incoming/scan",
+            "fax_ingress": sources.get("fax", {}).get("path"),
+            "normalized_output": "/data/output",
+            "fax_outbox_pending": "/data/outgoing/fax/pending",
+            "fax_outbox_sent": "/data/outgoing/fax/sent",
+            "fax_outbox_failed": "/data/outgoing/fax/failed",
+            "fax_sender_status": "/data/.document-gateway/fax-sender.json",
+            "status": "/data/.document-gateway/status.json",
+            "events": "/data/.document-gateway/events.jsonl",
+        },
+        "fax_sender": {
+            "plugin_api": "document-gateway.fax-sender/v1",
+            "selected": config.get("fax_sender", "null"),
+            "canonical_media_type": "application/pdf",
+            "transport_specific_conversion": "sender_plugin",
+        },
+        "naming": {
+            "style": config["naming_style"],
+            "preserve_original_name": config["preserve_original_name"],
+            "collision_suffix": "__NN",
+        },
+        "sources": sorted(sources),
+    })
+
+def iter_files(root):
+    if not root.exists():
+        return
+    for path in root.rglob("*"):
+        if path.is_file() and not path.name.startswith("."):
+            yield path
+
+def main():
+    if hasattr(time, "tzset"):
+        time.tzset()
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (DATA / "incoming" / "scan").mkdir(parents=True, exist_ok=True)
+    (DATA / "incoming" / "fax").mkdir(parents=True, exist_ok=True)
+    (SPOOL / "pdf").mkdir(parents=True, exist_ok=True)
+    (SPOOL / "state").mkdir(parents=True, exist_ok=True)
+    META.mkdir(parents=True, exist_ok=True)
+    if config.get("fax_outbox_enabled", False):
+        for state in ("pending", "sent", "failed"):
+            (FAX_OUTBOX / state).mkdir(parents=True, exist_ok=True)
+
+    sources = {
+        "print": {"path": "/spool/pdf", "destructive": True},
+    }
+    if config.get("scan_enabled", True):
+        sources["scan"] = {"path": "/data/incoming/scan", "destructive": True}
+    fax_mode = config.get("fax_mode", "disabled")
+    if fax_mode == "data_folder":
+        sources["fax"] = {"path": "/data/incoming/fax", "destructive": True}
+    elif fax_mode in {"host_path", "cifs"}:
+        sources["fax"] = {"path": "/fax-source", "destructive": False}
+
+    write_contract(config, sources)
+    ledger = load_ledger()
+    stable = {}
+    counters = {"processed": 0, "errors": 0}
+    last_event = emit("ready", sources=sources, output="/data/output")
+
+    while True:
+        seen = set()
+        for source, spec in sources.items():
+            root = Path(spec["path"])
+            for path in iter_files(root) or []:
+                key = f"{source}:{path}"
+                seen.add(key)
+                try:
+                    st = path.stat()
+                except FileNotFoundError:
+                    continue
+                signature = (st.st_size, st.st_mtime_ns)
+                old = stable.get(key)
+                now = time.monotonic()
+                if not old or old["signature"] != signature:
+                    stable[key] = {"signature": signature, "since": now}
+                    continue
+                if now - old["since"] < config["stable_seconds"]:
+                    continue
+
+                try:
+                    digest = sha256(path)
+                    fingerprint = f"{path}:{st.st_size}:{st.st_mtime_ns}:{digest}"
+                    if not spec["destructive"] and ledger["fax_fingerprints"].get(str(path)) == fingerprint:
+                        stable.pop(key, None)
+                        continue
+
+                    target = target_name(
+                        path, source, config["naming_style"], config["preserve_original_name"]
+                    )
+                    tmp = target.with_name("." + target.name + ".partial")
+                    shutil.copy2(path, tmp)
+                    os.replace(tmp, target)
+                    meta = {
+                        "source": source,
+                        "original_path": str(path),
+                        "original_name": path.name,
+                        "output_name": target.name,
+                        "size": target.stat().st_size,
+                        "sha256": digest,
+                        "imported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                    }
+                    if config.get("sidecars"):
+                        atomic_json(target.with_suffix(target.suffix + ".json"), meta)
+                    if spec["destructive"]:
+                        try:
+                            path.unlink()
+                        except FileNotFoundError:
+                            pass
+                    else:
+                        ledger["fax_fingerprints"][str(path)] = fingerprint
+                        save_ledger(ledger)
+                    counters["processed"] += 1
+                    last_event = emit("document_imported", **meta)
+                    stable.pop(key, None)
+                except Exception as exc:
+                    counters["errors"] += 1
+                    last_event = emit("import_error", source=source, path=str(path), error=str(exc))
+                    stable.pop(key, None)
+
+        for key in list(stable):
+            if key not in seen:
+                stable.pop(key, None)
+
+        atomic_json(STATUS, {
+            "schema_version": 1,
+            "state": "running",
+            "processed": counters["processed"],
+            "errors": counters["errors"],
+            "last_event": last_event,
+        })
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
+{% endset %}
+
+{% set fax_sender_script %}
+import hashlib
+import json
+import os
+import time
+from datetime import datetime
+from pathlib import Path
+
+CONFIG = Path("/opt/document-gateway/fax-sender.json")
+DATA = Path("/data")
+META = DATA / ".document-gateway"
+OUTBOX = DATA / "outgoing" / "fax"
+PENDING = OUTBOX / "pending"
+STATUS = META / "fax-sender.json"
+JOURNAL = META / "events.jsonl"
+PLUGIN_API = "document-gateway.fax-sender/v1"
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def emit(event, **fields):
+    record = {
+        "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "component": "fax-sender",
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(record, sort_keys=True), flush=True)
+    META.mkdir(parents=True, exist_ok=True)
+    with JOURNAL.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
+
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+def load_job(job_dir):
+    manifest_path = job_dir / "job.json"
+    if not manifest_path.is_file():
+        raise ValueError("job.json missing")
+    job = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if job.get("schema_version") != 1:
+        raise ValueError("unsupported job schema_version")
+    if job.get("channel") != "fax":
+        raise ValueError("channel must be fax")
+    if job.get("job_id") != job_dir.name:
+        raise ValueError("job_id must match queue directory")
+    if not isinstance(job.get("to"), str) or not job["to"].strip():
+        raise ValueError("fax destination 'to' is required")
+    if not isinstance(job.get("created_at"), str) or not job["created_at"].strip():
+        raise ValueError("created_at is required")
+    if job.get("media_type", "application/pdf") != "application/pdf":
+        raise ValueError("v1 fax queue canonical media type is application/pdf")
+    document_name = job.get("document")
+    if not isinstance(document_name, str) or not document_name:
+        raise ValueError("document is required")
+    document = (job_dir / document_name).resolve()
+    root = job_dir.resolve()
+    if document == root or root not in document.parents:
+        raise ValueError("document must stay inside the job directory")
+    if document.suffix.lower() != ".pdf" or not document.is_file():
+        raise ValueError("document must be an existing PDF")
+    with document.open("rb") as fh:
+        if fh.read(5) != b"%PDF-":
+            raise ValueError("document does not have a PDF signature")
+    digest = sha256(document)
+    expected = job.get("sha256")
+    if expected and expected != digest:
+        raise ValueError("sha256 mismatch")
+    return {
+        "job_id": job["job_id"],
+        "to": job["to"],
+        "document": document_name,
+        "media_type": "application/pdf",
+        "sha256": digest,
+        "created_at": job["created_at"],
+    }
+
+class NullSender:
+    name = "null"
+    can_transmit = False
+
+    def inspect(self, job):
+        return {
+            "state": "pending",
+            "disposition": "deferred",
+            "reason": "null sender never transmits or consumes queued jobs",
+            "job_id": job["job_id"],
+        }
+
+SENDERS = {"null": NullSender}
+
+def main():
+    if hasattr(time, "tzset"):
+        time.tzset()
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    if config.get("plugin_api") != PLUGIN_API:
+        raise RuntimeError("fax sender plugin API mismatch")
+    sender_name = config.get("sender", "null")
+    sender_type = SENDERS.get(sender_name)
+    if sender_type is None:
+        raise RuntimeError(f"unknown fax sender plugin: {sender_name}")
+    sender = sender_type()
+
+    PENDING.mkdir(parents=True, exist_ok=True)
+    (OUTBOX / "sent").mkdir(parents=True, exist_ok=True)
+    (OUTBOX / "failed").mkdir(parents=True, exist_ok=True)
+    META.mkdir(parents=True, exist_ok=True)
+    last_snapshot = None
+    emit("fax_sender_ready", plugin=sender.name, plugin_api=PLUGIN_API, can_transmit=sender.can_transmit)
+
+    while True:
+        valid = []
+        invalid = []
+        for job_dir in sorted(PENDING.iterdir()):
+            if not job_dir.is_dir() or job_dir.name.startswith("."):
+                continue
+            try:
+                job = load_job(job_dir)
+                result = sender.inspect(job)
+                valid.append({**job, "sender": sender.name, "sender_result": result})
+            except Exception as exc:
+                invalid.append({"job_id": job_dir.name, "error": str(exc)})
+        snapshot = {
+            "schema_version": 1,
+            "plugin_api": PLUGIN_API,
+            "plugin": sender.name,
+            "can_transmit": sender.can_transmit,
+            "pending_valid": valid,
+            "pending_invalid": invalid,
+            "counts": {"valid": len(valid), "invalid": len(invalid)},
+        }
+        encoded = json.dumps(snapshot, sort_keys=True)
+        if encoded != last_snapshot:
+            atomic_json(STATUS, snapshot)
+            emit("fax_outbox_observed", plugin=sender.name, valid=len(valid), invalid=len(invalid))
+            last_snapshot = encoded
+        time.sleep(2)
+
+if __name__ == "__main__":
+    main()
+{% endset %}
+
+{% set control_script %}
+import base64
+import hmac
+import json
+import os
+import re
+import time
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+CONFIG = Path("/opt/document-gateway/control.json")
+SPOOL = Path("/spool")
+CONTROL = SPOOL / "control"
+DESIRED = CONTROL / "desired.json"
+OBSERVED = CONTROL / "cups-observed.json"
+DATA = Path("/data")
+NORMALIZER_STATUS = DATA / ".document-gateway" / "status.json"
+FAX_STATUS = DATA / ".document-gateway" / "fax-sender.json"
+API_VERSION = "document-gateway.control/v1"
+ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+def load_json(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+def bootstrap(config):
+    CONTROL.mkdir(parents=True, exist_ok=True)
+    for _ in range(150):
+        if DESIRED.exists():
+            return
+        time.sleep(0.1)
+    destinations = {}
+    for printer in config.get("bootstrap_printers", []):
+        queue = printer["queue_name"]
+        destinations[queue] = {
+            "id": queue,
+            "kind": "physical-print",
+            "display_name": printer["display_name"],
+            "device_uri": printer["device_uri"],
+            "driver": printer.get("driver", "everywhere"),
+            "model": printer.get("model", ""),
+            "shared": bool(printer.get("shared", True)),
+        }
+    if not DESIRED.exists():
+        atomic_json(DESIRED, {
+            "schema_version": 1,
+            "generation": 1,
+            "destinations": destinations,
+        })
+
+def validate_destination(resource_id, body):
+    if not ID_RE.fullmatch(resource_id):
+        raise ValueError("destination id must match [A-Za-z0-9_.-]+")
+    if not isinstance(body, dict):
+        raise ValueError("JSON object required")
+    if body.get("id") not in (None, resource_id):
+        raise ValueError("body id must match URL id")
+    if body.get("kind", "physical-print") != "physical-print":
+        raise ValueError("v1 writable destination kind is physical-print")
+    display = body.get("display_name")
+    uri = body.get("device_uri")
+    if not isinstance(display, str) or not display.strip():
+        raise ValueError("display_name is required")
+    if not isinstance(uri, str) or not uri.strip():
+        raise ValueError("device_uri is required")
+    driver = body.get("driver", "everywhere")
+    if driver not in ("everywhere", "custom"):
+        raise ValueError("driver must be everywhere or custom")
+    model = str(body.get("model", ""))
+    if driver == "custom" and not model.strip():
+        raise ValueError("model is required for custom driver")
+    return {
+        "id": resource_id,
+        "kind": "physical-print",
+        "display_name": display.strip(),
+        "device_uri": uri.strip(),
+        "driver": driver,
+        "model": model.strip(),
+        "shared": bool(body.get("shared", True)),
+    }
+
+HTML = """<!doctype html>
+<meta charset="utf-8">
+<title>Document Gateway</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}
+table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #ddd;padding:.5rem;text-align:left}
+input,select,button{font:inherit;padding:.35rem;margin:.15rem}fieldset{border:1px solid #ddd;margin:1rem 0}
+code{background:#f3f3f3;padding:.1rem .3rem}.muted{opacity:.7}.ok{font-weight:600}
+</style>
+<h1>Document Gateway</h1>
+<p class="muted">Common control plane. CUPS :631 remains the advanced printer diagnostic interface.</p>
+<div id="status">Loading…</div>
+<h2>Destinations</h2>
+<table><thead><tr><th>ID</th><th>Name</th><th>URI</th><th>Driver</th><th>Observed</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+<fieldset><legend>Add / update physical printer</legend>
+<input id="id" placeholder="Brother_Office">
+<input id="name" placeholder="Brother Office">
+<input id="uri" size="36" placeholder="ipp://printer/ipp/print">
+<select id="driver"><option value="everywhere">IPP Everywhere</option><option value="custom">Custom</option></select>
+<input id="model" placeholder="Custom CUPS model">
+<label><input id="shared" type="checkbox" checked> shared</label>
+<button onclick="save()">Apply</button>
+</fieldset>
+<p><a href="/api/v1/capabilities">Capabilities JSON</a> · <a href="/api/v1/status">Status JSON</a> · <a href="/api/v1/plugins">Plugins JSON</a></p>
+<script>
+async function req(url, opts={}) {
+  const r=await fetch(url, opts);
+  if(!r.ok && r.status!==204) throw new Error(await r.text());
+  return r.status===204 ? null : await r.json();
+}
+async function refresh(){
+  const d=await req('/api/v1/destinations');
+  document.querySelector('#status').textContent='Desired generation '+d.generation+'; reconciled generation '+(d.observed?.desired_generation ?? 'pending');
+  const rows=document.querySelector('#rows'); rows.innerHTML='';
+  for(const [id,x] of Object.entries(d.destinations||{})){
+    const tr=document.createElement('tr');
+    const obs=d.observed?.queues?.[id];
+    tr.innerHTML='<td><code>'+id+'</code></td><td>'+esc(x.display_name)+'</td><td><code>'+esc(x.device_uri)+'</code></td><td>'+esc(x.driver)+'</td><td>'+(obs?.present?'present':'pending')+'</td><td><button>Delete</button></td>';
+    tr.querySelector('button').onclick=async()=>{await req('/api/v1/destinations/'+encodeURIComponent(id),{method:'DELETE'});await refresh()};
+    rows.appendChild(tr);
+  }
+}
+function esc(x){const d=document.createElement('div');d.textContent=x??'';return d.innerHTML}
+async function save(){
+  const id=document.querySelector('#id').value.trim();
+  const body={id,kind:'physical-print',display_name:document.querySelector('#name').value,device_uri:document.querySelector('#uri').value,driver:document.querySelector('#driver').value,model:document.querySelector('#model').value,shared:document.querySelector('#shared').checked};
+  await req('/api/v1/destinations/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  await refresh();
+}
+refresh().catch(e=>document.querySelector('#status').textContent=e);
+</script>
+"""
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "DocumentGateway/1"
+
+    def log_message(self, fmt, *args):
+        print(json.dumps({"component":"control","event":"http","client":self.client_address[0],"message":fmt % args}), flush=True)
+
+    @property
+    def config(self):
+        return self.server.config
+
+    def authorized(self):
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Basic "):
+            return False
+        try:
+            decoded = base64.b64decode(header[6:], validate=True).decode("utf-8")
+            user, password = decoded.split(":", 1)
+        except Exception:
+            return False
+        return hmac.compare_digest(user, self.config["admin_user"]) and hmac.compare_digest(password, self.config["admin_password"])
+
+    def require_auth(self):
+        if self.authorized():
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Document Gateway"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
+    def send_json(self, status, value):
+        payload = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def read_json(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        if length <= 0 or length > 1024 * 1024:
+            raise ValueError("request body must be 1..1048576 bytes")
+        return json.loads(self.rfile.read(length))
+
+    def path_parts(self):
+        return [unquote(x) for x in urlparse(self.path).path.split("/") if x]
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        if path == "/health":
+            return self.send_json(200, {"state":"ok","api_version":API_VERSION})
+        if not self.require_auth():
+            return
+        if path == "/":
+            payload = HTML.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        if path == "/api/v1/capabilities":
+            return self.send_json(200, {
+                "api_version": API_VERSION,
+                "idempotency": {
+                    "destination_put": True,
+                    "destination_delete": True,
+                    "fax_job_put": "contract-reserved",
+                },
+                "interfaces": ["webui", "http-json"],
+                "future_adapters": ["cli", "mcp", "native-gui"],
+                "transport_formats": [
+                    "application/pdf", "image/pwg-raster", "image/jpeg",
+                    "image/urf", "application/postscript", "application/vnd.hp-pcl"
+                ],
+                "artifact_profiles": {
+                    "pdf": "implemented",
+                    "pdfa": "planned",
+                    "png": "planned",
+                    "jpeg": "planned",
+                    "tiff": "planned",
+                    "text": "planned",
+                    "hocr": "planned",
+                    "alto-xml": "planned",
+                    "markdown": "planned-lossy-from-print",
+                    "html": "planned-lossy-from-print",
+                    "epub": "planned-lossy-from-print",
+                },
+            })
+        if path == "/api/v1/destinations":
+            desired = load_json(DESIRED, {"schema_version":1,"generation":0,"destinations":{}})
+            desired["observed"] = load_json(OBSERVED, {})
+            return self.send_json(200, desired)
+        if path == "/api/v1/status":
+            return self.send_json(200, {
+                "api_version": API_VERSION,
+                "cups": load_json(OBSERVED, {}),
+                "normalizer": load_json(NORMALIZER_STATUS, {}),
+                "fax_sender": load_json(FAX_STATUS, {}),
+            })
+        if path == "/api/v1/plugins":
+            return self.send_json(200, {
+                "fax_sender_api": "document-gateway.fax-sender/v1",
+                "fax_senders": [{"id":"null","can_transmit":False,"qualified":True}],
+            })
+        return self.send_json(404, {"error":"not_found"})
+
+    def do_PUT(self):
+        if not self.require_auth():
+            return
+        parts = self.path_parts()
+        if len(parts) != 4 or parts[:3] != ["api","v1","destinations"]:
+            return self.send_json(404, {"error":"not_found"})
+        resource_id = parts[3]
+        try:
+            spec = validate_destination(resource_id, self.read_json())
+            desired = load_json(DESIRED, {"schema_version":1,"generation":0,"destinations":{}})
+            destinations = desired.setdefault("destinations", {})
+            changed = destinations.get(resource_id) != spec
+            if changed:
+                destinations[resource_id] = spec
+                desired["schema_version"] = 1
+                desired["generation"] = int(desired.get("generation", 0)) + 1
+                atomic_json(DESIRED, desired)
+            return self.send_json(200, {
+                "changed": changed,
+                "generation": desired.get("generation", 0),
+                "resource": spec,
+            })
+        except (ValueError, json.JSONDecodeError) as exc:
+            return self.send_json(400, {"error":"invalid_destination","detail":str(exc)})
+
+    def do_DELETE(self):
+        if not self.require_auth():
+            return
+        parts = self.path_parts()
+        if len(parts) != 4 or parts[:3] != ["api","v1","destinations"]:
+            return self.send_json(404, {"error":"not_found"})
+        resource_id = parts[3]
+        desired = load_json(DESIRED, {"schema_version":1,"generation":0,"destinations":{}})
+        destinations = desired.setdefault("destinations", {})
+        if resource_id in destinations:
+            del destinations[resource_id]
+            desired["generation"] = int(desired.get("generation", 0)) + 1
+            atomic_json(DESIRED, desired)
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+def main():
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    if config.get("api_version") != API_VERSION:
+        raise RuntimeError("control API version mismatch")
+    config["admin_user"] = os.environ.get("DOCUMENT_GATEWAY_ADMIN_USER", config.get("admin_user", ""))
+    config["admin_password"] = os.environ.get("DOCUMENT_GATEWAY_ADMIN_PASSWORD", config.get("admin_password", ""))
+    if not config["admin_user"] or not config["admin_password"]:
+        raise RuntimeError("control-plane administrator credentials are required")
+    bootstrap(config)
+    server = ThreadingHTTPServer(("0.0.0.0", 8080), Handler)
+    server.config = config
+    print(json.dumps({"component":"control","event":"ready","api_version":API_VERSION,"port":8080}), flush=True)
+    server.serve_forever()
+
+if __name__ == "__main__":
+    main()
+{% endset %}
+
+{% do cups.set_user(0, 0) %}
+{# CUPS binds privileged port 631 and drops privileges to service users; keep cap_drop=ALL and restore only these runtime needs. #}
+{% do cups.add_caps(["CHOWN", "DAC_OVERRIDE", "NET_BIND_SERVICE", "SETGID", "SETUID"]) %}
+{% do cups.environment.add_env("CUPSADMIN", values.gateway.admin_user) %}
+{% do cups.environment.add_env("CUPSPASSWORD", values.gateway.admin_password) %}
+{% do cups.environment.add_env("AVAHI_HOSTNAME", values.gateway.mdns_hostname) %}
+{% do cups.configs.add("document-gateway-cups-script", gateway_script, values.consts.gateway_script_path, "0555") %}
+{% do cups.configs.add("document-gateway-cups-config", gateway_config | tojson, values.consts.gateway_config_path, "0400") %}
+{% do cups.set_entrypoint(["python3", values.consts.gateway_script_path]) %}
+{% do cups.set_command(["run"]) %}
+{% do cups.add_storage(values.consts.cups_config_path, values.storage.config) %}
+{% do cups.add_storage(values.consts.spool_path, values.storage.spool) %}
+{% if values.usb_enabled %}
+  {% do cups.add_usb_bus() %}
+{% endif %}
+{% do cups.healthcheck.set_test("wget", {"port": 631, "path": "/", "scheme": "http", "spider": true}) %}
+{% do cups.healthcheck.set_start_period(45) %}
+{% do cups.healthcheck.set_retries(10) %}
+
+{% if values.network.mode == "published_ipp" %}
+  {% do cups.add_port(values.network.ipp_port) %}
+  {% do tpl.portals.add(values.network.ipp_port, {"name": "CUPS Admin", "scheme": "http"}) %}
+{% elif values.network.mode == "host_mdns" %}
+  {% do cups.set_network_mode("host") %}
+{% elif values.network.mode == "external_lan" %}
+  {% do tpl.networks.register(values.network.external_network.name) %}
+  {% do cups.add_network(values.network.external_network.name, {"ipv4_address": values.network.external_network.ipv4_address}) %}
+{% endif %}
+
+{% do normalizer.set_user(0, 0) %}
+{% do normalizer.set_network_mode("none") %}
+{% do normalizer.healthcheck.disable() %}
+{% do normalizer.configs.add("document-gateway-normalizer-script", normalizer_script, values.consts.normalizer_script_path, "0555") %}
+{% do normalizer.configs.add("document-gateway-normalizer-config", normalizer_config | tojson, values.consts.normalizer_config_path, "0444") %}
+{% do normalizer.set_entrypoint(["python3", values.consts.normalizer_script_path]) %}
+{% do normalizer.set_command(["run"]) %}
+{% do normalizer.add_storage(values.consts.spool_path, values.storage.spool) %}
+{% do normalizer.add_storage(values.consts.data_path, values.storage.documents) %}
+
+{% if values.intake.fax_mode == "host_path" %}
+  {% set fax_storage = {
+    "type": "host_path",
+    "read_only": true,
+    "host_path_config": values.intake.fax_host_path
+  } %}
+  {% do normalizer.add_storage(values.consts.fax_source_path, fax_storage) %}
+{% elif values.intake.fax_mode == "cifs" %}
+  {% set fax_storage = {
+    "type": "cifs",
+    "read_only": true,
+    "cifs_config": values.intake.fax_cifs
+  } %}
+  {% do normalizer.add_storage(values.consts.fax_source_path, fax_storage) %}
+{% endif %}
+
+{% if values.management.enabled %}
+  {% do control.set_user(0, 0) %}
+  {% do control.configs.add("document-gateway-control-script", control_script, values.consts.control_script_path, "0555") %}
+  {% do control.configs.add("document-gateway-control-config", control_config | tojson, values.consts.control_config_path, "0400") %}
+  {% do control.set_entrypoint(["python3", values.consts.control_script_path]) %}
+  {% do control.set_command(["run"]) %}
+  {% do control.add_storage(values.consts.spool_path, values.storage.spool) %}
+  {% do control.add_storage(values.consts.data_path, values.storage.documents) %}
+  {% do control.add_port(values.management.port) %}
+  {% do control.healthcheck.set_test("wget", {"port": 8080, "path": "/health", "scheme": "http", "spider": true}) %}
+  {% do control.healthcheck.set_start_period(10) %}
+  {% do control.healthcheck.set_retries(10) %}
+  {% do tpl.portals.add(values.management.port, {"name": "Document Gateway", "scheme": "http"}) %}
+{% endif %}
+
+{% if values.fax_outbox.enabled %}
+  {% do fax_sender.set_user(0, 0) %}
+  {% do fax_sender.set_network_mode("none") %}
+  {% do fax_sender.healthcheck.disable() %}
+  {% do fax_sender.configs.add("document-gateway-fax-sender-script", fax_sender_script, values.consts.fax_sender_script_path, "0555") %}
+  {% do fax_sender.configs.add("document-gateway-fax-sender-config", fax_sender_config | tojson, values.consts.fax_sender_config_path, "0444") %}
+  {% do fax_sender.set_entrypoint(["python3", values.consts.fax_sender_script_path]) %}
+  {% do fax_sender.set_command(["run"]) %}
+  {% do fax_sender.add_storage(values.consts.data_path, values.storage.documents) %}
+{% endif %}
+
+{{ tpl.render() | tojson }}
