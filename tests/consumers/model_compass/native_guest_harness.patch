@@ -67,7 +67,7 @@ index aee419c4..8eb6c39f 100644
      "apps_runtime_exercised": bool(os.environ.get("R_APP_RESULT")) and json.loads(os.environ["R_APP_RESULT"]).get("oracleSatisfied") is True,
      "app_lifecycle_exercised": bool(os.environ.get("R_LIFECYCLE_RESULT")) and json.loads(os.environ["R_LIFECYCLE_RESULT"]).get("oracleSatisfied") is True,
 -    "foundry_materialization_exercised": bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
-+    "foundry_materialization_exercised": os.environ.get("R_T6_PRODUCT") != "model-compass" and bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
++    "foundry_materialization_exercised": bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True and (os.environ.get("R_T6_PRODUCT") != "model-compass" or json.loads(os.environ["R_FOUNDRY_RESULT"]).get("native_F2_F6") == "GUEST_REAL_PASS"),
 +    "native_compass_image_transport_exercised": os.environ.get("R_T6_PRODUCT") == "model-compass" and bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
    },
    "rpc_discovery": json.loads(os.environ["R_RPC_DISCOVERY"]) if os.environ.get("R_RPC_DISCOVERY") else None,
@@ -99,7 +99,7 @@ index aee419c4..8eb6c39f 100644
 +COMPASS_HOSTFWD=""
 +if [[ "$RUNG" == "t6" && "$T6_PRODUCT" == "model-compass" ]]; then
 +  # Bind only the disposable runner loopback to installed guest port.
-+  COMPASS_HOSTFWD=",hostfwd=tcp:127.0.0.1:15431-:15431"
++  COMPASS_HOSTFWD=",hostfwd=tcp:127.0.0.1:15431-:15431,hostfwd=tcp:127.0.0.1:18098-:18088"
 +fi
  if [[ "$RUNG" == "t6" && ( "$T6_PRODUCT" == "minecraft-paper" || "$T6_PRODUCT" == "collage-native-paper" || "$T6_PRODUCT" == "minecraft-vanilla-263" ) ]]; then
    MINECRAFT_HOST_PORT="$(python3 - <<'PY'
@@ -125,7 +125,7 @@ index aee419c4..8eb6c39f 100644
 +    --password-file "$PASSWORD_FILE" \
 +    --product-source-dir "$COMPASS_SOURCE_DIR" \
 +    --plan-file "$COMPASS_PLAN_FILE" \
-+    --out "$FOUNDRY_OUT" --timeout 8 --job-timeout 360 --state-timeout 240 >/dev/null 2>&1 || true
++    --full-lifecycle --out "$FOUNDRY_OUT" --timeout 8 --job-timeout 360 --state-timeout 240 >/dev/null 2>&1 || true
 +elif [[ "$T6_PRODUCT" == "official-catalog" ]]; then
    python3 "$SCRIPT_DIR/truenas_middleware_official_catalog_t6_probe.py" \
      --host 127.0.0.1 --port "$MIDDLEWARE_PORT" \
@@ -136,7 +136,7 @@ index aee419c4..8eb6c39f 100644
  
 -if [[ "$T6_PRODUCT" == "official-catalog" ]]; then
 +if [[ "$T6_PRODUCT" == "model-compass" ]]; then
-+  write_receipt SUPPORTED true guest-image-transport "isolated exact TrueNAS 25.04.2.6 guest native registry app + hostfwd + immutable source-built Model Compass image pull/readback passed; registry app cleaned; product F2-F6 NOT_RUN"
++  write_receipt SUPPORTED true foundry-materialization "isolated TrueNAS 25.04.2.6 source-built digest-pinned native Model Compass F2-F6 app + external ZFS synthetic state retention qualified, final owned cleanup; production installation NOT_RUN"
 +elif [[ "$T6_PRODUCT" == "official-catalog" ]]; then
    write_receipt SUPPORTED true foundry-materialization "exact Foundry-exported native catalog control passed observe/discover-plan-apply-verify convergence, stop/start, config update/read-back, redeploy, conditional native-upgrade receipt, retain-data delete/reinstall, NOOP convergence, and final cleanup"
  elif [[ "$T6_PRODUCT" == "garm-provider-g2" ]]; then
