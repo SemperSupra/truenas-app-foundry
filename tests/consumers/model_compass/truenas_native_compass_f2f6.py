@@ -303,7 +303,7 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
         # Official public filesystem.setperm, never private file_receive.
         perms = call("filesystem.setperm", [{"path": MOUNT, "uid": 65532, "gid": 65532,
                                              "mode": "700", "options": {"stripacl": True}}])
-        if isinstance(perms, int):
+        if isinstance(perms, int) and not isinstance(perms, bool):
             job(perms, "dataset_setperm")
         root = file_stat(MOUNT)
         require(root["uid"] == 65532 and (root["mode"] & 0o777) == 0o700
@@ -441,7 +441,7 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
                 require(assert_external() == baseline, "external state drift before final owned cleanup")
                 require(not query_app(APP) and not query_app(SEED_APP), "App attached to dataset at cleanup")
                 result = call("pool.dataset.delete", [DATASET, {"recursive": False, "force": False}])
-                if isinstance(result, int):
+                if isinstance(result, int) and not isinstance(result, bool):
                     job(result, "owned_dataset_delete")
                 require(not query_dataset(), "owned dataset remained after explicit cleanup")
                 events.append("CLEANUP_OWNED_ZFS_DATASET_ABSENT")
