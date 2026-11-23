@@ -1,5 +1,11 @@
 name: TrueNAS Foundry exact-source private/public method visibility oracle
 on:
+  push:
+    branches: ['review/issue-356-method-visibility-v1']
+    paths:
+      - 'tools/truenas_method_visibility.py'
+      - 'tools/test_truenas_method_visibility.py'
+      - '.github/workflows/foundry-method-visibility.yml'
   pull_request:
     paths:
       - 'tools/truenas_method_visibility.py'
