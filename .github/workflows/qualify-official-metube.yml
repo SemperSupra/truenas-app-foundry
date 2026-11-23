@@ -1,0 +1,36 @@
+name: Qualify existing TrueNAS MeTube catalog source
+on:
+  push:
+    branches: [qualification/metube-official-source-20261108]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  official-catalog-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install upstream catalog renderer dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/foundry-metube-venv
+          /tmp/foundry-metube-venv/bin/pip install --disable-pip-version-check --quiet pyyaml psutil pytest pytest-cov bcrypt pydantic
+          docker compose version
+      - name: Independent exact-source render and six hostile guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="/tmp/foundry-metube-venv/bin:$PATH"
+          python3 tools/qualify_official_metube_source.py
+          python3 -m json.tool evidence-metube-official.json >/dev/null
+          sha256sum evidence-metube-official.json
+      - name: Public-safe qualification evidence (no target credentials)
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-metube-source-render-qualified
+          path: evidence-metube-official.json
+          retention-days: 1
+          if-no-files-found: error
