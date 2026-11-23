@@ -18,7 +18,7 @@ MIN_HOST_MEM_KIB=$((11 * 1024 * 1024))
 MIN_HOST_FREE_KIB=$((28 * 1024 * 1024))
 
 usage() {
-  echo "Usage: gha_kvm_truenas_rdte.sh --out RECEIPT [--state-dir DIR] [--target-version VERSION] [--rung t0|t1|t2|t3|t4|t5|t6] [--compute-fixture none|container-c0|vm-v0|vm-v1] [--t6-product litellm|wow-sidecar|garm|garm-controller-f0f5|garm-provider-g2|garm-provider-g3|garm-provider-g4|garm-provider-g5|garm-provider-container-pre-b4|official-catalog|foliorelay|minecraft-paper|collage-native-paper|minecraft-vanilla-263] [--foundry-control-dir DIR] [--foundry-commit SHA] [--g2-fixture-dir DIR] [--g2-fixture-producer SHA] [--g3-fixture-dir DIR] [--g3-fixture-producer SHA] [--g4-fixture-dir DIR] [--g4-fixture-producer SHA] [--g5-matrix-dir DIR] [--g5-matrix-producer SHA] [--container-fixture-dir DIR] [--container-fixture-producer SHA] [--session-manifest FILE] [--vanilla-collage-readback] [--vanilla-lantern-zip FILE --vanilla-lantern-manifest FILE]"
+  echo "Usage: gha_kvm_truenas_rdte.sh --out RECEIPT [--state-dir DIR] [--target-version VERSION] [--rung t0|t1|t2|t3|t4|t5|t6] [--compute-fixture none|container-c0|vm-v0|vm-v1] [--t6-product litellm|wow-sidecar|garm|garm-controller-f0f5|garm-provider-g2|garm-provider-g3|garm-provider-g4|garm-provider-g5|garm-provider-container-pre-b4|official-catalog|foliorelay|minecraft-paper|collage-native-paper|minecraft-vanilla-263|model-compass] [--foundry-control-dir DIR] [--foundry-commit SHA] [--g2-fixture-dir DIR] [--g2-fixture-producer SHA] [--g3-fixture-dir DIR] [--g3-fixture-producer SHA] [--g4-fixture-dir DIR] [--g4-fixture-producer SHA] [--g5-matrix-dir DIR] [--g5-matrix-producer SHA] [--container-fixture-dir DIR] [--container-fixture-producer SHA] [--session-manifest FILE] [--vanilla-collage-readback] [--vanilla-lantern-zip FILE --vanilla-lantern-manifest FILE]"
 }
 
 OUT=""
@@ -28,6 +28,8 @@ COMPUTE_FIXTURE="none"
 T6_PRODUCT="litellm"
 FOUNDRY_CONTROL_DIR=""
 FOUNDRY_COMMIT=""
+COMPASS_SOURCE_DIR=""
+COMPASS_PLAN_FILE=""
 G2_FIXTURE_DIR=""
 G2_FIXTURE_PRODUCER=""
 G3_FIXTURE_DIR=""
@@ -56,6 +58,8 @@ while [[ $# -gt 0 ]]; do
     --t6-product) T6_PRODUCT="$2"; shift 2 ;;
     --foundry-control-dir) FOUNDRY_CONTROL_DIR="$2"; shift 2 ;;
     --foundry-commit) FOUNDRY_COMMIT="$2"; shift 2 ;;
+    --compass-source-dir) COMPASS_SOURCE_DIR="$2"; shift 2 ;;
+    --compass-plan-file) COMPASS_PLAN_FILE="$2"; shift 2 ;;
     --g2-fixture-dir) G2_FIXTURE_DIR="$2"; shift 2 ;;
     --g2-fixture-producer) G2_FIXTURE_PRODUCER="$2"; shift 2 ;;
     --g3-fixture-dir) G3_FIXTURE_DIR="$2"; shift 2 ;;
@@ -117,14 +121,21 @@ if [[ "$VANILLA_COLLAGE_READBACK" == "true" ]]; then
     { echo "vanilla scoped readback only admitted on exact 25.04.2.6/T6/vanilla263" >&2; exit 2; }
 fi
 if [[ "$RUNG" == "t6" ]]; then
-  if [[ "$T6_PRODUCT" != "official-catalog" && "$T6_PRODUCT" != "garm-provider-g5" && "$T6_PRODUCT" != "foliorelay" && "$T6_PRODUCT" != "minecraft-paper" && "$T6_PRODUCT" != "garm-controller-f0f5" && "$T6_PRODUCT" != "minecraft-vanilla-263" ]]; then
+  if [[ "$T6_PRODUCT" != "official-catalog" && "$T6_PRODUCT" != "garm-provider-g5" && "$T6_PRODUCT" != "foliorelay" && "$T6_PRODUCT" != "minecraft-paper" && "$T6_PRODUCT" != "garm-controller-f0f5" && "$T6_PRODUCT" != "minecraft-vanilla-263" && "$T6_PRODUCT" != "model-compass" ]]; then
     if [[ "$T6_PRODUCT" == "collage-native-paper" ]]; then
       [[ "$VERSION" == "25.04.1" ]] || { echo "COLLAGE P2 admitted only on isolated TrueNAS 25.04.1" >&2; exit 2; }
     else
       [[ "$VERSION" == "26.0.0-BETA.3" ]] || { echo "product-specific T6 controls remain admitted only for exact TrueNAS 26.0.0-BETA.3" >&2; exit 2; }
     fi
   fi
-  [[ "$T6_PRODUCT" == "litellm" || "$T6_PRODUCT" == "wow-sidecar" || "$T6_PRODUCT" == "garm" || "$T6_PRODUCT" == "garm-controller-f0f5" || "$T6_PRODUCT" == "garm-provider-g2" || "$T6_PRODUCT" == "garm-provider-g3" || "$T6_PRODUCT" == "garm-provider-g4" || "$T6_PRODUCT" == "garm-provider-g5" || "$T6_PRODUCT" == "garm-provider-container-pre-b4" || "$T6_PRODUCT" == "official-catalog" || "$T6_PRODUCT" == "foliorelay" || "$T6_PRODUCT" == "minecraft-paper" || "$T6_PRODUCT" == "collage-native-paper" || "$T6_PRODUCT" == "minecraft-vanilla-263" ]] || { echo "unsupported T6 product: $T6_PRODUCT" >&2; exit 2; }
+  [[ "$T6_PRODUCT" == "litellm" || "$T6_PRODUCT" == "wow-sidecar" || "$T6_PRODUCT" == "garm" || "$T6_PRODUCT" == "garm-controller-f0f5" || "$T6_PRODUCT" == "garm-provider-g2" || "$T6_PRODUCT" == "garm-provider-g3" || "$T6_PRODUCT" == "garm-provider-g4" || "$T6_PRODUCT" == "garm-provider-g5" || "$T6_PRODUCT" == "garm-provider-container-pre-b4" || "$T6_PRODUCT" == "official-catalog" || "$T6_PRODUCT" == "foliorelay" || "$T6_PRODUCT" == "minecraft-paper" || "$T6_PRODUCT" == "collage-native-paper" || "$T6_PRODUCT" == "minecraft-vanilla-263" || "$T6_PRODUCT" == "model-compass" ]] || { echo "unsupported T6 product: $T6_PRODUCT" >&2; exit 2; }
+  if [[ "$T6_PRODUCT" == "model-compass" ]]; then
+    [[ "$VERSION" == "25.04.2.6" ]] || { echo "model-compass native transport requires exact TrueNAS 25.04.2.6" >&2; exit 2; }
+    [[ -n "$COMPASS_SOURCE_DIR" && -d "$COMPASS_SOURCE_DIR" && -f "$COMPASS_SOURCE_DIR/deploy/model-compass/Dockerfile" ]] || { echo "model-compass transport requires pinned source checkout" >&2; exit 2; }
+    [[ -n "$COMPASS_PLAN_FILE" && -f "$COMPASS_PLAN_FILE" ]] || { echo "model-compass requires exact guarded registry plan" >&2; exit 2; }
+    COMPASS_SOURCE_DIR="$(realpath "$COMPASS_SOURCE_DIR")"
+    COMPASS_PLAN_FILE="$(realpath "$COMPASS_PLAN_FILE")"
+  fi
   if [[ "$T6_PRODUCT" == "minecraft-vanilla-263" ]]; then
     [[ "$VERSION" == "25.04.2.6" ]] || { echo "vanilla26.3 native product requires exact TrueNAS25.04.2.6" >&2; exit 2; }
   fi
@@ -281,6 +292,8 @@ payload = {
       if os.environ.get("R_RUNG") == "t6" and os.environ.get("R_T6_PRODUCT") == "minecraft-vanilla-263"
       else {"name": "rdte-t6-minecraft-paper", "catalog_app": "minecraft", "catalog_version_candidate": "1.15.29", "paper_version": "1.21.11"}
       if os.environ.get("R_RUNG") == "t6" and os.environ.get("R_T6_PRODUCT") in {"minecraft-paper", "collage-native-paper"}
+      else {"name": "rdte-compass-registry", "registry_image": "registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373", "product": "compass-exact-source-public-fixture", "scope": "guest-image-transport-only"}
+      if os.environ.get("R_RUNG") == "t6" and os.environ.get("R_T6_PRODUCT") == "model-compass"
       else {"name": "rdte-t6-litellm", "image": "ghcr.io/sempersupra/litellm-appliance@sha256:225c899db85865929f6099d3e1fe27097cafaed5af823fa397e75e1eb6ec51ac"}
       if os.environ.get("R_RUNG") == "t6"
       else {"name": "rdte-t4-probe", "image": "nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10"}
@@ -318,7 +331,8 @@ payload = {
     "compute_materialization_exercised": bool(os.environ.get("R_COMPUTE_RESULT")) and json.loads(os.environ["R_COMPUTE_RESULT"]).get("oracleSatisfied") is True,
     "apps_runtime_exercised": bool(os.environ.get("R_APP_RESULT")) and json.loads(os.environ["R_APP_RESULT"]).get("oracleSatisfied") is True,
     "app_lifecycle_exercised": bool(os.environ.get("R_LIFECYCLE_RESULT")) and json.loads(os.environ["R_LIFECYCLE_RESULT"]).get("oracleSatisfied") is True,
-    "foundry_materialization_exercised": bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
+    "foundry_materialization_exercised": os.environ.get("R_T6_PRODUCT") != "model-compass" and bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
+    "native_compass_image_transport_exercised": os.environ.get("R_T6_PRODUCT") == "model-compass" and bool(os.environ.get("R_FOUNDRY_RESULT")) and json.loads(os.environ["R_FOUNDRY_RESULT"]).get("oracleSatisfied") is True,
   },
   "rpc_discovery": json.loads(os.environ["R_RPC_DISCOVERY"]) if os.environ.get("R_RPC_DISCOVERY") else None,
   "install_result": json.loads(os.environ["R_INSTALL_RESULT"]) if os.environ.get("R_INSTALL_RESULT") else None,
@@ -342,6 +356,7 @@ payload = {
     "T4 initializes Apps on that pool and runs one synthetic public-safe custom Compose app.",
     "T5 exercises stop/start, config mutation/read-back, redeploy, stop, and delete for that digest-pinned custom app.",
     "T6 consumes one exact public TrueNAS App Foundry materialization control and verifies native Custom App realization/read-back.",
+    "Model-Compass T6 guest transport is a narrower native registry/app.image.pull probe and NEVER implies product F2-F6 application lifecycle.",
     "The first T6 control remains registry-tag mutable; T6 does not claim immutable upstream container-image identity.",
     "This does not qualify physical storage controllers, SMART, GPU, IPMI, or HA behavior.",
   ],
@@ -397,7 +412,10 @@ if [[ "$RUNG" == "t2" || "$RUNG" == "t3" || "$RUNG" == "t4" || "$RUNG" == "t5" |
       fail_evidence HARNESS_FAILURE preflight "missing TrueNAS T5 lifecycle client"
   fi
   if [[ "$RUNG" == "t6" ]]; then
-    if [[ "$T6_PRODUCT" == "official-catalog" ]]; then
+    if [[ "$T6_PRODUCT" == "model-compass" ]]; then
+      [[ -f "$SCRIPT_DIR/truenas_middleware_compass_guest_transport_probe.py" ]] || fail_evidence HARNESS_FAILURE preflight "missing Model Compass native guest transport probe"
+      command -v docker >/dev/null 2>&1 || fail_evidence ENVIRONMENT_FAILURE preflight "missing Docker on runner for source image staging"
+    elif [[ "$T6_PRODUCT" == "official-catalog" ]]; then
       [[ -f "$SCRIPT_DIR/truenas_middleware_official_catalog_t6_probe.py" ]] ||
         fail_evidence HARNESS_FAILURE preflight "missing TrueNAS T6 official-catalog control client"
     elif [[ "$T6_PRODUCT" == "garm-provider-g2" ]]; then
@@ -576,6 +594,11 @@ import socket
 s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()
 PY
 )"
+if [[ "$RUNG" == "t6" && "$T6_PRODUCT" == "model-compass" ]]; then
+  # Unique QEMU user-network forwarding: runner loopback -> isolated guest.
+  # No private LAN/host routing and no external OCI registry publication.
+  COMPASS_HOSTFWD=",hostfwd=tcp:127.0.0.1:15431-:15431"
+fi
 : >"$STATE_DIR/serial.log"
 sudo -n qemu-system-x86_64 \
   -enable-kvm -cpu host -smp "$VCPUS" -m "$RAM_MIB" \
@@ -708,6 +731,7 @@ FOLIORELAY_OBSERVER_HOST_PORT=""
 FOLIORELAY_HOSTFWD=""
 MINECRAFT_HOST_PORT=""
 MINECRAFT_HOSTFWD=""
+COMPASS_HOSTFWD=""
 if [[ "$RUNG" == "t6" && ( "$T6_PRODUCT" == "minecraft-paper" || "$T6_PRODUCT" == "collage-native-paper" || "$T6_PRODUCT" == "minecraft-vanilla-263" ) ]]; then
   MINECRAFT_HOST_PORT="$(python3 - <<'PY'
 import socket
@@ -750,7 +774,7 @@ sudo -n qemu-system-x86_64 \
   -device "virtio-blk-pci,drive=rdteboot,id=rdte-boot,addr=0x4,bootindex=1" \
   "${DATA_DRIVE_ARGS[@]}" \
   -boot strict=on \
-  -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$HTTP_PORT-:80,hostfwd=tcp:127.0.0.1:$HTTPS_PORT-:443${LITELLM_HOSTFWD}${GARM_HOSTFWD}${FOLIORELAY_HOSTFWD}${MINECRAFT_HOSTFWD}" \
+  -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$HTTP_PORT-:80,hostfwd=tcp:127.0.0.1:$HTTPS_PORT-:443${LITELLM_HOSTFWD}${GARM_HOSTFWD}${FOLIORELAY_HOSTFWD}${MINECRAFT_HOSTFWD}${COMPASS_HOSTFWD}" \
   -device "virtio-net-pci,netdev=net0,mac=$NIC_MAC,addr=0x3" \
   -display none -monitor none \
   -serial "file:$STATE_DIR/serial.log" \
@@ -1123,7 +1147,15 @@ if not isinstance(provider,dict) or provider.get("classification")!="SUPPORTED" 
 pathlib.Path(sys.argv[2]).write_text(json.dumps(provider,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 PY
 else
-if [[ "$T6_PRODUCT" == "official-catalog" ]]; then
+if [[ "$T6_PRODUCT" == "model-compass" ]]; then
+  python3 "$SCRIPT_DIR/truenas_middleware_compass_guest_transport_probe.py" \
+    --host 127.0.0.1 --port "$MIDDLEWARE_PORT" \
+    "${MIDDLEWARE_TLS_ARG[@]}" \
+    --password-file "$PASSWORD_FILE" \
+    --product-source-dir "$COMPASS_SOURCE_DIR" \
+    --plan-file "$COMPASS_PLAN_FILE" \
+    --out "$FOUNDRY_OUT" --timeout 8 --job-timeout 360 --state-timeout 240 >/dev/null 2>&1 || true
+elif [[ "$T6_PRODUCT" == "official-catalog" ]]; then
   python3 "$SCRIPT_DIR/truenas_middleware_official_catalog_t6_probe.py" \
     --host 127.0.0.1 --port "$MIDDLEWARE_PORT" \
     "${MIDDLEWARE_TLS_ARG[@]}" \
@@ -1303,7 +1335,9 @@ PY
 [[ "$FOUNDRY_OK" == "true" ]] ||
   fail_evidence ORACLE_FAILURE foundry-materialization "exact Foundry-exported $T6_PRODUCT control did not realize and verify on TrueNAS"
 
-if [[ "$T6_PRODUCT" == "official-catalog" ]]; then
+if [[ "$T6_PRODUCT" == "model-compass" ]]; then
+  write_receipt SUPPORTED true guest-image-transport "isolated exact TrueNAS 25.04.2.6 guest native registry app + hostfwd + immutable source-built Model Compass image pull/readback passed; registry app cleaned; product F2-F6 NOT_RUN"
+elif [[ "$T6_PRODUCT" == "official-catalog" ]]; then
   write_receipt SUPPORTED true foundry-materialization "exact Foundry-exported native catalog control passed observe/discover-plan-apply-verify convergence, stop/start, config update/read-back, redeploy, conditional native-upgrade receipt, retain-data delete/reinstall, NOOP convergence, and final cleanup"
 elif [[ "$T6_PRODUCT" == "garm-provider-g2" ]]; then
   write_receipt SUPPORTED true foundry-materialization "exact packaged GARM TrueNAS provider passed verified WSS/API-key transport, valid local adoption, foreign exclusion, managed-drift fail-closed behavior, fresh-process readoption, and zero-residue cleanup; provider create/delete and GitHub/JIT intentionally not exercised"
