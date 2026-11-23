@@ -311,9 +311,10 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
                 and not root.get("acl"), "dataset owner/perms/ACL not applied")
         events.append("F2_NATIVE_DATASET_PERMISSION_READBACK")
         # A pinned public fixture container seeds ONLY synthetic data as nonroot.
-        job(call("app.create", [{"app_name": SEED_APP, "custom_app": True,
-                                 "custom_compose_config": seed_compose()}]), "synthetic_seed_create")
-        seed_owned = True
+        seed_job = call("app.create", [{"app_name": SEED_APP, "custom_app": True,
+                                        "custom_compose_config": seed_compose()}])
+        seed_owned = True  # a submitted native job may fail after creating partial App state
+        job(seed_job, "synthetic_seed_create")
         wait_running(SEED_APP)
         until = time.monotonic() + state_timeout
         while time.monotonic() < until:
@@ -333,11 +334,23 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
         # Existing Foundry generic target planner owns all materialization choices.
         desired = {"app_name": APP, "materialization_identity": identity(current_compose)}
         p = lifecycle.target.plan(observed(None), desired, registry)
+        native["generic_create_plan"] = {
+            "status": p.get("status"),
+            "action": p.get("action"),
+            "blockers": p.get("blockers", [])[:8],
+            "missing_public_methods": p.get("missing_methods", []),
+            "profile_missing_methods": p.get("target", {}).get("missing_profile_methods", []),
+            "target_apply_qualified": p.get("target", {}).get("apply_qualified"),
+        }
         require(p["status"] == "READY" and p["action"] == "CREATE",
                 "Foundry generic materialization denied CREATE")
-        job(call("app.create", [{"app_name": APP, "custom_app": True,
-                                 "custom_compose_config": current_compose}]), "compass_create")
+        events.append("F3_GENERIC_CREATE_READY")
+        events.append("F3_NATIVE_COMPASS_CREATE_SUBMITTED")
+        create_job = call("app.create", [{"app_name": APP, "custom_app": True,
+                                         "custom_compose_config": current_compose}])
         app_owned = True
+        job(create_job, "compass_create")
+        events.append("F3_NATIVE_COMPASS_CREATE_JOB_SUCCESS")
         wait_running(APP)
         a = observed(current_compose)
         require(lifecycle.target.verify(a, desired, registry)["status"] == "VERIFIED",
@@ -403,9 +416,11 @@ def run(call, job, guest_ref: str, receipt: dict, *, state_timeout: int = 180) -
         create = lifecycle.target.plan(observed(None), desired, registry)
         require(create["status"] == "READY" and create["action"] == "CREATE",
                 "generic create plan rejected reinstall")
-        job(call("app.create", [{"app_name": APP, "custom_app": True,
-                                 "custom_compose_config": current_compose}]), "compass_reinstall")
+        events.append("F6_NATIVE_COMPASS_REINSTALL_SUBMITTED")
+        reinstall_job = call("app.create", [{"app_name": APP, "custom_app": True,
+                                            "custom_compose_config": current_compose}])
         app_owned = True
+        job(reinstall_job, "compass_reinstall")
         wait_running(APP)
         require(assert_api() == initial_hash, "retained ZFS snapshot changed on native reinstall")
         require(lifecycle.verify(
