@@ -1,0 +1,56 @@
+name: Model Compass native F2-F6 real Docker Compose config validation (no guest)
+on:
+  pull_request:
+    paths:
+      - 'tests/consumers/model_compass/truenas_native_compass_f2f6.py'
+      - '.github/workflows/compass-f2f6-compose.yml'
+permissions:
+  contents: read
+jobs:
+  native-compose-shape:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Render exact external ZFS production-security fixture and temporary seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,pathlib,os,json
+          root=pathlib.Path.cwd()
+          os.environ["FOUNDRY_SOURCE_ROOT"]=str(root)
+          sys.path.insert(0,str(root/'tests/consumers/model_compass'))
+          from truenas_native_compass_f2f6 import compose,seed_compose
+          d=pathlib.Path(sys.argv[1])
+          img="127.0.0.1:15431/compass-guest-fixture@sha256:"+"a"*64
+          for name,data in [('product',compose(img)),('seed',seed_compose())]:
+            (d/f'compass-{name}-compose.json').write_text(json.dumps(data))
+          print('PASS: deterministic synthetic runtime composition rendered')
+          PY
+      - name: Parse and normalize via real Docker Compose, reject invalid privileges
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in product seed;do
+            docker compose -f "$RUNNER_TEMP/compass-$name-compose.json" config --format json > "$RUNNER_TEMP/compass-$name-normalized.json"
+          done
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,json,pathlib
+          d=pathlib.Path(sys.argv[1])
+          a=json.loads((d/'compass-product-normalized.json').read_text())['services']['model-compass']
+          b=json.loads((d/'compass-seed-normalized.json').read_text())['services']['seed']
+          assert a['read_only'] is True and a['user']=='65532:65532'
+          assert a['cap_drop']==['ALL']
+          assert all(v['read_only'] for v in a['volumes'])
+          assert all(v['type']=='bind' for v in a['volumes'])
+          assert len(a['volumes'])==2
+          assert a['ports'][0]['published']=='18088'
+          assert b['read_only'] is True and b['user']=='65532:65532'
+          assert b['cap_drop']==['ALL']
+          assert len(b['volumes'])==1 and b['volumes'][0]['read_only'] is False
+          assert 'privileged' not in a and 'privileged' not in b
+          print('PASS: real Docker Compose source fixture normalized; F2-F6 native guest NOT_RUN')
+          PY
