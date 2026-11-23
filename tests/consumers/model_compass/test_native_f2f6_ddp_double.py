@@ -147,6 +147,26 @@ class NativeF2F6MockTests(unittest.TestCase):
         self.assertIn("app.start",backend.history)
         self.assertIn("app.update",backend.history)
 
+    def test_missing_true_runtime_method_blocks_foundry_before_app_create(self):
+        backend=NativeDouble()
+        backend.methods.remove("system.version")
+        receipt={"evidence":{}}
+        with self.assertRaises(f.NativeQualificationError):
+            f.run(
+                backend.call,backend.job,
+                "127.0.0.1:15431/compass-guest-fixture@sha256:"+"a"*64,
+                receipt,state_timeout=2,
+            )
+        self.assertEqual(receipt["native_product"]["generic_create_plan"]["status"],"BLOCKED")
+        self.assertIn(
+            "system.version",
+            receipt["native_product"]["generic_create_plan"]["profile_missing_methods"],
+        )
+        self.assertNotIn("compass_create",str(receipt.get("evidence")))
+        self.assertNotIn(f.APP,backend.apps)
+        self.assertFalse(backend.dataset,"bounded owned test dataset not cleaned after failed plan")
+        self.assertIn("CLEANUP_OWNED_ZFS_DATASET_ABSENT",receipt["native_product"]["events"])
+
     def test_foreign_app_denied_before_any_native_write(self):
         backend=NativeDouble()
         backend.apps[f.APP]={
