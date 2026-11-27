@@ -1,0 +1,26 @@
+name: Validate loopback-only Foundry Catalog read API
+on:
+  pull_request:
+    paths:
+      - 'tools/foundry_catalog_federation.py'
+      - 'tools/foundry_catalog_read_http.py'
+      - 'tests/test_foundry_catalog_read_http.py'
+      - '.github/workflows/validate-foundry-catalog-read-http.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundry-catalog-read-http-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  loopback-read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile read-only gateway
+        run: python3 -m py_compile tools/foundry_catalog_federation.py tools/foundry_catalog_read_http.py
+      - name: Run bearer/method/collision/http contract tests
+        run: python3 -m unittest discover -s tests -p 'test_foundry_catalog_read_http.py' -v
