@@ -77,11 +77,13 @@ def validate_resource(item:Any)->dict[str,Any]:
     p=Path(path)
     # Normalize nothing silently: dot segments, duplicate separators and
     # traversal must not be accepted by a declarative host-resource authority.
-    if (not p.is_absolute() or len(p.parts)<3 or p.parts[0]!="/"
+    # Preserve current main's /mnt/<dataset>/<resource> minimum depth and
+    # normalization check while retaining CP3's stricter raw-input refusals.
+    if (not p.is_absolute() or len(p.parts)<4 or p.parts[0]!="/"
         or p.parts[1]!="mnt" or ".." in path.split("/")
-        or str(p)!=path or "\\" in path
+        or str(p)!=path or path!=os.path.normpath(path) or "\\" in path
         or any(ord(ch)<32 or ord(ch)==127 for ch in path)):
-        raise BindingError("host resource path must be canonical beneath /mnt")
+        raise BindingError("host resource path must be canonical beneath /mnt/<dataset>")
     kind=item.get("kind")
     if kind not in {"directory","file"}: raise BindingError("host resource kind must be directory|file")
     uid=item.get("uid"); gid=item.get("gid")
