@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'candidates/generative-stage1/upstream/**'
+      - 'candidates/generative-stage1/lifecycle/**'
       - '.github/workflows/qualify-generative-upstream-v1.yml'
   workflow_dispatch:
 
@@ -87,3 +88,6 @@ jobs:
             sleep 3
           done
           exit 1
+
+      - name: Qualify actual ComfyUI durable state and disposable runtime replacement
+        run: python3 candidates/generative-stage1/lifecycle/qualify_comfyui_state.py --image foundry-comfyui-upstream-cpu:probe
