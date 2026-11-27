@@ -1,0 +1,27 @@
+# Stage-1 public source proposal ONLY; not a production-ready TrueNAS app.
+# Supply an independently reviewed immutable image digest for config inspection.
+services:
+  app:
+    image: ${APP_IMAGE:?set reviewed immutable image digest}
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    ports:
+      - "127.0.0.1:${HOST_PORT:-7801}:7801"
+    tmpfs:
+      - "/tmp:rw,noexec,nosuid,size=256m"
+    volumes:
+      - type: volume
+        source: models
+        target: /SwarmUI/Models
+        read_only: true
+      - type: volume
+        source: outputs
+        target: /SwarmUI/Output
+volumes:
+  models: {}
+  outputs: {}

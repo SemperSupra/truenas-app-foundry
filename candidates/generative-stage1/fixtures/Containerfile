@@ -1,0 +1,7 @@
+# Public synthetic CPU boot fixture, not one of the candidate applications.
+FROM python:3.12-alpine
+WORKDIR /srv
+COPY server.py /srv/server.py
+USER 10001:10001
+EXPOSE 8188
+CMD ["python3", "/srv/server.py"]
