@@ -4,7 +4,18 @@ on:
     paths:
       - 'tests/test_foundry_catalog_bootstrap_rehearsal.py'
       - 'tools/bind_truenas_site.py'
+      - 'tools/test_bind_truenas_site.py'
       - 'tools/package_truenas_deployment_artifact.py'
+      - '.github/workflows/validate-foundry-catalog-bootstrap-reuse.yml'
+  # Exact public source-review branch only: conflict blocks PR merge-ref CI.
+  # Remove this temporary push qualification lane before release integration.
+  push:
+    branches:
+      - feature/foundry-catalog-bootstrap-reuse-20261014
+    paths:
+      - 'tests/test_foundry_catalog_bootstrap_rehearsal.py'
+      - 'tools/bind_truenas_site.py'
+      - 'tools/test_bind_truenas_site.py'
       - '.github/workflows/validate-foundry-catalog-bootstrap-reuse.yml'
   workflow_dispatch:
 permissions:
