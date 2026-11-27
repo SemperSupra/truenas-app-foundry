@@ -1,0 +1,59 @@
+name: Qualify native SearXNG private ingress source render
+on:
+  pull_request:
+    paths:
+      - 'tools/qualify_searxng_native_ingress.py'
+      - '.github/workflows/qualify-searxng-native-ingress.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: searxng-source-render-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-render:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out Foundry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check out pinned upstream catalog
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: truenas/apps
+          ref: 77058ecb5b28199f35150912cacb13283a6fb244
+          path: upstream
+          persist-credentials: false
+      - name: Verify source identities and derive minimal fixtures
+        run: |
+          set -euo pipefail
+          root="trains/community/searxng/1.4.143"
+          test "$(git -C upstream rev-parse HEAD)" = 77058ecb5b28199f35150912cacb13283a6fb244
+          test "$(git -C upstream hash-object "$root/questions.yaml")" = d2f610872e7d7e9cc039b86d0cde23d99a1ba7e9
+          test "$(git -C upstream hash-object "$root/templates/docker-compose.yaml")" = 14ec9eb30df37a6afa6a2f0eb0b3d3f17039fc83
+          test "$(git -C upstream hash-object "$root/ix_values.yaml")" = cf903c69c25b279296ac18ccc0b9da47a3797b29
+          test "$(git -C upstream hash-object "$root/templates/test_values/basic-values.yaml")" = 25c203a72bb596c8d9351a2bb1f31cf1aaa084ad
+          rm -rf upstream/ix-dev/community/searxng
+          cp -a "upstream/$root" upstream/ix-dev/community/searxng
+          python3 -m venv "$RUNNER_TEMP/searxng-render"
+          "$RUNNER_TEMP/searxng-render/bin/python" -m pip install --disable-pip-version-check 'PyYAML==6.0.2'
+          "$RUNNER_TEMP/searxng-render/bin/python" tools/qualify_searxng_native_ingress.py prepare upstream/ix-dev/community/searxng/templates/test_values
+      - name: Run exact catalog renderer and negative default baseline
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          py="$RUNNER_TEMP/searxng-render/bin/python"
+          for pair in "basic-values:default" "foundry-exposed:exposed" "foundry-loopback:loopback"; do
+            fixture="${pair%:*}"
+            mode="${pair#*:}"
+            "$py" .github/scripts/ci.py --app searxng --train community --test-file "$fixture.yaml" --render-only=True --skip-metadata
+            compose=ix-dev/community/searxng/templates/rendered/docker-compose.yaml
+            docker compose -f "$compose" config --quiet
+            "$py" ../tools/qualify_searxng_native_ingress.py "$mode" "$compose"
+          done
+      - name: Scope qualification
+        if: always()
+        run: echo 'Source-only pinned catalog rendering, no native App deployment, external query, site data, VPN or physical TrueNAS apply.' >> "$GITHUB_STEP_SUMMARY"
