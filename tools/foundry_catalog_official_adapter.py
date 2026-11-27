@@ -85,6 +85,11 @@ def project(pin: dict[str, Any], checkout: Path, apps: list[str]) -> dict[str, A
         raise OfficialCatalogError("app selection must be a bounded unique set")
     if not all(isinstance(app, str) and APP_NAME.fullmatch(app) for app in apps):
         raise OfficialCatalogError("invalid official app name")
+    # Bind the declared official publisher to the checkout's actual remote,
+    # not only a copied Git commit object or operator-supplied directory.
+    origin = git(checkout, "remote", "get-url", "origin").removesuffix(".git")
+    if origin != pin["repository"].removesuffix(".git"):
+        raise OfficialCatalogError("official Git checkout origin mismatches source authority")
     paths = [f"ix-dev/{train}/{app}" for app in apps]
     verify_checkout(checkout, revision, paths)
     results: list[dict[str, Any]] = []
