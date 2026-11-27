@@ -55,6 +55,7 @@ class Tests(unittest.TestCase):
     for attack in (
       "/mnt/tank/../../etc/shadow",
       "/mnt/tank/../other",
+      "/mnt/tank",
       "/mnt/tank//apps/probe",
       "/mnt/tank/./apps/probe",
       "/mnt/tank/apps/probe/",
