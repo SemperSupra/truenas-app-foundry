@@ -1,0 +1,34 @@
+{
+  "schema": "foundry.public-upstream-source-probe.v1",
+  "purpose": "Source identity only; not a release lock, image approval, or native TrueNAS qualification.",
+  "apps": [
+    {
+      "name": "comfyui-app",
+      "repository": "Comfy-Org/ComfyUI",
+      "tag": "v0.46.0",
+      "sha": "a277b5bf213e8a44fa34817b7770b54f86ef4cea",
+      "probe": "cpu-oci-http-boot"
+    },
+    {
+      "name": "swarmui-app",
+      "repository": "mcmonkeyprojects/SwarmUI",
+      "tag": "0.9.8-Beta",
+      "sha": "ec823c3f750ce9b5103e623f3ad9918d02b8ddde",
+      "probe": "source-identity-only"
+    },
+    {
+      "name": "invokeai-app",
+      "repository": "invoke-ai/InvokeAI",
+      "tag": "v6.14.4",
+      "sha": "95785064801f7eaf2c3cdb3afa9710c0328a38ef",
+      "probe": "source-identity-only"
+    },
+    {
+      "name": "ace-step-app",
+      "repository": "ace-step/ACE-Step-1.5",
+      "tag": "v0.1.8",
+      "sha": "dce621408bee8c31b4fcf4811682eb9359e1bc94",
+      "probe": "source-identity-only"
+    }
+  ]
+}

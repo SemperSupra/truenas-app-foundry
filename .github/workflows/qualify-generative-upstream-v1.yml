@@ -1,0 +1,89 @@
+name: qualify public generative upstream source and CPU probe
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/generative-stage1/upstream/**'
+      - '.github/workflows/qualify-generative-upstream-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [comfyui-app, swarmui-app, invokeai-app, ace-step-app]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify public upstream exact commit and release tag
+        env:
+          APP: ${{ matrix.app }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$APP" <<'PY'
+          import json, pathlib, re, subprocess, sys, tempfile
+          pins=json.loads(pathlib.Path("candidates/generative-stage1/upstream/source-probes.json").read_text())
+          assert pins["schema"]=="foundry.public-upstream-source-probe.v1"
+          rec=next(x for x in pins["apps"] if x["name"]==sys.argv[1])
+          assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",rec["repository"])
+          assert re.fullmatch(r"[0-9a-f]{40}",rec["sha"])
+          assert re.fullmatch(r"[A-Za-z0-9_.-]+",rec["tag"])
+          with tempfile.TemporaryDirectory() as temp:
+              def git(*args):
+                  return subprocess.check_output(["git","-C",temp,*args],text=True).strip()
+              git("init","-q")
+              git("remote","add","origin","https://github.com/"+rec["repository"]+".git")
+              git("fetch","--depth=1","--no-tags","origin","refs/tags/"+rec["tag"])
+              sha=git("rev-parse","FETCH_HEAD^{commit}")
+              assert sha==rec["sha"], (rec["name"],sha,rec["sha"])
+              tree=git("ls-tree","--name-only",sha)
+              license_paths=[p for p in tree.splitlines() if p.lower().startswith(("license","copying"))]
+              print(json.dumps({"app":rec["name"],"tag":rec["tag"],"source_sha":sha,"license_paths":license_paths,"claim":"source-identity-only"},sort_keys=True))
+          PY
+  comfyui-cpu-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Acquire exact public ComfyUI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/comfy-src"
+          git init -q "$source_dir"
+          git -C "$source_dir" remote add origin https://github.com/Comfy-Org/ComfyUI.git
+          git -C "$source_dir" fetch --depth=1 --no-tags origin a277b5bf213e8a44fa34817b7770b54f86ef4cea
+          git -C "$source_dir" checkout --detach FETCH_HEAD
+          test "$(git -C "$source_dir" rev-parse HEAD)" = a277b5bf213e8a44fa34817b7770b54f86ef4cea
+          rm -rf "$source_dir/.git"
+      - name: Build actual upstream ComfyUI CPU image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --file candidates/generative-stage1/upstream/ComfyUI.cpu.Containerfile --tag foundry-comfyui-upstream-cpu:probe "$RUNNER_TEMP/comfy-src"
+          docker image inspect --format '{{.Id}}' foundry-comfyui-upstream-cpu:probe
+      - name: Boot actual application without external networking or models
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name comfyui-cpu-probe --network none --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 5g foundry-comfyui-upstream-cpu:probe
+          trap 'docker logs comfyui-cpu-probe 2>&1 | tail -n 100 || true; docker rm -f comfyui-cpu-probe >/dev/null 2>&1 || true' EXIT
+          for n in $(seq 1 60); do
+            if docker exec comfyui-cpu-probe python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8188/system_stats",timeout=2)); assert d["devices"] and d["devices"][0]["type"]=="cpu"; print(json.dumps({"source":"a277b5bf213e8a44fa34817b7770b54f86ef4cea","device":d["devices"][0]["type"],"claim":"actual-upstream-cpu-http-boot"}))'; then
+              docker exec comfyui-cpu-probe python -m pip freeze
+              exit 0
+            fi
+            test "$(docker inspect --format '{{.State.Running}}' comfyui-cpu-probe)" = true || exit 1
+            sleep 3
+          done
+          exit 1
