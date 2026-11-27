@@ -62,6 +62,29 @@ class NativeComputeTests(unittest.TestCase):
         p["profiles"]["truenas-native-vm"]["operations"]["ENSURE_RUNNING"] = "app.start"
         self.assertEqual(self.check(profile=p, methods=VM + ["app.start"])["status"], "BLOCKED")
 
+    def test_unregistered_source_identity_and_shape_block(self):
+        for mutation in ("middleware", "blob", "notes", "malformed-family", "extra"):
+            with self.subTest(mutation=mutation):
+                p = copy.deepcopy(PROFILE)
+                if mutation == "middleware":
+                    p["middleware"]["commit"] = "0" * 40
+                elif mutation == "blob":
+                    p["profiles"]["truenas-native-vm"]["sources"][0]["blob"] = "0" * 40
+                elif mutation == "notes":
+                    p["profiles"]["truenas-native-vm"]["source_notes"] = []
+                elif mutation == "malformed-family":
+                    p["profiles"] = None
+                else:
+                    p["extra"] = True
+                r = self.check(profile=p)
+                self.assertEqual(r["status"], "BLOCKED")
+                self.assertIn("SOURCE_PROFILE_DRIFT", r["blockers"])
+                self.assertFalse(r["apply_authorized"])
+
+    def test_profile_key_order_is_not_drift(self):
+        p = dict(reversed(list(PROFILE.items())))
+        self.assertEqual(self.check(profile=p), self.check())
+
     def test_observation_must_be_explicit(self):
         with self.assertRaises(WorkloadContractError):
             self.check(methods="vm.query")
