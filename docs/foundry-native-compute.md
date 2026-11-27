@@ -1,0 +1,5 @@
+# Native compute source-family inspection
+
+Pinned 25.10.7 upstream middleware source: 8ede398839710e56893d88ce85088139d8fab18e. This is a non-actuating contract inspection, not a VM or container planner/executor. It reports whether a small semantic operation vocabulary has a matching observed native API family and required discovery methods. It never produces native call arguments, changes resources, or approves apply. Method presence does not prove operational success. Exact version and native family cannot be inferred across releases.
+
+VM and legacy system-container lifecycles have materially different schemas. The source profile keeps these separate. Native VM delete has explicit zvols/force flags, while legacy instance delete takes only an identifier and may force-stop before removing the instance. Legacy retain-data delete remains blocked. VM deletion is source-compatible only, still requires separate durable storage evidence before any execution. Existing Apps v2 is untouched; later native materialization reuses existing compute adapters. Future versions and native container.* need their own pinned source and runtime evidence.

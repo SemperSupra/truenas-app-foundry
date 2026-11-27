@@ -1,0 +1,82 @@
+{
+  "schema": "foundry-native-compute-source-contract/v1",
+  "version": "25.10.7",
+  "middleware": {
+    "repository": "truenas/middleware",
+    "commit": "8ede398839710e56893d88ce85088139d8fab18e"
+  },
+  "qualification": "SOURCE_ONLY",
+  "runtime_qualified": false,
+  "apply_authorized": false,
+  "profiles": {
+    "truenas-native-vm": {
+      "kind": "vm",
+      "namespace": "vm",
+      "id_type": "positive_integer",
+      "state_field": "status.state",
+      "sources": [
+        {
+          "path": "src/middlewared/middlewared/api/v25_10_0/vm.py",
+          "blob": "2dad2a7e851d354bc9d6e1d201781b2809e77894"
+        },
+        {
+          "path": "src/middlewared/middlewared/plugins/vm/vm_lifecycle.py",
+          "blob": "85c5049c8c90572746ea1acf0a357a88afc88cb5"
+        },
+        {
+          "path": "src/middlewared/middlewared/plugins/vm/vm_devices.py",
+          "blob": "7d9b0098692190015fc178d25d8483927b90d757"
+        }
+      ],
+      "discovery": [
+        "vm.query",
+        "vm.device.nic_attach_choices"
+      ],
+      "operations": {
+        "ENSURE_RUNNING": "vm.start",
+        "ENSURE_STOPPED": "vm.stop",
+        "RESTART": "vm.restart",
+        "ENSURE_ABSENT": "vm.delete"
+      },
+      "source_notes": [
+        "VM state is a string, not an exhaustive closed enum; unknown and transitional values must block.",
+        "Start exposes overcommit; stop exposes force and force_after_timeout; no implicit forced shutdown.",
+        "Delete exposes zvols and force options; retained-data deletion requires independent disk ownership and retention proof before any future apply."
+      ]
+    },
+    "truenas-legacy-container": {
+      "kind": "system-container",
+      "namespace": "virt.instance",
+      "id_type": "nonempty_string",
+      "state_field": "status",
+      "sources": [
+        {
+          "path": "src/middlewared/middlewared/api/v25_10_0/virt_instance.py",
+          "blob": "5a97786a1522de7fb6e84b516127b01b8fd439df"
+        },
+        {
+          "path": "src/middlewared/middlewared/plugins/virt/instance.py",
+          "blob": "8f3f21996b4d14385ba17405676704cb9b921bea"
+        },
+        {
+          "path": "src/middlewared/middlewared/api/v25_10_0/virt_global.py",
+          "blob": "a52edd8fb6a7ea45a22992a3ea1a64c1e7d16bc5"
+        }
+      ],
+      "discovery": [
+        "virt.instance.query",
+        "virt.global.bridge_choices"
+      ],
+      "operations": {
+        "ENSURE_RUNNING": "virt.instance.start",
+        "ENSURE_STOPPED": "virt.instance.stop",
+        "RESTART": "virt.instance.restart"
+      },
+      "source_notes": [
+        "Create instance_type restricted to CONTAINER in pinned schema.",
+        "Graceful stop requires explicit timeout; restart shares stop schema.",
+        "Delete accepts only ID and implementation may force-stop then delete instance; do not claim retain-data semantics. Deletion unsupported in this initial contract."
+      ]
+    }
+  }
+}
