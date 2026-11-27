@@ -2,6 +2,9 @@ name: Validate typed Foundry workload artifact identity
 on:
   pull_request:
     paths:
+      - .foundry/native-compute/**
+      - tools/foundry_native_compute.py
+      - tools/test_foundry_native_compute.py
       - tools/foundry_workload_artifact.py
       - tools/test_foundry_workload_artifact.py
       - docs/foundry-workload-artifact.md
@@ -18,4 +21,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Exercise offline typed identity and existing lifecycle contracts
-        run: python3 -m unittest -v tools/test_foundry_workload_artifact.py tools/test_foundry_lifecycle.py
+        run: python3 -m unittest -v tools/test_foundry_workload_artifact.py tools/test_foundry_native_compute.py tools/test_foundry_lifecycle.py
