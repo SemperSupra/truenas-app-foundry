@@ -91,3 +91,6 @@ jobs:
 
       - name: Qualify actual ComfyUI durable state and disposable runtime replacement
         run: python3 candidates/generative-stage1/lifecycle/qualify_comfyui_state.py --image foundry-comfyui-upstream-cpu:probe
+
+      - name: Qualify two actual ComfyUI workers sharing a readonly model projection
+        run: python3 candidates/generative-stage1/lifecycle/qualify_comfyui_shared_assets.py --image foundry-comfyui-upstream-cpu:probe

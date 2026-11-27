@@ -86,7 +86,7 @@ def healthy(name):
     raise RuntimeError("actual application did not reach CPU HTTP readiness")
 
 
-def run_app(name, owner, image, volumes):
+def run_app(name, owner, image, volumes, extra_args=()):
     assert not container_exists(name)
     args = ["run", "-d", "--name", name, "--label", f"{LABEL}={owner}",
             "--network", "none", "--pull", "never", "--read-only",
@@ -105,6 +105,7 @@ def run_app(name, owner, image, volumes):
              "--input-directory", BASE + "/input", "--output-directory", BASE + "/output",
              "--models-directory", BASE + "/models", "--temp-directory", "/tmp",
              "--previews-directory", "/tmp/previews"]
+    args.extend(extra_args)
     docker(*args)
     healthy(name)
     return verify_runtime(name, owner, image, volumes)
