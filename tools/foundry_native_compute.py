@@ -1,11 +1,17 @@
 """Offline exact-family source contract inspection. No native calls or plans."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from tools.foundry_workload_artifact import WorkloadContractError, canonical_digest
 
 VERSION = "25.10.7"
+# Trust the reviewed registry in this exact Foundry checkout, not a caller-supplied
+# profile with plausible method names. This still is not runtime attestation.
+PROFILE_PATH = Path(__file__).resolve().parents[1] / ".foundry/native-compute/25.10.7-source.json"
+REGISTERED_PROFILE_SHA256 = canonical_digest(json.loads(PROFILE_PATH.read_text(encoding="utf-8")))
 FAMILIES = {
     "truenas-native-vm": ("vm", {"vm.query", "vm.device.nic_attach_choices"}),
     "truenas-legacy-container": ("system-container", {"virt.instance.query", "virt.global.bridge_choices"}),
@@ -22,6 +28,16 @@ def inspect_native(profile: dict[str, Any], *, adapter: str, version: str,
         raise WorkloadContractError("invalid adapter or operation")
     if not isinstance(observed_methods, list) or not all(isinstance(x, str) and x for x in observed_methods):
         raise WorkloadContractError("explicit observed methods required")
+    try:
+        supplied_identity = canonical_digest(profile)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise WorkloadContractError("profile is not canonical JSON") from exc
+    if supplied_identity != REGISTERED_PROFILE_SHA256:
+        return {"schema": "foundry-native-compute-inspection/v1",
+                "status": "BLOCKED", "blockers": ["SOURCE_PROFILE_DRIFT"],
+                "profile_sha256": supplied_identity,
+                "apply_authorized": False, "runtime_qualified": False,
+                "ownership_verified": False, "storage_delete_authorized": False}
     blockers = []
     if version != VERSION or profile.get("version") != VERSION:
         blockers.append("EXACT_VERSION_UNSUPPORTED")
@@ -51,6 +67,6 @@ def inspect_native(profile: dict[str, Any], *, adapter: str, version: str,
         blockers.append("SOURCE_CONTRACT_AUTHORITY_INVALID")
     return {"schema":"foundry-native-compute-inspection/v1",
             "status":"BLOCKED" if blockers else "SOURCE_COMPATIBLE_ONLY",
-            "blockers":blockers, "profile_sha256":canonical_digest(profile),
+            "blockers":blockers, "profile_sha256":supplied_identity,
             "apply_authorized":False, "runtime_qualified":False,
             "ownership_verified":False, "storage_delete_authorized":False}
