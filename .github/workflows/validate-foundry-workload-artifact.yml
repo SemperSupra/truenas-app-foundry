@@ -5,6 +5,7 @@ on:
       - .foundry/native-compute/**
       - tools/foundry_retained_state.py
       - tools/test_foundry_retained_state.py
+      - tools/test_foundry_retained_state_filesystem.py
       - docs/foundry-retained-state.md
       - tools/foundry_native_compute.py
       - tools/test_foundry_native_compute.py
@@ -24,4 +25,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Exercise offline typed identity and existing lifecycle contracts
-        run: python3 -m unittest -v tools/test_foundry_workload_artifact.py tools/test_foundry_native_compute.py tools/test_foundry_retained_state.py tools/test_foundry_lifecycle.py
+        run: python3 -m unittest -v tools/test_foundry_workload_artifact.py tools/test_foundry_native_compute.py tools/test_foundry_retained_state.py tools/test_foundry_retained_state_filesystem.py tools/test_foundry_lifecycle.py
