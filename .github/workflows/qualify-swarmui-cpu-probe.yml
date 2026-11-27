@@ -1,0 +1,47 @@
+name: qualify actual upstream SwarmUI CPU frontend
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/generative-stage1/swarmui-probe/**'
+      - '.github/workflows/qualify-swarmui-cpu-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swarmui-cpu-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch exact public source and build frontend OCI probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/swarm-src"
+          git init -q "$src"
+          git -C "$src" remote add origin https://github.com/mcmonkeyprojects/SwarmUI.git
+          git -C "$src" fetch --depth=1 --no-tags origin ec823c3f750ce9b5103e623f3ad9918d02b8ddde
+          git -C "$src" checkout --detach FETCH_HEAD
+          test "$(git -C "$src" rev-parse HEAD)" = ec823c3f750ce9b5103e623f3ad9918d02b8ddde
+          docker build -f candidates/generative-stage1/swarmui-probe/Containerfile -t foundry-swarmui-cpu:probe "$src"
+          docker image inspect --format '{{.Id}}' foundry-swarmui-cpu:probe
+      - name: Boot isolated actual frontend and check installation UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name foundry-swarm-cpu --network none --cap-drop ALL --security-opt no-new-privileges --memory 5g --pids-limit 256 foundry-swarmui-cpu:probe
+          trap 'docker logs foundry-swarm-cpu 2>&1 | tail -n 80 || true; docker rm -f foundry-swarm-cpu >/dev/null 2>&1 || true' EXIT
+          for n in $(seq 1 50); do
+            if docker exec foundry-swarm-cpu sh -c 'curl -fsSL --max-time 4 http://127.0.0.1:7801/Install | grep -qi swarmui'; then
+              echo 'PASS actual SwarmUI frontend /Install; no backend setup, model download or inference'
+              exit 0
+            fi
+            test "$(docker inspect --format '{{.State.Running}}' foundry-swarm-cpu)" = true || exit 1
+            sleep 3
+          done
+          exit 1

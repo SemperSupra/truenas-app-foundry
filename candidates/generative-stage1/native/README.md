@@ -1,0 +1,3 @@
+# Native iX source-render probes (not deployment candidates)
+
+Four source-render-only application shapes use the Foundry's existing public TrueNAS Apps materialization pin and iX library. The pinned public Python image is a fixture, not an upstream application image; the fixed failing entrypoint prevents accidental functional deployment. The renderer checks actual iX templates and normalizes Compose without creating or running an app. Synthetic ixVolume bindings under /opt/tests/mnt are not real host settings. Native schema ingestion and actual application/runtime/profile acceptance remain separate.

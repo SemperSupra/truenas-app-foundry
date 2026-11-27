@@ -1,0 +1,13 @@
+{# Public render-only fixture: inert image and explicitly failing entrypoint. #}
+{% set tpl = ix_lib.base.render.Render(values) %}
+{% set c = tpl.add_container(values.consts.container_name, "image") %}
+{% do c.set_user(10001, 10001) %}
+{% do c.set_read_only(true) %}
+{% do c.set_init(true) %}
+{% do c.healthcheck.disable() %}
+{% do c.set_entrypoint(["/bin/false"]) %}
+{% do c.add_storage(values.consts.models_path, {"type": "ix_volume", "read_only": true, "ix_volume_config": values.storage.models.ix_volume_config}) %}
+{% do c.add_storage(values.consts.outputs_path, {"type": "ix_volume", "ix_volume_config": values.storage.outputs.ix_volume_config}) %}
+{% do c.add_storage("/tmp", {"type": "tmpfs", "tmpfs_config": {"size": 64, "mode": "0700", "uid": 10001, "gid": 10001}}) %}
+{% do c.add_port({"bind_mode": "published", "port_number": values.consts.port, "host_ips": ["127.0.0.1"]}) %}
+{{ tpl.render() | tojson }}

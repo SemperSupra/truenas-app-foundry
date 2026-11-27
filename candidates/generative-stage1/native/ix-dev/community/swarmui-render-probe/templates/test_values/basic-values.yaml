@@ -1,0 +1,22 @@
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
+ix_volumes:
+  swarmui-render-probe-models: /opt/tests/mnt/swarmui-render-probe/models
+  swarmui-render-probe-outputs: /opt/tests/mnt/swarmui-render-probe/outputs
+storage:
+  models:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: swarmui-render-probe-models
+      acl_enable: false
+      auto_permissions: false
+      create_host_path: true
+  outputs:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: swarmui-render-probe-outputs
+      acl_enable: false
+      auto_permissions: false
+      create_host_path: true
