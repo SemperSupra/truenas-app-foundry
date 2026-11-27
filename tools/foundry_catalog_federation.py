@@ -231,6 +231,20 @@ def query(
     raise CatalogIdentityError("unsupported read-only catalog operation")
 
 
+def load_catalogs(paths: list[Path]) -> list[dict[str, Any]]:
+    """One bounded, duplicate-key-rejecting reader shared by CLI and HTTP."""
+    if not isinstance(paths, list) or not paths or len(paths) > MAX_CATALOG_SOURCES:
+        raise CatalogIdentityError("catalog source file list must be bounded and nonempty")
+    indexes = []
+    for path in paths:
+        with path.open("rb") as handle:
+            payload = handle.read(MAX_INDEX_BYTES + 1)
+        if len(payload) > MAX_INDEX_BYTES:
+            raise CatalogIdentityError("source index exceeds size limit")
+        indexes.append(json.loads(payload.decode("utf-8"), object_pairs_hook=_no_duplicate_json_keys))
+    return federate(indexes)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="+", help="local pinned index JSON")
@@ -241,14 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--digest")
     args = parser.parse_args(argv)
     try:
-        indexes = []
-        for path in args.source:
-            with path.open("rb") as handle:
-                payload = handle.read(MAX_INDEX_BYTES + 1)
-            if len(payload) > MAX_INDEX_BYTES:
-                raise CatalogIdentityError("source index exceeds size limit")
-            indexes.append(json.loads(payload.decode("utf-8"), object_pairs_hook=_no_duplicate_json_keys))
-        rows = federate(indexes)
+        rows = load_catalogs(args.source)
         result = query(rows, args.operation, package_id=args.package_id,
                        version=args.version, revision=args.revision, digest=args.digest)
     except (CatalogIdentityError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
