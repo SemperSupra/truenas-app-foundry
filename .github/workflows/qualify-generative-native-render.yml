@@ -26,7 +26,7 @@ jobs:
       - name: Render exact pinned iX library source and assert normalized Compose
         env:
           APP: ${{ matrix.app }}
-        run: python3 tools/validate_generative_native_render.py --app "$APP"
+        run: python3 tools/validate_generative_native_render.py --app "$APP" --ci-reclaim-generated-ownership
       - name: Record actual public renderer image identity
         if: always()
-        run: docker image inspect --format '{{json .RepoDigests}}' ghcr.io/truenas/apps_validation:latest
+        run: docker image inspect --format '{{json .RepoDigests}}' ghcr.io/truenas/apps_validation@sha256:92fa1b88da88c30fbacc7dcbbea68e7bfc63c5924ae6d1018ed620b92d0a6058
