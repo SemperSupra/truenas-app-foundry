@@ -62,7 +62,7 @@ def main():
             if volume == shared:
                 # A valid tiny safetensors container, distinct contents per category;
                 # deliberately not valid weights for any generative architecture.
-                source = payload + "\n" + r'''
+                source = "import os; assert not os.listdir('/seed')\n" + r'''
 from pathlib import Path
 import json, struct
 for i, category in enumerate(CATEGORIES):
@@ -72,17 +72,17 @@ for i, category in enumerate(CATEGORIES):
     header += b" " * ((-len(header)) % 8)
     path.write_bytes(struct.pack("<Q",len(header)) + header + struct.pack("<f",float(i)))
     path.chmod(0o444)
+p = Path('/seed/extra_model_paths.yaml')
+p.write_text(CONFIG, encoding='utf-8')
+p.chmod(0o444)
+os.chmod('/seed', 0o555)
 '''
-                seed(image, volume, "CATEGORIES=" + repr(CATEGORIES) + "\n" + source)
-            elif volume.endswith("-user"):
-                source = payload + "\nfrom pathlib import Path\n"
-                source += "p=Path('/seed/extra_model_paths.yaml'); p.write_text(" + repr(config) + "); p.chmod(0o444)\n"
-                seed(image, volume, source)
+                seed(image, volume, "CATEGORIES=" + repr(CATEGORIES) + "\nCONFIG=" + repr(config) + "\n" + source)
             else:
                 seed(image, volume, payload)
         for name, binding in zip(names, bindings):
             ids.append(run_app(name, owner, image, binding, extra_args=(
-                "--extra-model-paths-config", BASE + "/user/extra_model_paths.yaml")))
+                "--extra-model-paths-config", BASE + "/models/extra_model_paths.yaml")))
         receipt("apply", runtime_count=2, shared_model_volume=True)
         scan = HTTP_SETUP + "\nimport hashlib\n"
         scan += "categories=" + repr(CATEGORIES) + "\n"
