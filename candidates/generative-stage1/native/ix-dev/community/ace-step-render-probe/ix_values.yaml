@@ -1,0 +1,9 @@
+images:
+  image:
+    repository: python@sha256
+    tag: f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+consts:
+  container_name: ace-step-render-probe
+  models_path: /app/checkpoints
+  outputs_path: /app/gradio_outputs
+  port: 7860

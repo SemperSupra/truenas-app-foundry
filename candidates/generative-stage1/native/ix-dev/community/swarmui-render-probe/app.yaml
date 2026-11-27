@@ -1,0 +1,30 @@
+app_version: '0.9.8-Beta'
+capabilities: []
+categories:
+- productivity
+changelog_url: https://github.com/mcmonkeyprojects/SwarmUI/releases
+date_added: '2026-11-27'
+description: Public source-render fixture for SwarmUI; intentionally not deployable.
+home: https://github.com/mcmonkeyprojects/SwarmUI
+host_mounts: []
+icon: https://raw.githubusercontent.com/github/explore/main/topics/python/python.png
+keywords:
+- render-probe
+lib_version: 2.3.4
+lib_version_hash: 2e3a8847308fb2eb0da046018f287c73822c094b5950a10377c3235794ff1242
+maintainers:
+- name: SemperSupra
+  url: https://github.com/SemperSupra
+name: swarmui-render-probe
+run_as_context:
+- description: Synthetic source-render identity; actual upstream user is unqualified.
+  uid: 10001
+  gid: 10001
+  user_name: probe
+  group_name: probe
+screenshots: []
+sources:
+- https://github.com/mcmonkeyprojects/SwarmUI
+title: SwarmUI Render Probe
+train: community
+version: 0.0.1

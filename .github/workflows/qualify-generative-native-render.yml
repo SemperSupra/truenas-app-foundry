@@ -1,0 +1,32 @@
+name: qualify generative native iX source-render probes
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/generative-stage1/native/**'
+      - 'tools/validate_generative_native_render.py'
+      - '.github/workflows/qualify-generative-native-render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-source-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [comfyui-render-probe, swarmui-render-probe, invokeai-render-probe, ace-step-render-probe]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Render exact pinned iX library source and assert normalized Compose
+        env:
+          APP: ${{ matrix.app }}
+        run: python3 tools/validate_generative_native_render.py --app "$APP" --ci-reclaim-generated-ownership
+      - name: Record actual public renderer image identity
+        if: always()
+        run: docker image inspect --format '{{json .RepoDigests}}' ghcr.io/truenas/apps_validation@sha256:92fa1b88da88c30fbacc7dcbbea68e7bfc63c5924ae6d1018ed620b92d0a6058

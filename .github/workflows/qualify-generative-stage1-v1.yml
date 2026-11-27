@@ -1,0 +1,53 @@
+name: qualify generative Stage 1 V1 public scaffolds
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/generative-stage1/**'
+      - 'tools/validate_generative_stage1.py'
+      - '.github/workflows/qualify-generative-stage1-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-cpu-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Python standard-library contract and negative tests
+        run: python3 -m unittest discover -s candidates/generative-stage1/tests -p 'test_*.py' -v
+      - name: Docker Compose normalized configuration gates (no pull, no real image)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in comfyui-app swarmui-app invokeai-app ace-step-app; do
+            export APP_IMAGE='ghcr.io/example.invalid/public-safe/placeholder@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+            docker compose -f "candidates/generative-stage1/apps/$app/compose.yaml" config --format json > "$RUNNER_TEMP/$app.json"
+            python3 tools/validate_generative_stage1.py --app "$app" --compose-json "$RUNNER_TEMP/$app.json"
+          done
+      - name: OCI build of public CPU surrogate ONLY
+        run: docker build -f candidates/generative-stage1/fixtures/Containerfile -t foundry-generative-cpu-fixture:v1 candidates/generative-stage1/fixtures
+      - name: CPU HTTP boot of public surrogate ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name foundry-generative-v1-cpu -p 127.0.0.1:18188:8188 foundry-generative-cpu-fixture:v1
+          trap 'docker rm -f foundry-generative-v1-cpu >/dev/null 2>&1 || true' EXIT
+          python3 - <<'PY'
+          import json, time, urllib.request
+          url = 'http://127.0.0.1:18188/health'
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(url, timeout=1) as resp:
+                      body = json.load(resp)
+                  assert body == {'status': 'ok', 'fixture': 'public-cpu-surrogate-v1'}, body
+                  print('PASS CPU surrogate boot: public fixture only; no application qualification')
+                  break
+              except (OSError, AssertionError):
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          PY

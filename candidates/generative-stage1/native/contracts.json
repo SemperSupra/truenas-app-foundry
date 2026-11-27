@@ -1,0 +1,29 @@
+{
+  "schema": "foundry.generative.native-render-fixtures.v1",
+  "cases": {
+    "comfyui-render-probe": {
+      "port": 8188,
+      "models": "/opt/ComfyUI/models",
+      "outputs": "/opt/ComfyUI/output",
+      "fixture_image": "python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+    },
+    "swarmui-render-probe": {
+      "port": 7801,
+      "models": "/SwarmUI/Models",
+      "outputs": "/SwarmUI/Output",
+      "fixture_image": "python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+    },
+    "invokeai-render-probe": {
+      "port": 9090,
+      "models": "/invokeai/models",
+      "outputs": "/invokeai/outputs",
+      "fixture_image": "python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+    },
+    "ace-step-render-probe": {
+      "port": 7860,
+      "models": "/app/checkpoints",
+      "outputs": "/app/gradio_outputs",
+      "fixture_image": "python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+resources:
+  limits:
+    cpus: 1.0
+    memory: 1024
+ix_volumes:
+  invokeai-render-probe-models: /opt/tests/mnt/invokeai-render-probe/models
+  invokeai-render-probe-outputs: /opt/tests/mnt/invokeai-render-probe/outputs
+storage:
+  models:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: invokeai-render-probe-models
+      acl_enable: false
+      auto_permissions: false
+      create_host_path: true
+  outputs:
+    type: ix_volume
+    ix_volume_config:
+      dataset_name: invokeai-render-probe-outputs
+      acl_enable: false
+      auto_permissions: false
+      create_host_path: true

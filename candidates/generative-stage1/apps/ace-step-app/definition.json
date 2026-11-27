@@ -1,0 +1,30 @@
+{
+  "schema": "foundry.generative.stage1.v1",
+  "name": "ace-step-app",
+  "phase": "draft-source-only",
+  "upstream": {
+    "source_repository": "https://github.com/ace-step/ACE-Step-1.5",
+    "container_port": 7860
+  },
+  "runtime_target": "truenas-scale-apps",
+  "artifact": {
+    "source_type": "compose-proposal",
+    "image_digest": null,
+    "image_approval_required": true,
+    "rootless_runtime_qualified": false
+  },
+  "boundaries": {
+    "default_host_bind": "127.0.0.1",
+    "host_path_mounts_allowed": false,
+    "raw_credentials_allowed": false,
+    "public_data_only": true
+  },
+  "validation": {
+    "compose_config": "pending-ci",
+    "cpu_boot": "surrogate-only",
+    "upstream_image_boot": "not-qualified",
+    "gpu_hil": "local-only",
+    "native_ix_source_render": "not-qualified",
+    "private_promotion": "not-authorized"
+  }
+}
