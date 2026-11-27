@@ -1,0 +1,21 @@
+name: Validate typed Foundry workload artifact identity
+on:
+  pull_request:
+    paths:
+      - tools/foundry_workload_artifact.py
+      - tools/test_foundry_workload_artifact.py
+      - docs/foundry-workload-artifact.md
+      - .github/workflows/validate-foundry-workload-artifact.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise offline typed identity and existing lifecycle contracts
+        run: python3 -m unittest -v tools/test_foundry_workload_artifact.py tools/test_foundry_lifecycle.py
